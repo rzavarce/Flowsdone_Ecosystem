@@ -1,0 +1,81 @@
+extensions:
+  basicauth/opensearch:
+    client_auth:
+      username: admin
+      password: ${OPENSEARCH_PASSWORD}
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Logs de TODOS los contenedores del host (json-file driver de Docker),
+  # incluida la infra que no habla OTLP nativo (postgres, redis, rabbitmq, ...).
+  filelog/docker:
+    include:
+      - /var/lib/docker/containers/*/*.log
+    start_at: beginning
+    include_file_path: true
+    operators:
+      # Cada línea del driver json-file de Docker es un JSON: {"log":"...","stream":"stdout|stderr","time":"..."}
+      - type: json_parser
+        parse_to: attributes
+        on_error: send
+      - type: move
+        from: attributes.log
+        to: body
+        if: attributes.log != nil
+      - type: severity_parser
+        parse_from: attributes.stream
+        if: attributes.stream != nil
+        mapping:
+          error: stderr
+          info: stdout
+      - type: remove
+        field: attributes.time
+        if: attributes.time != nil
+      - type: remove
+        field: attributes.stream
+        if: attributes.stream != nil
+      - type: regex_parser
+        parse_from: attributes["log.file.path"]
+        if: attributes["log.file.path"] != nil
+        regex: '^/var/lib/docker/containers/(?P<container_id>[0-9a-f]+)/'
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  resource/docker:
+    attributes:
+      - key: source
+        value: docker
+        action: upsert
+
+exporters:
+  opensearch:
+    http:
+      endpoint: https://opensearch:9200
+      tls:
+        insecure_skip_verify: true
+      auth:
+        authenticator: basicauth/opensearch
+    timeout: 10s
+
+service:
+  extensions: [basicauth/opensearch]
+
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [opensearch]
+
+    logs:
+      receivers: [otlp, filelog/docker]
+      processors: [batch, resource/docker]
+      exporters: [opensearch]

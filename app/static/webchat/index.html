@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZavarceCloud AI Webchat</title>
+  <link rel="stylesheet" href="agent-chat-widget.css" />
+</head>
+<body>
+  <main class="demo-page">
+    <section class="demo-card">
+      <h1>ZavarceCloud AI Webchat</h1>
+      <p>El WebSocket se crea al hacer click en el launcher.</p>
+      <p>Los mensajes del usuario viajan por WebSocket al gateway.</p>
+      <p>El gateway reenvía por Kafka al workflow.</p>
+    </section>
+  </main>
+
+  <script>
+
+    const conversationId =
+        localStorage.getItem("conversation_id") ||
+        crypto.randomUUID();
+
+    localStorage.setItem("conversation_id", conversationId);
+
+    window.AgentChatConfig = {
+      wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://')
+           + location.host
+           + '/ws',
+
+      workflowId: "ce5e5ede-7e5f-4046-beaf-b1bef4973d3c",
+      conversationId: conversationId,
+      userId: "anonymous",
+
+      transport: "kafka",
+
+      title: 'ZavarceCloud AI',
+      initialMessage: 'Hi! How can I help you today?',
+      inputPlaceholder: 'Type your message...',
+      waitingMessage: 'Processing your request',
+
+      launcherColor: '#4F46E5',
+      launcherIconColor: '#ffffff',
+      launcherIconAccentColor: '#111827',
+      sendButtonColor: '#10B981',
+
+      width: '420px',
+      height: '680px',
+      autoOpen: false
+    };
+  </script>
+
+  <!-- El widget DESPUÉS del config, sin defer -->
+  <script src="agent-chat-widget.js"></script>
+</body>
+</html>
