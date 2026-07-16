@@ -201,7 +201,7 @@ async def no_cache_static(request, call_next):
 
 # Static files (webchat, widgets, etc.)
 static_dir = Path(__file__).resolve().parent / "static"
-app.mount("/static", NoCacheStaticFiles(directory=static_dir), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=static_dir, html=True), name="static")
 
 # Routers
 app.include_router(ws_router)
