@@ -4,8 +4,8 @@ import logging
 
 from fastapi import APIRouter, Request, Header, HTTPException
 
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
-from api_gateway.app.core.config import settings
+from ....domain.models.message_envelope import MessageEnvelope
+from ....core.config import settings
 
 logger = logging.getLogger("internal.outbound")
 

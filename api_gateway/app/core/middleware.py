@@ -2,7 +2,7 @@ import time
 import uuid
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from api_gateway.app.core.context import correlation_id_ctx
+from ..core.context import correlation_id_ctx
 import logging
 
 logger = logging.getLogger("api")

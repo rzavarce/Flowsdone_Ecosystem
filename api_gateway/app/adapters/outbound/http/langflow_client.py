@@ -1,5 +1,5 @@
 import httpx
-from api_gateway.app.core.config import settings
+from ....core.config import settings
 
 class LangflowClient:
     def __init__(self):

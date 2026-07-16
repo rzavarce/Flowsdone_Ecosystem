@@ -3,22 +3,23 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
+from starlette.staticfiles import StaticFiles
 
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
+from .core.config import settings
+from .core.logging import setup_logging
 
-from api_gateway.app.adapters.inbound.http.websocket import router as ws_router
-from api_gateway.app.adapters.inbound.http.webhooks import router as webhooks_router
-from api_gateway.app.adapters.inbound.http.internal_outbound import router as internal_router
+from .adapters.inbound.http.websocket import router as ws_router
+from .adapters.inbound.http.webhooks import router as webhooks_router
+from .adapters.inbound.http.internal_outbound import router as internal_router
 
-from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
-from api_gateway.app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
-from api_gateway.app.adapters.outbound.queue.factory import PublisherFactory
+from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from .adapters.outbound.queue.factory import PublisherFactory
 
-from api_gateway.app.application.services.ws_registry import WSRegistry
-from api_gateway.app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
-from api_gateway.app.application.use_cases.ingest_message import IngestMessageUseCase
+from .application.services.ws_registry import WSRegistry
+from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from .application.use_cases.ingest_message import IngestMessageUseCase
 
 # ---------------------------------------------------------------------
 # Logging
@@ -178,9 +179,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        if isinstance(response, Response):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 # Static files (webchat, widgets, etc.)
 static_dir = Path(__file__).resolve().parent / "static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=static_dir), name="static")
 
 # Routers
 app.include_router(ws_router)

@@ -1,6 +1,6 @@
 from typing import Protocol
-from api_gateway.app.domain.models.message import Message
-from api_gateway.app.application.dto.message_dto import MessageDTO
+from ...domain.models.message import Message
+from ...application.dto.message_dto import MessageDTO
 
 
 class MessagePublisherPort(Protocol):

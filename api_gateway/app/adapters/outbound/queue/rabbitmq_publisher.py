@@ -4,7 +4,7 @@ from typing import Any
 
 import aio_pika
 
-from api_gateway.app.domain.ports.outbound import MessagePublisherPort
+from ....domain.ports.outbound import MessagePublisherPort
 
 logger = logging.getLogger("rabbitmq.publisher")
 
