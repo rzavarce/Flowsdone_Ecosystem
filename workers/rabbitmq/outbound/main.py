@@ -6,11 +6,11 @@ import logging
 
 import httpx
 
-from app.core.config import settings
-from app.core.logging import setup_logging
+from api_gateway.app.core.config import settings
+from api_gateway.app.core.logging import setup_logging
 
-from app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
-from app.domain.models.message_envelope import MessageEnvelope
+from api_gateway.app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
+from api_gateway.app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("rabbitmq.outbound.worker")

@@ -161,7 +161,7 @@ services:
 
   opensearch:
     <<: *common
-    profiles: [prod]
+    # profiles: [prod]
     image: ${OPENSEARCH_IMAGE}
     container_name: ${CONTAINER_PREFIX}_opensearch
     environment:
@@ -198,7 +198,7 @@ services:
 
   opensearch-dashboards:
     <<: *common
-    profiles: [prod]
+    # profiles: [prod]
     image: ${OPENSEARCH_DASHBOARDS_IMAGE}
     container_name: ${CONTAINER_PREFIX}_opensearch_dashboards
     environment:
@@ -219,7 +219,7 @@ services:
 
   otel-collector:
     <<: *common
-    profiles: [prod]
+    # profiles: [prod]
     image: ${OTEL_COLLECTOR_IMAGE}
     container_name: ${CONTAINER_PREFIX}_otel_collector
     user: "0"
@@ -529,8 +529,7 @@ services:
     ports:
       - "${API_PORT}:8000"
     volumes:
-      - ./app:/app/app
-      - ./app/static:/app/app/static
+      - ./api_gateway:/app/api_gateway
     depends_on:
       postgres:
         condition: service_healthy
