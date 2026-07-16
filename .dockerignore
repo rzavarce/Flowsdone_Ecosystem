@@ -1,0 +1,24 @@
+# Datos persistentes de los contenedores (algunos con permisos restrictivos, p.ej. postgres_data)
+volumes/
+
+# Control de versiones
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+
+# Entornos y secretos
+.env
+.env.*
+
+# Otros
+.claude/
+.Blackboard.txt
+evolution-api/node_modules/
