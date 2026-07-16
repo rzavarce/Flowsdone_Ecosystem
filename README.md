@@ -25,7 +25,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 
 ## 1. Qué hace este proyecto
 
-Es un **API Gateway** (`app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) que recibe mensajes desde distintos canales (webchat propio, WhatsApp vía Evolution API) y los enruta a un workflow de **Langflow** para generar la respuesta con un LLM. El transporte entre el gateway y los workers es intercambiable: **Kafka** o **RabbitMQ**, ambos con workers dedicados de inbound/outbound (`workers/`).
+Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) que recibe mensajes desde distintos canales (webchat propio, WhatsApp vía Evolution API) y los enruta a un workflow de **Langflow** para generar la respuesta con un LLM. El transporte entre el gateway y los workers es intercambiable: **Kafka** o **RabbitMQ**, ambos con workers dedicados de inbound/outbound (`workers/`).
 
 - **Langflow** es el único lugar donde vive la orquestación de IA (agentes, prompts, RAG contra Weaviate).
 - **n8n** es solo para automatización/triggers (webhooks, cron, integraciones) — **no** usa su nodo AI Agent; si un workflow de n8n necesita IA, le pega a Langflow por HTTP (`LANGFLOW_BASE_URL`).
@@ -43,7 +43,7 @@ Es un **API Gateway** (`app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.m
                         │        (única red, dev y prod)            │
                         └──────────────────────────────────────────┘
 
-  Canales de entrada                Gateway (app/, hexagonal)
+  Canales de entrada                Gateway (api_gateway/app/, hexagonal)
   ┌───────────┐                     ┌──────────────────────────┐
   │  Webchat   │──── WS/HTTP ──────▶│   api  (FastAPI :8000)   │
   │ (estático, │                     │  domain/application/     │
@@ -307,7 +307,7 @@ Evolution API todavía no está conectado a n8n (`EVOLUTION_N8N_ENABLED=false`);
 Solo activa en `profile prod`. Dos fuentes distintas confluyen en el mismo índice de OpenSearch (`ss4o_logs-*`):
 
 1. **Logs de infraestructura**: el `otel-collector` lee `/var/lib/docker/containers/*/*.log` (el log driver `json-file` de Docker) de **todos** los contenedores del host — Postgres, Redis, RabbitMQ, Langflow, Langfuse, etc. — sin necesidad de instrumentarlos.
-2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` y `evolution` también mandan sus propias trazas OTLP.
+2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `api_gateway/app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` y `evolution` también mandan sus propias trazas OTLP.
 
 Para explorarlos: http://localhost:5601 (usuario `admin`, password `OPENSEARCH_PASSWORD`) → Discover → index pattern `ss4o_logs-*`.
 

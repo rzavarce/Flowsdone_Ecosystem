@@ -1,0 +1,23 @@
+from typing import Protocol
+from api_gateway.app.application.dto.message_dto import MessageDTO
+
+# ✅ re-export legacy ports (antes estaban en app/domain/ports/outbound.py)
+class MessagePublisherPort(Protocol):
+    async def publish(self, message: MessageDTO) -> None: ...
+
+
+class LangflowExecutorPort(Protocol):
+    async def run(
+        self,
+        *,
+        workflow_id: str,
+        payload: dict,
+        conversation_id: str,
+    ) -> dict: ...
+
+
+# ✅ export response publisher (si ya creaste response_publisher.py)
+try:
+    from .response_publisher import OutboundResponse, ResponsePublisherPort  # noqa: F401
+except Exception:
+    pass

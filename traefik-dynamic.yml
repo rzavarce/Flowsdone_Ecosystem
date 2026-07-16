@@ -3,6 +3,22 @@
 # Traefik las recarga solo gracias a --providers.file.watch=true
 
 http:
+  middlewares:
+    webchat-static:
+      replacePathRegex:
+        regex: "^/(.*)"
+        replacement: "/static/webchat/$1"
+
+    flowsdone-static:
+      replacePathRegex:
+        regex: "^/(.*)"
+        replacement: "/static/flowsdone/$1"
+
+    fibralan-static:
+      replacePathRegex:
+        regex: "^/(.*)"
+        replacement: "/static/fibralan/$1"
+
   routers:
     n8n:
       rule: "Host(`auto.flowsdone.com`)"
@@ -18,6 +34,13 @@ http:
         certresolver: myresolver
       service: langfuse-svc
 
+    langflow:
+      rule: "Host(`agents.flowsdone.com`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: langflow-svc
+
     evolution:
       rule: "Host(`evo.flowsdone.com`)"
       entrypoints: [websecure]
@@ -31,6 +54,17 @@ http:
       tls:
         certresolver: myresolver
       service: webchat-svc
+      middlewares:
+        - webchat-static
+
+    flowsdone:
+      rule: "Host(`flowsdone.com`) || Host(`www.flowsdone.com`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+      middlewares:
+        - flowsdone-static
 
     minio:
       rule: "Host(`buckets.flowsdone.com`)"
@@ -67,6 +101,15 @@ http:
         certresolver: myresolver
       service: logs-svc
 
+    fibralan:
+      rule: "Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+      middlewares:
+        - fibralan-static
+
   services:
     n8n-svc:
       loadBalancer:
@@ -77,6 +120,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://langfuse-web:3000"
+
+    langflow-svc:
+      loadBalancer:
+        servers:
+          - url: "http://langflow:7860"
 
     evolution-svc:
       loadBalancer:

@@ -3,20 +3,20 @@ import logging
 
 import asyncpg
 
-from app.core.config import settings
-from app.core.logging import setup_logging
+from api_gateway.app.core.config import settings
+from api_gateway.app.core.logging import setup_logging
 
-from app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
-from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
+from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
 
-from app.adapters.outbound.langflow.executor import LangflowExecutor
-from app.adapters.outbound.db.idempotency_repository import (
+from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
+from api_gateway.app.adapters.outbound.db.idempotency_repository import (
     PostgresIdempotencyRepository,
 )
 
-from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
-from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
-from app.domain.models.message_envelope import MessageEnvelope
+from api_gateway.app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from api_gateway.app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from api_gateway.app.domain.models.message_envelope import MessageEnvelope
 
 # ---------------------------------------------------------------------
 # Logging
