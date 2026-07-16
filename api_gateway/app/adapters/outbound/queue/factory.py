@@ -1,7 +1,7 @@
 import logging
 from typing import Mapping
 
-from api_gateway.app.domain.ports.outbound import MessagePublisherPort
+from ....domain.ports.outbound import MessagePublisherPort
 
 logger = logging.getLogger("publisher.factory")
 

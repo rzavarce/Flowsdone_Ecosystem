@@ -1,5 +1,5 @@
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
-from api_gateway.app.core.config import settings
+from ..core.config import settings
 import logging
 
 logger = logging.getLogger("kafka.admin")

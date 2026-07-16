@@ -4,8 +4,8 @@ from typing import Any
 
 import httpx
 
-from api_gateway.app.core.config import settings
-from api_gateway.app.domain.ports.outbound import LangflowExecutorPort
+from ....core.config import settings
+from ....domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("langflow.executor")
 
@@ -57,15 +57,35 @@ class LangflowExecutor(LangflowExecutorPort):
         )
 
         if response.status_code >= 400:
+            error_text = response.text
+            try:
+                content_type = response.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    payload = response.json()
+                    if isinstance(payload, dict):
+                        if isinstance(payload.get("detail"), str):
+                            error_text = payload["detail"]
+                        elif isinstance(payload.get("detail"), dict):
+                            error_text = payload["detail"].get("message") or payload["detail"].get("error") or response.text
+                        elif payload.get("message"):
+                            error_text = payload["message"]
+            except Exception:
+                error_text = response.text
+
             logger.error(
                 "langflow.call.failed",
                 extra={
                     "status_code": response.status_code,
-                    "response_text": response.text,
+                    "response_text": error_text,
                 },
             )
 
-        response.raise_for_status()
+            return {
+                "error": True,
+                "status_code": response.status_code,
+                "message": error_text,
+                "raw_response": response.text,
+            }
 
         logger.info("langflow.call.success")
 

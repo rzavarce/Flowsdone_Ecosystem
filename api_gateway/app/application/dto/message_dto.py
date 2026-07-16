@@ -1,6 +1,6 @@
 from uuid import uuid4
 from pydantic import BaseModel, Field
-from api_gateway.app.domain.models.message import Message
+from ...domain.models.message import Message
 
 class MessageDTO(BaseModel):
     version: int = 1

@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
+from ...domain.models.message_envelope import MessageEnvelope
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 
@@ -26,6 +26,43 @@ class HandleOutboundResponseUseCase:
         self.ws_registry = ws_registry
     
 
+    def _extract_text(self, value: Any) -> Optional[str]:
+        if value is None:
+            return None
+
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+
+        if isinstance(value, dict):
+            for key in ("message", "response", "output", "content", "text", "answer", "result"):
+                if key in value:
+                    extracted = self._extract_text(value[key])
+                    if extracted:
+                        return extracted
+
+            for key in ("detail", "error"):
+                if key in value:
+                    extracted = self._extract_text(value[key])
+                    if extracted:
+                        return extracted
+
+            for key in ("outputs", "data", "results"):
+                if key in value:
+                    extracted = self._extract_text(value[key])
+                    if extracted:
+                        return extracted
+
+            return None
+
+        if isinstance(value, list):
+            for item in value:
+                extracted = self._extract_text(item)
+                if extracted:
+                    return extracted
+
+        return None
+
     async def execute(
         self,
         envelope: MessageEnvelope,
@@ -35,18 +72,24 @@ class HandleOutboundResponseUseCase:
         # ----------------------------------------------------------
         # 1. Extraer mensaje de Langflow
         # ----------------------------------------------------------
-        try:
-            response_message = (
-                result["outputs"][0]["outputs"][0]["outputs"]["message"]["message"]
+        response_message = self._extract_text(result)
+
+        if not response_message:
+            logger.error(
+                "handle.outbound.invalid_langflow_response",
+                extra={
+                    "message_id": envelope.meta.message_id,
+                    "result_preview": str(result)[:1000],
+                },
             )
-        except Exception:
-            logger.error("handle.outbound.invalid_langflow_response", exc_info=True)
-            return
+            response_message = "El workflow no devolvió una respuesta válida."
 
         # ----------------------------------------------------------
         # 2. Construir payload final
         # ----------------------------------------------------------
         response_payload = {
+            "type": "chat.response",
+            "response": response_message,
             "message": response_message,
         }
 

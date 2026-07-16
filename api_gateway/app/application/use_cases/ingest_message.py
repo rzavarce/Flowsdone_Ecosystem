@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope, MessageMeta
+from ...domain.models.message_envelope import MessageEnvelope, MessageMeta
 
 logger = logging.getLogger("usecase.ingest_message")
 

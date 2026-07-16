@@ -1,5 +1,5 @@
 import aio_pika
-from api_gateway.app.domain.ports.outbound.response_publisher import (
+from ....domain.ports.outbound.response_publisher import (
     ResponsePublisherPort,
     OutboundResponse,
 )

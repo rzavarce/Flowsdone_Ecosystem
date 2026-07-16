@@ -1,5 +1,5 @@
 from typing import Protocol
-from api_gateway.app.application.dto.message_dto import MessageDTO
+from ....application.dto.message_dto import MessageDTO
 
 # ✅ re-export legacy ports (antes estaban en app/domain/ports/outbound.py)
 class MessagePublisherPort(Protocol):

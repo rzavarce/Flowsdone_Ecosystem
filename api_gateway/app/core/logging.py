@@ -1,8 +1,8 @@
 import logging
 import sys
 from pythonjsonlogger import jsonlogger
-from api_gateway.app.core.context import correlation_id_ctx
-from api_gateway.app.core.config import settings
+from ..core.context import correlation_id_ctx
+from ..core.config import settings
 
 
 class CorrelationIdFilter(logging.Filter):
