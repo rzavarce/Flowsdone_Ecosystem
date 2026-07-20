@@ -285,6 +285,7 @@
     <script src="script.js"></script>
 
     <script>
+
         const conversationId =
             localStorage.getItem("conversation_id") ||
             crypto.randomUUID();
@@ -292,23 +293,30 @@
         localStorage.setItem("conversation_id", conversationId);
 
         window.AgentChatConfig = {
-        wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
-        workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d",
-        conversationId: conversationId,
-        userId: "anonymous",
-        n8nWebhookPath: '/webhook/8ddf2e2c-e855-4b8d-a99e-c7d200c6ec57',
-        title: 'Fibralan AI Support',
-        initialMessage: 'Hola! ¿Cómo puedo asistirte hoy?',
-        inputPlaceholder: 'Escriba un mensaje...',
-        waitingMessage: 'Esperando respuesta del sistema',
-        launcherColor: '#ff6b00',
-        launcherIconColor: '#ffffff',
-        launcherIconAccentColor: '#000',
-        headerColor: '#ff6b00',
-        sendButtonColor: '#10B981',
-        width: '420px',
-        height: '680px',
-        autoOpen: false
+            wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://')
+                + location.host
+                + '/ws',
+
+            workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d",
+            conversationId: conversationId,
+            userId: "anonymous",
+
+            transport: "kafka",
+
+            title: 'Fibralan AI Support',
+            initialMessage: 'Hola! ¿Cómo puedo asistirte hoy?',
+            inputPlaceholder: 'Escriba un mensaje...',
+            waitingMessage: 'Esperando respuesta del sistema',
+
+            launcherColor: '#ff6b00',
+            launcherIconColor: '#ffffff',
+            launcherIconAccentColor: '#000',
+            headerColor: '#ff6b00',
+            sendButtonColor: '#10B981',
+
+            width: '420px',
+            height: '680px',
+            autoOpen: false
         };
     </script>
 </body>
