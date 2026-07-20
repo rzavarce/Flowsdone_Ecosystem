@@ -48,6 +48,18 @@ http:
         certresolver: myresolver
       service: evolution-svc
 
+    # Los routers *-ws van SIN el middleware de reescritura de path: si no,
+    # replacePathRegex convierte /ws en /static/<sitio>/ws y el websocket
+    # del chat nunca llega al gateway. Priority alta para que Traefik los
+    # elija sobre el router Host-only de abajo (que sí tiene el rewrite).
+    webchat-ws:
+      rule: "Host(`chat.flowsdone.com`) && Path(`/ws`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+      priority: 100
+
     webchat:
       rule: "Host(`chat.flowsdone.com`)"
       entrypoints: [websecure]
@@ -56,6 +68,14 @@ http:
       service: webchat-svc
       middlewares:
         - webchat-static
+
+    flowsdone-ws:
+      rule: "(Host(`flowsdone.com`) || Host(`www.flowsdone.com`)) && Path(`/ws`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+      priority: 100
 
     flowsdone:
       rule: "Host(`flowsdone.com`) || Host(`www.flowsdone.com`)"
@@ -100,6 +120,14 @@ http:
       tls:
         certresolver: myresolver
       service: logs-svc
+
+    fibralan-ws:
+      rule: "(Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)) && Path(`/ws`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+      priority: 100
 
     fibralan:
       rule: "Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)"
