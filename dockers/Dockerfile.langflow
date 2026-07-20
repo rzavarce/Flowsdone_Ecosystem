@@ -2,4 +2,6 @@ FROM langflowai/langflow:1.4.0
 
 USER root
 
-RUN pip install --no-cache-dir python-toon "langfuse<3"
+RUN /app/.venv/bin/uv pip install --python /app/.venv/bin/python3 \
+    --reinstall-package weaviate-client \
+    python-toon "langfuse<3" "weaviate-client<4"
