@@ -50,18 +50,18 @@ http:
 
     # Los routers *-ws van SIN el middleware de reescritura de path: si no,
     # replacePathRegex convierte /ws en /static/<sitio>/ws y el websocket
-    # del chat nunca llega al gateway. Priority alta para que Traefik los
-    # elija sobre el router Host-only de abajo (que sí tiene el rewrite).
+    # del chat nunca llega al gateway. Las reglas son mutuamente excluyentes
+    # (!Path(`/ws`) en el router estático) en vez de depender de priority,
+    # para que no haya ambigüedad de cuál router gana.
     webchat-ws:
       rule: "Host(`chat.flowsdone.com`) && Path(`/ws`)"
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
       service: webchat-svc
-      priority: 100
 
     webchat:
-      rule: "Host(`chat.flowsdone.com`)"
+      rule: "Host(`chat.flowsdone.com`) && !Path(`/ws`)"
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
@@ -75,10 +75,9 @@ http:
       tls:
         certresolver: myresolver
       service: webchat-svc
-      priority: 100
 
     flowsdone:
-      rule: "Host(`flowsdone.com`) || Host(`www.flowsdone.com`)"
+      rule: "(Host(`flowsdone.com`) || Host(`www.flowsdone.com`)) && !Path(`/ws`)"
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
@@ -127,10 +126,9 @@ http:
       tls:
         certresolver: myresolver
       service: webchat-svc
-      priority: 100
 
     fibralan:
-      rule: "Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)"
+      rule: "(Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)) && !Path(`/ws`)"
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
