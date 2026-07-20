@@ -285,8 +285,17 @@
     <script src="/fibralan/script.js"></script>
 
     <script>
+        const conversationId =
+            localStorage.getItem("conversation_id") ||
+            crypto.randomUUID();
+
+        localStorage.setItem("conversation_id", conversationId);
+
         window.AgentChatConfig = {
         wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
+        workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d",
+        conversationId: conversationId,
+        userId: "anonymous",
         n8nWebhookPath: '/webhook/8ddf2e2c-e855-4b8d-a99e-c7d200c6ec57',
         title: 'Fibralan AI Support',
         initialMessage: 'Hola! ¿Cómo puedo asistirte hoy?',

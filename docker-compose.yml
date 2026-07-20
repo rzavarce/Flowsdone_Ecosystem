@@ -448,6 +448,7 @@ services:
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
       LANGFLOW_DATA_DIR: /app/langflow/data
       LANGFLOW_DATABASE_URL: ${LANGFLOW_DATABASE_URL}   # ← NUEVO
+      LANGFLOW_COMPONENTS_PATH: /app/langflow/components
       LANGFLOW_LOG_LEVEL: ${LANGFLOW_LOG_LEVEL:-info}
     depends_on:
       postgres:
