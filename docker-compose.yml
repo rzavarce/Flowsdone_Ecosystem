@@ -492,6 +492,8 @@ services:
       EXECUTIONS_DATA_PRUNE: ${N8N_EXECUTIONS_DATA_PRUNE}
       WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       N8N_LOG_LEVEL: ${N8N_LOG_LEVEL}
+      # Permite usar $env.X en expresiones de nodos (Code, HTTP Request, etc.)
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       # Para llamar a Langflow desde nodos HTTP Request / Code en vez del AI Agent node
       LANGFLOW_BASE_URL: ${LANGFLOW_BASE_URL}
       LANGFLOW_API_KEY: ${LANGFLOW_API_KEY}
