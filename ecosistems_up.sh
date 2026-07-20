@@ -197,46 +197,39 @@ for svc in rabbitmq kafka minio weaviate clickhouse; do
 success "Infraestructura base completa."
 
 phase "Fase 2 — MinIO + observabilidad"
-MINIO_INTERNAL_PORT="${MINIO_PORT:-${MINIO_API_PORT:-9000}}"
 log "Creando bucket MinIO '${MINIO_BUCKET}'…"
-MC_VOL="mc_config_$$"
-docker volume create "$MC_VOL" >/dev/null
 minio_container=$(resolve_container_id minio || true)
 if [[ -z "$minio_container" ]]; then
   error "No se encontró el contenedor de minio para crear el bucket."
 fi
-network_name=$(docker inspect "$minio_container" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' 2>/dev/null | head -1 || true)
-if [[ -z "$network_name" ]]; then
-  error "No se pudo resolver la red de minio."
-fi
 
+# mc ya viene incluido en la imagen de minio (se usa en su healthcheck),
+# así que ejecutamos dentro del propio contenedor en vez de levantar uno
+# aparte — evita depender de red/pull de minio/mc y de tener que parsear
+# el texto de salida para saber si ya existía.
+alias_ok=false
 for attempt in $(seq 1 12); do
-  if docker run --rm \
-    --network "$network_name" \
-    -v "${MC_VOL}:/root/.mc" \
-    minio/mc alias set local "http://minio:${MINIO_INTERNAL_PORT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" --quiet >/dev/null 2>&1; then
+  if docker exec "$minio_container" mc alias set local "http://localhost:9000" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; then
+    alias_ok=true
     break
   fi
   sleep 5
- done
+done
+$alias_ok || error "No se pudo autenticar con MinIO tras varios intentos (¿el servicio está healthy?)."
 
-BUCKET_OUTPUT=""
+bucket_ok=false
 for attempt in $(seq 1 12); do
-  BUCKET_OUTPUT=$(docker run --rm \
-    --network "$network_name" \
-    -v "${MC_VOL}:/root/.mc" \
-    minio/mc mb "local/${MINIO_BUCKET}" 2>&1) && break || true
+  if docker exec "$minio_container" mc mb --ignore-existing "local/${MINIO_BUCKET}" >/dev/null 2>&1; then
+    bucket_ok=true
+    break
+  fi
   sleep 5
- done
-if echo "$BUCKET_OUTPUT" | grep -qiE "already (exists|owned|your bucket)"; then
-  success "Bucket '${MINIO_BUCKET}' ya existe — sin cambios."
-elif echo "$BUCKET_OUTPUT" | grep -qiE "created|success"; then
-  success "Bucket '${MINIO_BUCKET}' creado."
+done
+if $bucket_ok; then
+  success "Bucket '${MINIO_BUCKET}' listo."
 else
-  warn "No se pudo validar la creación del bucket: $BUCKET_OUTPUT"
+  error "No se pudo crear el bucket '${MINIO_BUCKET}' tras varios intentos. Sin este bucket, Langfuse falla en silencio (500) al recibir trazas."
 fi
-
-docker volume rm "$MC_VOL" >/dev/null 2>&1 || true
 
 $ONLY_INFRA && { success "Modo --only-infra: finalizado."; exit 0; }
 
