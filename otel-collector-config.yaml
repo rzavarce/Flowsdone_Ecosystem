@@ -34,6 +34,11 @@ receivers:
         mapping:
           error: stderr
           info: stdout
+      - type: time_parser
+        parse_from: attributes.time
+        layout_type: gotime
+        layout: "2006-01-02T15:04:05.999999999Z"
+        if: attributes.time != nil
       - type: remove
         field: attributes.time
         if: attributes.time != nil
