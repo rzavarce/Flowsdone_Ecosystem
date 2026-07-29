@@ -5,8 +5,3 @@ USER root
 RUN /app/.venv/bin/uv pip install --python /app/.venv/bin/python3 \
     --reinstall-package weaviate-client \
     python-toon "langfuse<3" "weaviate-client<4"
-
-# Bug nativo de Langflow: Parser._safe_convert hace json.dumps(data.data) sin
-# default=str, y explota si el Data trae un datetime (ej. metadata de Message).
-RUN sed -i 's/return json.dumps(data.data)/return json.dumps(data.data, default=str)/' \
-    /app/.venv/lib/python3.12/site-packages/langflow/components/processing/parser.py
