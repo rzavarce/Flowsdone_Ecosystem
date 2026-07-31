@@ -12,14 +12,25 @@ from .core.logging import setup_logging
 from .adapters.inbound.http.websocket import router as ws_router
 from .adapters.inbound.http.webhooks import router as webhooks_router
 from .adapters.inbound.http.internal_outbound import router as internal_router
+from .adapters.inbound.http.channels import router as channels_router
+from .adapters.inbound.http.admin import router as admin_router
 
 from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
 from .adapters.outbound.queue.factory import PublisherFactory
 
+from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
+from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
+from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+
+from .infrastructure.database import create_engine, create_sessionmaker
+
 from .application.services.ws_registry import WSRegistry
 from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from .application.use_cases.ingest_message import IngestMessageUseCase
+from .application.use_cases.route_channel_message import RouteChannelMessageUseCase
 
 # ---------------------------------------------------------------------
 # Logging
@@ -142,6 +153,31 @@ async def lifespan(app: FastAPI):
 
     logger.info("ingest.use_case.initialized")
 
+    # --------------------------------------------------------------
+    # Base de datos (multi-tenant: tenants/projects/agents/workflows/channels)
+    # --------------------------------------------------------------
+    db_engine = create_engine()
+    db_sessionmaker = create_sessionmaker(db_engine)
+    app.state.db_engine = db_engine
+
+    app.state.tenant_repo = SqlAlchemyTenantRepository(db_sessionmaker)
+    app.state.project_repo = SqlAlchemyProjectRepository(db_sessionmaker)
+    app.state.agent_repo = SqlAlchemyAgentRepository(db_sessionmaker)
+    app.state.workflow_config_repo = SqlAlchemyWorkflowConfigRepository(db_sessionmaker)
+    app.state.channel_connection_repo = SqlAlchemyChannelConnectionRepository(db_sessionmaker)
+
+    logger.info("database.repositories.ready")
+
+    # --------------------------------------------------------------
+    # Enrutamiento de mensajes de canal (webhooks nativos -> Kafka -> Langflow)
+    # --------------------------------------------------------------
+    app.state.route_channel_message_use_case = RouteChannelMessageUseCase(
+        channel_connection_repo=app.state.channel_connection_repo,
+        ingest_message_use_case=ingest_use_case,
+    )
+
+    logger.info("route_channel_message.use_case.initialized")
+
     logger.info("application.startup.complete")
 
     # --------------------------------------------------------------
@@ -165,6 +201,11 @@ async def lifespan(app: FastAPI):
         if rabbit_pub:
             await rabbit_pub.stop()
             logger.info("rabbitmq.publisher.stopped")
+
+    db_engine = getattr(app.state, "db_engine", None)
+    if db_engine:
+        await db_engine.dispose()
+        logger.info("database.engine.disposed")
 
     logger.info("application.shutdown.complete")
 
@@ -207,3 +248,5 @@ app.mount("/static", NoCacheStaticFiles(directory=static_dir, html=True), name="
 app.include_router(ws_router)
 app.include_router(webhooks_router)
 app.include_router(internal_router)
+app.include_router(channels_router)
+app.include_router(admin_router)

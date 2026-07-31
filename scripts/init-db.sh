@@ -25,17 +25,7 @@ if [ -n "${POSTGRES_MULTIPLE_DATABASES:-}" ]; then
 
   echo "✅ All databases created"
 
-  if echo "$POSTGRES_MULTIPLE_DATABASES" | grep -qw "gatewaydb"; then
-    echo "🛠️ Ensuring workflow_executions table exists in gatewaydb"
-    psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname gatewaydb <<-EOSQL
-      CREATE TABLE IF NOT EXISTS workflow_executions (
-        message_id text PRIMARY KEY,
-        workflow_id text NOT NULL,
-        status text NOT NULL,
-        created_at timestamptz NOT NULL DEFAULT now(),
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-EOSQL
-    echo "✅ workflow_executions table ensured"
-  fi
+  # El esquema de gatewaydb (workflow_executions, tenants, projects, agents,
+  # workflows, channel_connections) lo gestiona Alembic — ver el servicio
+  # `migrate` en docker-compose.yml y api_gateway/migrations/.
 fi

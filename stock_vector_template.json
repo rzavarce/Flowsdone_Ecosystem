@@ -1,0 +1,28 @@
+[
+  {
+    "code": "PROD-001",
+    "name": "Servidor Dell PowerEdge R650",
+    "category": "Equipos de Computo",
+    "price": 2450.50,
+    "in_stock": true,
+    "tags": ["hardware", "servidor", "rack"]
+  },
+  {
+    "code": "PROD-002",
+    "name": "Switch Cisco Catalyst 9300",
+    "category": "Redes",
+    "price": 1280.00,
+    "in_stock": true,
+    "tags": ["redes", "cisco", "switch"]
+  },
+  {
+    "code": "PROD-003",
+    "name": "Disco Sólido NVMe 2TB Enterprise",
+    "description": "Disco sólido de alta velocidad para servidores y estaciones de trabajo.",
+    "category": "Almacenamiento",
+    "price_bsf": 220.00,
+    "price_usd": 220.00,
+    "quantity": 0
+  }
+]
+

@@ -388,3 +388,21 @@ docker compose down -v
 ```bash
 docker compose up -d --force-recreate --remove-orphans
 ```
+
+
+OJO IMPORTANTE PARA CREAR UNA COLLECION NUEVA EN WEAVIATE USAR LA API
+
+curl -X POST http://localhost:8080/v1/schema \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TU_API_KEY_AQUI" \
+  -d '{
+    "class": "NOMBRE_COLLECCION",
+    "vectorizer": "none",
+    "replicationConfig": {
+      "factor": 1
+    }
+  }'
+
+CREATE USER fibralan_user WITH PASSWORD '15WB4FV4d0xn';
+
+
