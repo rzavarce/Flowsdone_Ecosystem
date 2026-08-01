@@ -113,7 +113,7 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
 | `kafka_inbound_worker` / `kafka_outbound_worker` | build (`dockers/Dockerfile.worker`) | Camino de mensajería (canales → Langflow): consumen/publican en Kafka, llaman a Langflow, entregan la respuesta |
 | `rabbitmq_inbound_worker` / `rabbitmq_outbound_worker` | build (`dockers/Dockerfile.worker`) | `outbound` entrega al gateway la respuesta que publique un workflow de n8n. `inbound` es un remanente que también llama a Langflow sobre RabbitMQ — ver el caveat de la sección 2, hoy el camino real hacia n8n es el `RabbitMQ Trigger` node (sección 13) |
 | `langflow` | build (`dockers/Dockerfile.langflow`) | Orquestación de IA — el único lugar con lógica de agentes/prompts |
-| `n8n` | `n8nio/n8n:2.22.2` | Automatización/triggers. Llama a Langflow por HTTP, no usa AI Agent |
+| `n8n` | `n8nio/n8n:2.33.3` | Automatización/triggers. Llama a Langflow por HTTP, no usa AI Agent |
 | `evolution` | build (`./evolution-api`, vendorizado) | Gateway de WhatsApp (Evolution API v2.3.7) |
 | `langfuse-web` / `langfuse-worker` | `langfuse/langfuse:3.180.0` / `-worker:3` | Tracing y observabilidad de LLMs |
 | `postgres` | `postgres:17-alpine` | DB principal: `gatewaydb`, `langfusedb`, `langflowdb`, `evolutiondb`, `n8ndb` |
@@ -535,7 +535,7 @@ Langfuse **no** escucha en el puerto por defecto de Next.js (`3000`) desde el ho
 
 ### No veo trazas de n8n en Langfuse (ni en OpenSearch)
 
-n8n 2.22.2 lee `N8N_OTEL_ENABLED` / `N8N_OTEL_EXPORTER_OTLP_ENDPOINT` — **no** `N8N_OTEL_TRACING_ENABLED`/`N8N_OTEL_TRACING_ENDPOINT`/`N8N_OTEL_TRACING_PROTOCOL` (nombres de una doc/versión vieja que esta versión ignora silenciosamente, sin error). Si tu `n8n` no manda nada, confirmá con `docker exec <n8n> printenv | grep OTEL` que las variables que ve el proceso son las correctas — ya están arregladas en `docker-compose.yml`, pero si algún override local las vuelve a poner mal, este es el síntoma (silencio total, ni logs de error).
+n8n 2.33.3 lee `N8N_OTEL_ENABLED` / `N8N_OTEL_EXPORTER_OTLP_ENDPOINT` — **no** `N8N_OTEL_TRACING_ENABLED`/`N8N_OTEL_TRACING_ENDPOINT`/`N8N_OTEL_TRACING_PROTOCOL` (nombres de una doc/versión vieja que esta versión ignora silenciosamente, sin error). Si tu `n8n` no manda nada, confirmá con `docker exec <n8n> printenv | grep OTEL` que las variables que ve el proceso son las correctas — ya están arregladas en `docker-compose.yml`, pero si algún override local las vuelve a poner mal, este es el síntoma (silencio total, ni logs de error).
 
 ### Langfuse crashea en loop / "JavaScript heap out of memory"
 
