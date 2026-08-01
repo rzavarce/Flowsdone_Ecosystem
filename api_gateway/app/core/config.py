@@ -45,6 +45,7 @@ class Settings(BaseModel):
     # Langflow
     # --------------------------------------------------
     LANGFLOW_BASE_URL: str = "http://langflow:7860"
+    LANGFLOW_API_KEY: Optional[str] = None
 
     # --------------------------------------------------
     # Multi-tenant SaaS: admin API + cifrado de credenciales
@@ -112,6 +113,7 @@ settings = Settings(
     DATABASE_URL_SQLALCHEMY=os.getenv("DATABASE_URL_SQLALCHEMY"),
 
     LANGFLOW_BASE_URL=os.getenv("LANGFLOW_BASE_URL", "http://langflow:7860"),
+    LANGFLOW_API_KEY=os.getenv("LANGFLOW_API_KEY"),
 
     ADMIN_API_KEY=os.getenv("ADMIN_API_KEY", "dev-admin-key-change-me"),
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),

@@ -27,16 +27,28 @@
 
     localStorage.setItem("conversation_id", conversationId);
 
+    // Casos de uso básicos de prueba (ver ?caso=langflow o ?caso=n8n en la URL):
+    //   - langflow (default): transport=kafka -> kafka_inbound_worker -> Langflow ("Basic Prompting")
+    //   - n8n: transport=rabbitmq -> workflow de n8n "Flowsdone - Caso de uso basico (RabbitMQ)"
+    const params = new URLSearchParams(location.search);
+    const caso = params.get("caso") || "langflow";
+
+    const CASES = {
+      langflow: { workflowId: "9539cac7-b379-4437-9d57-a2f8f1331a32", transport: "kafka" },
+      n8n: { workflowId: "n8n-demo-workflow", transport: "rabbitmq" },
+    };
+    const selected = CASES[caso] || CASES.langflow;
+
     window.AgentChatConfig = {
       wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://')
            + location.host
            + '/ws',
 
-      workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d",
+      workflowId: params.get("workflow_id") || selected.workflowId,
       conversationId: conversationId,
       userId: "anonymous",
 
-      transport: "kafka",
+      transport: params.get("transport") || selected.transport,
 
       title: 'ZavarceCloud AI',
       initialMessage: 'Hi! How can I help you today?',

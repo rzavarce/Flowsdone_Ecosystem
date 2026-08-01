@@ -12,9 +12,14 @@ logger = logging.getLogger("langflow.executor")
 
 class LangflowExecutor(LangflowExecutorPort):
     def __init__(self) -> None:
+        headers = {}
+        if settings.LANGFLOW_API_KEY:
+            headers["x-api-key"] = settings.LANGFLOW_API_KEY
+
         self.client = httpx.AsyncClient(
             base_url=settings.LANGFLOW_BASE_URL,
             timeout=httpx.Timeout(60.0),
+            headers=headers,
         )
 
     async def run(
