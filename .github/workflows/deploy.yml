@@ -3,7 +3,7 @@ name: Deploy Flowsdone Ecosystem
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   deploy:
@@ -25,8 +25,8 @@ jobs:
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
 
-            # Descargar los cambios más recientes desde master
-            git pull origin master
+            # Descargar los cambios más recientes desde main
+            git pull origin main
 
             # Buildear las imágenes actualizadas antes de tocar nada más
             docker compose --profile prod build
