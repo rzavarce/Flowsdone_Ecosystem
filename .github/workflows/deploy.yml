@@ -1,0 +1,43 @@
+name: Deploy Flowsdone Ecosystem
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Desplegar en VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop_on_error: true
+          script: |
+            # Entrar al directorio del proyecto
+            cd /srv/Flowsdone_Ecosystem
+
+            # Descargar los cambios más recientes desde master
+            git pull origin master
+
+            # Buildear las imágenes actualizadas antes de tocar nada más
+            docker compose --profile prod build
+
+            # Migrar el esquema de gatewaydb (tenants/projects/agents/workflows/
+            # channel_connections/workflow_executions) ANTES de levantar api y
+            # los workers, para que arranquen ya contra el esquema nuevo.
+            docker compose --profile prod run --rm api alembic -c api_gateway/alembic.ini upgrade head
+
+            # Desplegar contenedores incluyendo el perfil 'prod' (para Traefik, etc.)
+            docker compose --profile prod up -d --remove-orphans
+
+            # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco
+            docker image prune -f

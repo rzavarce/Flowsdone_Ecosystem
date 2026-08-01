@@ -221,7 +221,7 @@ docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "\l"
 
 ### Migraciones de `gatewaydb` (Alembic)
 
-El esquema de `gatewaydb` (`tenants`, `projects`, `agents`, `workflows`, `channel_connections`, `workflow_executions`) vive en `api_gateway/migrations/`, gestionado con Alembic (`api_gateway/alembic.ini`). No hay un servicio de Docker que las corra solo — se aplican a mano:
+El esquema de `gatewaydb` (`tenants`, `projects`, `agents`, `workflows`, `channel_connections`, `workflow_executions`) vive en `api_gateway/migrations/`, gestionado con Alembic (`api_gateway/alembic.ini`). No hay un servicio de Docker que las corra solo. En producción, `.github/workflows/deploy.yml` las corre automáticamente (`docker compose run --rm api alembic ... upgrade head`) después de buildear las imágenes y antes de levantar `api`/los workers. En local se aplican a mano:
 
 ```bash
 # Desde la raíz del repo, contra el postgres del stack ya levantado
