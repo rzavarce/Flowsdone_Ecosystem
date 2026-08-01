@@ -12,24 +12,31 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 4. [Perfiles de Docker (dev / prod)](#4-perfiles-de-docker-dev--prod)
 5. [Requisitos previos](#5-requisitos-previos)
 6. [Puesta en marcha](#6-puesta-en-marcha)
-7. [Bases de datos](#7-bases-de-datos)
-8. [URLs locales (dev)](#8-urls-locales-dev)
-9. [Dominios de producción (prod, vía Traefik)](#9-dominios-de-producción-prod-vía-traefik)
-10. [Evolution API — puesta a tono](#10-evolution-api--puesta-a-tono)
-11. [n8n + Langflow — cómo se integran](#11-n8n--langflow--cómo-se-integran)
-12. [Observabilidad](#12-observabilidad)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Mantenimiento](#14-mantenimiento)
+7. [Bases de datos y migraciones](#7-bases-de-datos-y-migraciones)
+8. [Multi-tenancy: tenants, proyectos, agentes y canales](#8-multi-tenancy-tenants-proyectos-agentes-y-canales)
+9. [Webhooks por canal](#9-webhooks-por-canal)
+10. [URLs locales (dev)](#10-urls-locales-dev)
+11. [Dominios de producción (prod, vía Traefik)](#11-dominios-de-producción-prod-vía-traefik)
+12. [Evolution API — puesta a tono](#12-evolution-api--puesta-a-tono)
+13. [n8n + Langflow — cómo se integran](#13-n8n--langflow--cómo-se-integran)
+14. [Observabilidad](#14-observabilidad)
+15. [Troubleshooting](#15-troubleshooting)
+16. [Mantenimiento](#16-mantenimiento)
 
 ---
 
 ## 1. Qué hace este proyecto
 
-Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) que recibe mensajes desde distintos canales (webchat propio, WhatsApp vía Evolution API) y los enruta a un workflow de **Langflow** para generar la respuesta con un LLM. El transporte entre el gateway y los workers es intercambiable: **Kafka** o **RabbitMQ**, ambos con workers dedicados de inbound/outbound (`workers/`).
+Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) multi-tenant que recibe mensajes desde distintos canales (webchat propio, Facebook Messenger, Instagram, X/Twitter, WhatsApp vía Evolution API, Telegram, TikTok) y los enruta según una regla fija:
+
+- **Mensajería conversacional de cualquier canal → siempre Kafka → Langflow.** Todo webhook de canal (sección 9) resuelve a qué tenant/proyecto/agente pertenece y publica en Kafka; `kafka_inbound_worker` ejecuta el agente en Langflow y la respuesta vuelve por WebSocket/callback.
+- **Disparo de automatizaciones de n8n → siempre RabbitMQ.** El endpoint genérico `/webhooks/generic` (o cualquier caller interno) publica en RabbitMQ; un workflow de n8n con un nodo **RabbitMQ Trigger** lo consume directamente (no pasa por Langflow) y puede responder publicando en la cola de salida (ver sección 13).
+
+El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus propios proyectos, canales conectados (credenciales cifradas), agentes de Langflow y automatizaciones de n8n — ver sección 8.
 
 - **Langflow** es el único lugar donde vive la orquestación de IA (agentes, prompts, RAG contra Weaviate).
 - **n8n** es solo para automatización/triggers (webhooks, cron, integraciones) — **no** usa su nodo AI Agent; si un workflow de n8n necesita IA, le pega a Langflow por HTTP (`LANGFLOW_BASE_URL`).
-- **Langfuse** traza cada ejecución de Langflow (tokens, latencia, costos).
+- **Langfuse** traza cada ejecución de Langflow (tokens, latencia, costos) y también recibe las trazas OTLP de n8n (reenviadas por el `otel-collector`).
 - **OpenSearch + OTel Collector** centralizan logs de *todos* los contenedores del stack (no solo la app) y trazas OTLP de los servicios instrumentados.
 - **Traefik** expone todo por dominio con HTTPS, pero solo en producción.
 
@@ -43,48 +50,58 @@ Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — v
                         │        (única red, dev y prod)            │
                         └──────────────────────────────────────────┘
 
-  Canales de entrada                Gateway (api_gateway/app/, hexagonal)
-  ┌───────────┐                     ┌──────────────────────────┐
-  │  Webchat   │──── WS/HTTP ──────▶│   api  (FastAPI :8000)   │
-  │ (estático, │                     │  domain/application/     │
-  │  servido   │                     │  adapters                │
-  │  por api)  │                     └─────────────┬────────────┘
-  └───────────┘                                    │
-  ┌───────────┐        AMQP/webhook                │ publica en Kafka o RabbitMQ
-  │ Evolution  │───────────────────────────────────▶│
-  │ API (WA)   │                                    │
-  └───────────┘                             ┌───────┴────────┐
-                                             ▼                ▼
-                                  ┌──────────────┐   ┌──────────────────┐
-                                  │    Kafka      │   │     RabbitMQ      │
-                                  └──────┬────────┘   └─────────┬─────────┘
-                                         ▼                      ▼
-                          kafka_inbound_worker         rabbitmq_inbound_worker
-                                         │                      │
-                                         └──────────┬───────────┘
-                                                     ▼
-                                          ┌────────────────────┐
-                                          │      Langflow       │──▶ Langfuse (tracing)
-                                          │  (orquestación IA)  │──▶ Weaviate (RAG)
-                                          └──────────┬──────────┘
-                                                     ▼
-                          kafka_outbound_worker / rabbitmq_outbound_worker
-                                                     │
-                                                     ▼
-                                       api (/internal/outbound) → WS al cliente
+  Canales de entrada (webhooks nativos, sección 9)         Gateway (api_gateway/app/, hexagonal)
+  ┌────────────┬────────────┬─────────┬──────────┬────────┐   ┌──────────────────────────┐
+  │  Webchat   │ Facebook / │ X /     │ WhatsApp │Telegram│   │   api  (FastAPI :8000)   │
+  │  (WS)      │ Instagram  │ Twitter │(Evolution│/TikTok │──▶│  domain/application/     │
+  │            │ (Graph API)│         │   API)   │        │   │  adapters                │
+  └────────────┴────────────┴─────────┴──────────┴────────┘   └─────────────┬────────────┘
+                                                                             │
+                            RouteChannelMessageUseCase resuelve             │ transport="kafka"
+                            (channel_type, external_id) → tenant/           │ SIEMPRE para canales
+                            proyecto/agente (sección 8)                     ▼
+                                                                  ┌──────────────────┐
+                                                                  │       Kafka        │
+                                                                  └─────────┬──────────┘
+                                                                            ▼
+                                                                 kafka_inbound_worker
+                                                                            │
+                                                                            ▼
+                                                                 ┌────────────────────┐
+                                                                 │      Langflow       │──▶ Langfuse (tracing)
+                                                                 │  (orquestación IA)  │──▶ Weaviate (RAG)
+                                                                 └──────────┬──────────┘
+                                                                            ▼
+                                                                 kafka_outbound_worker
+                                                                            │
+                                                                            ▼
+                                                          api (/internal/outbound) → WS al cliente
 
-  Automatización (aparte, sin tocar el flujo de mensajes de arriba)
-  ┌──────┐   HTTP Request node   ┌──────────┐
-  │ n8n   │──────────────────────▶│ Langflow │   (n8n NO usa el nodo AI Agent)
-  └──────┘                       └──────────┘
+  Automatización de n8n (aparte, sin tocar el flujo de mensajes de arriba)
+  ┌──────────────────┐   transport="rabbitmq"   ┌──────────┐   RabbitMQ Trigger node   ┌──────┐
+  │ /webhooks/generic │─────────────────────────▶│ RabbitMQ │──────────────────────────▶│ n8n  │
+  └──────────────────┘                           └──────────┘                           └──┬───┘
+                                                       ▲                                     │
+                                                       │      nodo RabbitMQ (publish)         │
+                                                       └─────────── outbound.messages ◀───────┘
+                                                                            │
+                                                       rabbitmq_outbound_worker (ya existente)
+                                                                            │
+                                                                            ▼
+                                                          api (/internal/outbound) → WS al cliente
+
+  n8n también puede llamar a Langflow por HTTP si un workflow necesita IA (NO usa el nodo AI Agent, ver sección 13)
 
   Observabilidad (solo profile prod)
   Todos los contenedores ──logs (docker)──▶ otel-collector ──▶ OpenSearch ──▶ OpenSearch Dashboards
-  api + workers + n8n + evolution ──OTLP (logs/traces)──▶ otel-collector ┘
+  api + workers + n8n + evolution ──OTLP (logs/traces)──▶ otel-collector ──▶ OpenSearch
+                                                              └──▶ Langfuse (traces, vía OTLP público)
 
   Proxy (solo profile prod)
   Traefik (file provider, traefik-dynamic.yml) ──▶ HTTPS por dominio ──▶ cada servicio
 ```
+
+> ⚠️ **Caveat conocido:** `rabbitmq_inbound_worker` (heredado de antes de que existiera esta separación) sigue escuchando la misma cola/routing key (`rag_worker_queue` / `inbound.message`) y trata cualquier mensaje `transport=rabbitmq` como si fuera para Langflow. Mientras no se lo desactive, un mensaje dirigido a n8n también dispara (en paralelo) un intento fallido de `rabbitmq_inbound_worker` contra Langflow con un `workflow_id` que no existe ahí — no rompe nada, pero genera una segunda respuesta de error. Si no vas a usar el camino "RabbitMQ → Langflow" (no es el diseño de este proyecto), podés `docker compose stop rabbitmq_inbound_worker` con seguridad.
 
 ---
 
@@ -93,10 +110,10 @@ Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — v
 | Servicio | Imagen / build | Rol |
 |---|---|---|
 | `api` | build (`dockers/Dockerfile.api`) | Gateway FastAPI: ingesta HTTP/WS, publica a Kafka/RabbitMQ, sirve el webchat estático y `/internal/outbound` |
-| `kafka_inbound_worker` / `kafka_outbound_worker` | build (`dockers/Dockerfile.worker`) | Consumen/publican en Kafka, llaman a Langflow, entregan la respuesta |
-| `rabbitmq_inbound_worker` / `rabbitmq_outbound_worker` | build (`dockers/Dockerfile.worker`) | Igual que arriba pero sobre RabbitMQ |
+| `kafka_inbound_worker` / `kafka_outbound_worker` | build (`dockers/Dockerfile.worker`) | Camino de mensajería (canales → Langflow): consumen/publican en Kafka, llaman a Langflow, entregan la respuesta |
+| `rabbitmq_inbound_worker` / `rabbitmq_outbound_worker` | build (`dockers/Dockerfile.worker`) | `outbound` entrega al gateway la respuesta que publique un workflow de n8n. `inbound` es un remanente que también llama a Langflow sobre RabbitMQ — ver el caveat de la sección 2, hoy el camino real hacia n8n es el `RabbitMQ Trigger` node (sección 13) |
 | `langflow` | build (`dockers/Dockerfile.langflow`) | Orquestación de IA — el único lugar con lógica de agentes/prompts |
-| `n8n` | `n8nio/n8n:2.22.2` | Automatización/triggers. Llama a Langflow por HTTP, no usa AI Agent |
+| `n8n` | `n8nio/n8n:2.33.3` | Automatización/triggers. Llama a Langflow por HTTP, no usa AI Agent |
 | `evolution` | build (`./evolution-api`, vendorizado) | Gateway de WhatsApp (Evolution API v2.3.7) |
 | `langfuse-web` / `langfuse-worker` | `langfuse/langfuse:3.180.0` / `-worker:3` | Tracing y observabilidad de LLMs |
 | `postgres` | `postgres:17-alpine` | DB principal: `gatewaydb`, `langfusedb`, `langflowdb`, `evolutiondb`, `n8ndb` |
@@ -178,7 +195,7 @@ docker compose logs -f rabbitmq_inbound_worker
 Para producción, además necesitás:
 - Completar `SSL_EMAIL` en `.env` (Let's Encrypt lo requiere).
 - Que los dominios `DOMAIN_*` apunten (DNS) a la IP pública de este host.
-- Ajustar los dominios en `traefik-dynamic.yml` si difieren de los que trae por defecto (ver sección 9 — Traefik usa el **file provider**, no lee variables de `.env` ni labels de Docker).
+- Ajustar los dominios en `traefik-dynamic.yml` si difieren de los que trae por defecto (ver sección 11 — Traefik usa el **file provider**, no lee variables de `.env` ni labels de Docker).
 
 ```bash
 docker compose --profile prod up -d
@@ -186,9 +203,9 @@ docker compose --profile prod up -d
 
 ---
 
-## 7. Bases de datos
+## 7. Bases de datos y migraciones
 
-`init-db.sh` crea automáticamente, **al primer arranque** de Postgres (volumen vacío), todas las bases listadas en `POSTGRES_MULTIPLE_DATABASES` del `.env` (`gatewaydb,langfusedb,langflowdb,evolutiondb,n8ndb`).
+`init-db.sh` crea automáticamente, **al primer arranque** de Postgres (volumen vacío), todas las bases listadas en `POSTGRES_MULTIPLE_DATABASES` del `.env` (`gatewaydb,langfusedb,langflowdb,evolutiondb,n8ndb`). Ya **no** crea tablas dentro de `gatewaydb` — eso lo gestiona Alembic.
 
 Si Postgres **ya tenía datos** y agregaste una base nueva a esa variable, el script no se vuelve a correr solo. Hay que crearla a mano, sin perder el resto de los datos:
 
@@ -202,14 +219,124 @@ Verificar:
 docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "\l"'
 ```
 
+### Migraciones de `gatewaydb` (Alembic)
+
+El esquema de `gatewaydb` (`tenants`, `projects`, `agents`, `workflows`, `channel_connections`, `workflow_executions`) vive en `api_gateway/migrations/`, gestionado con Alembic (`api_gateway/alembic.ini`). No hay un servicio de Docker que las corra solo. En producción, `.github/workflows/deploy.yml` las corre automáticamente (`docker compose run --rm api alembic ... upgrade head`) después de buildear las imágenes y antes de levantar `api`/los workers. En local se aplican a mano:
+
+```bash
+# Desde la raíz del repo, contra el postgres del stack ya levantado
+docker compose run --rm api alembic -c api_gateway/alembic.ini upgrade head
+
+# Ver la revisión actual
+docker compose run --rm api alembic -c api_gateway/alembic.ini current
+
+# Crear una migración nueva después de tocar api_gateway/app/adapters/outbound/db/models.py
+docker compose run --rm api alembic -c api_gateway/alembic.ini revision --autogenerate -m "descripción"
+```
+
+> **Importante:** `alembic.ini` resuelve `sqlalchemy.url` en runtime desde `settings.DATABASE_URL_SQLALCHEMY` (`api_gateway/app/core/config.py`), no está hardcodeado — no hace falta tocar el `.ini` para apuntar a otro entorno, alcanza con la variable de entorno.
+
 ---
 
-## 8. URLs locales (dev)
+## 8. Multi-tenancy: tenants, proyectos, agentes y canales
+
+El gateway es un **SaaS multi-cliente**: cada tenant puede tener varios proyectos, cada proyecto sus propios agentes de Langflow, sus automatizaciones de n8n, y sus canales conectados (con credenciales propias). El modelo, de mayor a menor:
+
+```
+tenant (cliente)
+ └─ project (ej. "Soporte", "Ventas")
+     ├─ agent          → langflow_flow_id: qué flow de Langflow atiende los mensajes de este proyecto
+     ├─ workflow        → n8n_workflow_id: automatización de n8n asociada al proyecto (informativo, no interviene en el routing de canales)
+     └─ channel_connection → un canal conectado (Facebook Page, número de WhatsApp/instancia Evolution, bot de Telegram, etc.)
+                             apunta a UN agent; sus credenciales (tokens, secrets) se guardan cifradas
+```
+
+La tabla `channel_connections` tiene una unique constraint `(channel_type, external_id)` — es la clave que usan los webhooks de la sección 9 para resolver, a partir del payload nativo de cada plataforma, a qué tenant/proyecto/agente pertenece un mensaje entrante. El `conversation_id` que llega a Langflow queda namespaced como `f"{project_id}:{channel_type}:{external_conversation_key}"` para que dos tenants no choquen aunque hablen con el mismo número/usuario.
+
+Las credenciales de `channel_connections.credentials` se cifran con `cryptography.Fernet` antes de guardarse (`adapters/outbound/db/crypto.py`) usando `CHANNEL_CREDENTIALS_ENCRYPTION_KEY`. Generar una clave nueva:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### API de administración
+
+Todo se gestiona vía HTTP en `/internal/admin/*`, protegido con el header `X-Admin-Api-Key` (valor = `ADMIN_API_KEY` del `.env`). CRUD completo (`POST`/`GET` colección, `GET`/`PATCH`/`DELETE` por id) para `tenants`, `projects`, `agents`, `workflows` y `channel-connections`. Los `GET` de `channel-connections` **nunca** devuelven `credentials` en claro (solo `has_credentials: bool`).
+
+```bash
+KEY="$ADMIN_API_KEY"   # el valor real está en .env
+
+# 1. Tenant
+curl -s -X POST http://localhost:8000/internal/admin/tenants \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"name":"Acme Corp","slug":"acme"}'
+
+# 2. Proyecto (usar el id devuelto arriba)
+curl -s -X POST http://localhost:8000/internal/admin/projects \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"tenant_id":"<tenant_id>","name":"Soporte","slug":"soporte"}'
+
+# 3. Agente (langflow_flow_id = id del flow en Langflow)
+curl -s -X POST http://localhost:8000/internal/admin/agents \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"project_id":"<project_id>","name":"Agente Soporte","langflow_flow_id":"<flow_id>","is_default":true}'
+
+# 4. Canal conectado (ejemplo WhatsApp vía Evolution API)
+curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{
+        "project_id":"<project_id>",
+        "agent_id":"<agent_id>",
+        "channel_type":"whatsapp_evolution",
+        "external_id":"<nombre-de-la-instancia-evolution>",
+        "credentials":{"note":"lo que necesites guardar, se cifra automáticamente"}
+      }'
+```
+
+Filtros disponibles: `GET /internal/admin/projects?tenant_id=...`, `GET /internal/admin/agents?project_id=...`, `GET /internal/admin/workflows?project_id=...`, `GET /internal/admin/channel-connections?project_id=...`.
+
+---
+
+## 9. Webhooks por canal
+
+Cada canal tiene su propio endpoint HTTP que entiende el payload **nativo** de esa plataforma, lo verifica, resuelve el `channel_connection` (sección 8) y publica en Kafka hacia Langflow — nunca hace falta armar el envelope a mano (eso lo sigue haciendo `/webhooks/generic` para casos genéricos/n8n).
+
+| Canal | Ruta | Verificación | `external_id` (clave de lookup) |
+|---|---|---|---|
+| Facebook Messenger | `GET/POST /webhooks/facebook` | GET: `hub.verify_token` == `META_WEBHOOK_VERIFY_TOKEN`. POST: `X-Hub-Signature-256` (HMAC-SHA256 con `META_APP_SECRET`) | `entry[].id` (Page ID) |
+| Instagram DM | `GET/POST /webhooks/instagram` | Igual que Facebook (misma Meta App) | `entry[].id` (IG Business Account ID) |
+| X / Twitter | `GET/POST /webhooks/twitter` | GET: CRC challenge firmado con `X_CONSUMER_SECRET`. POST: `X-Twitter-Webhooks-Signature` | `for_user_id` |
+| WhatsApp (Evolution API) | `POST /webhooks/whatsapp` | Header `apikey` == `EVOLUTION_API_KEY` | `instance` (nombre de la instancia Evolution) |
+| Telegram | `POST /webhooks/telegram/{bot_token}` | Header `X-Telegram-Bot-Api-Secret-Token` == `TELEGRAM_WEBHOOK_SECRET` | `{bot_token}` (path) |
+| TikTok | `POST /webhooks/tiktok` | Header `TikTok-Signature` (HMAC-SHA256 con `TIKTOK_CLIENT_SECRET`) | `data.open_id` |
+
+Si el `channel_connection` no existe para ese `(channel_type, external_id)` (canal sin registrar todavía en el admin API), el webhook responde `200` igual (para que la plataforma no reintente infinito) pero no publica nada — queda logueado como `*.not_routable`.
+
+**Variables de entorno nuevas** (agregalas a `.env`, placeholders en `env.example.txt`):
+
+| Variable | Para qué |
+|---|---|
+| `ADMIN_API_KEY` | Header `X-Admin-Api-Key` del API de administración (sección 8) |
+| `CHANNEL_CREDENTIALS_ENCRYPTION_KEY` | Clave Fernet para cifrar `channel_connections.credentials` |
+| `META_APP_SECRET` / `META_WEBHOOK_VERIFY_TOKEN` | Facebook + Instagram (una sola Meta App para ambos) |
+| `X_CONSUMER_SECRET` | X / Twitter (Account Activity API) |
+| `TELEGRAM_WEBHOOK_SECRET` | Telegram (`secret_token` configurado vía `setWebhook`) |
+| `TIKTOK_CLIENT_SECRET` | TikTok for Developers |
+| `EVOLUTION_API_KEY` | Ya existía para el propio Evolution API; se reutiliza como shared secret del webhook `apikey` |
+| `LANGFLOW_API_KEY` | **Obligatoria** para que `LangflowExecutor` autentique contra Langflow — ver troubleshooting (sección 15) |
+
+Hoy solo **WhatsApp (Evolution API)** tiene credenciales reales configuradas — Facebook/Instagram/X/Telegram/TikTok están implementados y probados a nivel de verificación de firma, pero necesitan que cargues las apps/bots reales de cada plataforma (`META_APP_SECRET`, tokens de bot, etc.) antes de recibir tráfico real.
+
+---
+
+## 10. URLs locales (dev)
 
 | Servicio | URL |
 |---|---|
 | API Gateway | http://localhost:8000 |
-| Webchat (demo) | http://localhost:8000/static/webchat/ |
+| Webchat (demo) | http://localhost:8000/static/webchat/ (`?caso=langflow` o `?caso=n8n`, ver sección 13) |
+| Admin API (tenants/proyectos/agentes/canales) | http://localhost:8000/internal/admin/* (sección 8) |
+| Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
 | Langflow | http://localhost:7860 |
 | Langfuse | http://localhost:4100 |
 | n8n | http://localhost:5678 |
@@ -235,7 +362,7 @@ Solo con `--profile prod` (o `COMPOSE_PROFILES=prod`):
 
 ---
 
-## 9. Dominios de producción (prod, vía Traefik)
+## 11. Dominios de producción (prod, vía Traefik)
 
 Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider — los labels `traefik.*` que puedan aparecer en el compose **no tienen efecto**. Los dominios reales están hardcodeados en `traefik-dynamic.yml`; las variables `DOMAIN_*` del `.env` son solo referencia/documentación y **no** se leen automáticamente. Si cambiás un dominio, actualizalo en los dos lugares.
 
@@ -253,7 +380,7 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 
 ---
 
-## 10. Evolution API — puesta a tono
+## 12. Evolution API — puesta a tono
 
 A diferencia de otros setups de Evolution API, acá el código **ya está vendorizado** en `./evolution-api/` (fork del repo oficial, v2.3.7) — no hace falta clonarlo aparte ni buildear manualmente.
 
@@ -285,37 +412,76 @@ Al arrancar corre las migraciones de Prisma solo. Conecta contra el mismo `postg
 
 ---
 
-## 11. n8n + Langflow — cómo se integran
+## 13. n8n + Langflow — cómo se integran
 
-n8n **no** tiene el nodo AI Agent en el flujo recomendado de este proyecto. La orquestación de IA vive enteramente en Langflow. Para que un workflow de n8n dispare un flujo de Langflow:
+n8n **no** tiene el nodo AI Agent en el flujo recomendado de este proyecto. La orquestación de IA vive enteramente en Langflow. Hay dos integraciones, en direcciones opuestas:
+
+### n8n → Langflow (un workflow de n8n necesita IA)
 
 - Variables ya inyectadas en el contenedor de n8n: `LANGFLOW_BASE_URL` (`http://langflow:7860` interno) y `LANGFLOW_API_KEY`.
 - En un nodo **HTTP Request**:
   - URL: `{{$env.LANGFLOW_BASE_URL}}/api/v1/run/<flow_id>`
   - Method: `POST`
+  - Header: `x-api-key: {{$env.LANGFLOW_API_KEY}}` — **obligatorio**, ver sección 15.
   - Body (JSON): `{"input_value": "...", "output_type": "chat", "input_type": "chat", "session_id": "..."}`
-  - **Importante:** `input_value` va en la **raíz** del body, no anidado bajo `"input"` — un error así hace que Langflow ignore el mensaje real y devuelva la respuesta por defecto del flujo (ver sección 13).
+  - **Importante:** `input_value` va en la **raíz** del body, no anidado bajo `"input"` — un error así hace que Langflow ignore el mensaje real y devuelva la respuesta por defecto del flujo.
 
-Las ejecuciones de n8n emiten trazas OTLP (`N8N_OTEL_TRACING_ENABLED=true`) hacia el mismo `otel-collector` que usa el resto del stack (solo visibles en `profile prod`).
+### Gateway → n8n (el gateway dispara una automatización)
+
+El gateway publica en RabbitMQ (`/webhooks/generic` con `transport: "rabbitmq"`, o cualquier caller que use `IngestMessageUseCase`). Un workflow de n8n lo recibe con un nodo **RabbitMQ Trigger** apuntando a la misma cola/exchange, y responde publicando en la cola de salida que el gateway ya escucha (`rabbitmq_outbound_worker`):
+
+1. **Credencial RabbitMQ** en n8n: host `rabbitmq`, puerto `5672`, user/pass = `RABBITMQ_USER`/`RABBITMQ_PASS`, vhost `/`.
+2. **RabbitMQ Trigger**: `Queue/Topic` = una cola propia (ej. `n8n_workflow_queue`) — **tiene que existir de antemano** (el nodo hace `checkQueue`, no la crea), bindeada al exchange `inbound.messages` con routing key `inbound.message`. Opción `JSON Parse Body` = true.
+3. **Code node**: arma el envelope de respuesta a partir de `$input.item.json.content` (el mensaje ya parseado):
+   ```js
+   const received = $input.item.json.content;
+   return { json: {
+     meta: {
+       message_id: 'n8n-' + Date.now(),
+       timestamp: new Date().toISOString(),
+       direction: 'outbound',
+       conversation_id: received.meta.conversation_id,
+       workflow_id: received.meta.workflow_id,
+     },
+     transport: 'rabbitmq',
+     channel: received.channel,
+     payload: { message: 'tu respuesta acá' },
+     response_to: received.meta.message_id,
+     version: 1,
+   }};
+   ```
+4. **RabbitMQ node** (no Trigger): `Mode` = Exchange, `Exchange` = `outbound.messages`, `Type` = Topic, `Routing Key` = `outbound.message`, `Send Input Data` = false, `Message` = `={{ JSON.stringify($json) }}`. Esto lo recoge `rabbitmq_outbound_worker` (ya existente) y lo entrega al cliente por WS/`callback_url`.
+
+Ver el caveat de la sección 2 sobre `rabbitmq_inbound_worker` compitiendo por la misma cola/routing key.
+
+Las ejecuciones de n8n emiten trazas OTLP (`N8N_OTEL_ENABLED=true`, ver el gotcha de nombres de variable en la sección 15) hacia el mismo `otel-collector` que usa el resto del stack — se ven en OpenSearch (solo `profile prod`) **y** en Langfuse (el collector las reenvía también al endpoint OTLP público de Langfuse, ver sección 14).
 
 Evolution API todavía no está conectado a n8n (`EVOLUTION_N8N_ENABLED=false`); si se quiere automatizar WhatsApp vía n8n, ese es el próximo paso natural (webhook de Evolution → n8n → Langflow).
 
 ---
 
-## 12. Observabilidad
+## 14. Observabilidad
 
 Solo activa en `profile prod`. Dos fuentes distintas confluyen en el mismo índice de OpenSearch (`ss4o_logs-*`):
 
 1. **Logs de infraestructura**: el `otel-collector` lee `/var/lib/docker/containers/*/*.log` (el log driver `json-file` de Docker) de **todos** los contenedores del host — Postgres, Redis, RabbitMQ, Langflow, Langfuse, etc. — sin necesidad de instrumentarlos.
-2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `api_gateway/app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` y `evolution` también mandan sus propias trazas OTLP.
+2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `api_gateway/app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` (`fd-n8n`) y `evolution` también mandan sus propias trazas OTLP.
 
 Para explorarlos: http://localhost:5601 (usuario `admin`, password `OPENSEARCH_PASSWORD`) → Discover → index pattern `ss4o_logs-*`.
 
 > Nota multi-tenancy: OpenSearch Dashboards tiene tenants (Global/Private). Si no ves datos aunque el índice tenga documentos, revisá el selector de tenant arriba a la derecha — los index patterns quedan atados al tenant en el que estabas parado cuando los creaste.
 
+### Trazas también en Langfuse (no solo OpenSearch)
+
+El `otel-collector` reenvía **todo** lo que le llega por el pipeline `traces` a dos exporters a la vez: `opensearch` y `otlphttp/langfuse` (`otel-collector-config.yaml`). Este último le pega al endpoint OTLP público de Langfuse (`POST {LANGFUSE_BASE_URL}/api/public/otel/v1/traces`), autenticado con Basic Auth (`LANGFUSE_PUBLIC_KEY`:`LANGFUSE_SECRET_KEY` vía la extensión `basicauth/langfuse`).
+
+- **Langflow** no pasa por acá — tiene su propio SDK de Langfuse nativo (`LANGFUSE_*` en el `environment` de `langflow`), con trazas ricas por componente (prompt, modelo, tokens).
+- **n8n** sí pasa por el `otel-collector`: cada ejecución de workflow aparece en Langfuse como una traza `workflow.execute` (menos detallada que Langflow — no desglosa nodo por nodo). Verificado con `GET /api/public/traces` contra Langfuse después de disparar el workflow de la sección 13.
+- Como el `otel-collector` solo corre en `profile prod` (sección 4), esta doble exportación (OpenSearch + Langfuse) también depende de ese profile.
+
 ---
 
-## 13. Troubleshooting
+## 15. Troubleshooting
 
 ### Cambié el `.env` pero el contenedor sigue con el valor viejo
 
@@ -337,6 +503,40 @@ El caller le está mandando `input_value` anidado bajo `"input"` en vez de en la
 {"input_value": "mensaje real", "output_type": "chat", "input_type": "chat", "session_id": "..."}
 ```
 
+### El pipeline completa (llega la respuesta por WS) pero dice "El workflow no devolvió una respuesta válida"
+
+`LangflowExecutor` no está autenticando contra Langflow. Sin credenciales, `POST /api/v1/run/{flow_id}` no devuelve el error real: devuelve `200` con el HTML del frontend de Langflow (el flow cae en la ruta catch-all del SPA), así que `LangflowExecutor` lo toma como éxito y no encuentra ningún campo de texto reconocible.
+
+Se soluciona con `LANGFLOW_API_KEY` (header `x-api-key`, ya lo manda `LangflowExecutor`) **y** que el flow no sea `PRIVATE` sin dueño:
+
+```bash
+# 1. Login como superuser (usuario/password "langflow" si nunca los cambiaste) y generar una API key real
+TOKEN=$(curl -s -X POST http://localhost:7860/api/v1/login \
+  -d "username=langflow&password=langflow" -H "Content-Type: application/x-www-form-urlencoded" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl -s -X POST http://localhost:7860/api/v1/api_key/ \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"flowsdone-gateway"}'
+# → copiar "api_key" a LANGFLOW_API_KEY en .env, y recrear api + los 4 workers
+
+# 2. Si el flow es uno de los templates de "Starter Projects" (sin dueño, access_type PRIVATE),
+#    marcarlo PUBLIC para que /run acepte requests autenticados solo con la API key:
+curl -s -X PATCH "http://localhost:7860/api/v1/flows/<flow_id>" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"access_type":"PUBLIC"}'
+```
+
+Si además no ves el flow al entrar a Langflow con ese usuario, es porque quedó en la carpeta de sistema "Starter Projects" (`user_id` nulo) en vez de en "My Projects" — movelo con `PATCH /api/v1/flows/<flow_id>` mandando el `folder_id` de tu carpeta (`GET /api/v1/folders/` para encontrarlo).
+
+### Langfuse: "localhost ha rechazado la conexión"
+
+Langfuse **no** escucha en el puerto por defecto de Next.js (`3000`) desde el host — ese es el puerto interno del contenedor. El puerto publicado es `LANGFUSE_PORT` (`.env`, por defecto `4100`). Entrá a `http://localhost:4100`, no a `:3000`.
+
+### No veo trazas de n8n en Langfuse (ni en OpenSearch)
+
+n8n 2.33.3 lee `N8N_OTEL_ENABLED` / `N8N_OTEL_EXPORTER_OTLP_ENDPOINT` — **no** `N8N_OTEL_TRACING_ENABLED`/`N8N_OTEL_TRACING_ENDPOINT`/`N8N_OTEL_TRACING_PROTOCOL` (nombres de una doc/versión vieja que esta versión ignora silenciosamente, sin error). Si tu `n8n` no manda nada, confirmá con `docker exec <n8n> printenv | grep OTEL` que las variables que ve el proceso son las correctas — ya están arregladas en `docker-compose.yml`, pero si algún override local las vuelve a poner mal, este es el síntoma (silencio total, ni logs de error).
+
 ### Langfuse crashea en loop / "JavaScript heap out of memory"
 
 V8 necesita headroom bajo el límite del contenedor. No bajar `LANGFUSE_MEM_LIMIT`/`LANGFUSE_WORKER_MEM_LIMIT` de ~2560m, y mantener `NODE_OPTIONS=--max-old-space-size=2048` en el environment de `langfuse-web`.
@@ -353,13 +553,17 @@ Revisá el tenant activo (selector arriba a la derecha, ícono de persona). Los 
 
 Asegurate de usar `DATABASE_CONNECTION_URI` (no `DATABASE_URL`) en el environment del servicio — es lo que espera este fork.
 
+### Un webhook de canal responde 200 pero el mensaje nunca llega a Langflow
+
+Buscá en los logs de `api` `*.not_routable` (ej. `channels.whatsapp_evolution.not_routable`). Significa que no hay ningún `channel_connection` activo con ese `(channel_type, external_id)` — hay que crearlo primero vía `/internal/admin/channel-connections` (sección 8). El webhook devuelve `200` a propósito para que la plataforma de origen no reintente infinito por un problema de configuración nuestro.
+
 ### Traefik no rutea un dominio nuevo
 
-Confirmá que agregaste el router **y** el service en `traefik-dynamic.yml` (no alcanza con la variable `DOMAIN_*` del `.env` — Traefik no la lee, ver sección 9).
+Confirmá que agregaste el router **y** el service en `traefik-dynamic.yml` (no alcanza con la variable `DOMAIN_*` del `.env` — Traefik no la lee, ver sección 11).
 
 ---
 
-## 14. Mantenimiento
+## 16. Mantenimiento
 
 **Persistencia:** los volúmenes con datos reales están en `./volumes/` (bind mounts) y como named volumes de Docker (`redis_data`, `clickhouse_data`, `opensearch_data`, `n8n_data`, `redisinsight_data`). Backup de `./volumes/` + `docker volume` cubre el estado completo.
 
@@ -388,3 +592,21 @@ docker compose down -v
 ```bash
 docker compose up -d --force-recreate --remove-orphans
 ```
+
+
+OJO IMPORTANTE PARA CREAR UNA COLLECION NUEVA EN WEAVIATE USAR LA API
+
+curl -X POST http://localhost:8080/v1/schema \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer TU_API_KEY_AQUI" \
+  -d '{
+    "class": "NOMBRE_COLLECCION",
+    "vectorizer": "none",
+    "replicationConfig": {
+      "factor": 1
+    }
+  }'
+
+CREATE USER fibralan_user WITH PASSWORD '15WB4FV4d0xn';
+
+

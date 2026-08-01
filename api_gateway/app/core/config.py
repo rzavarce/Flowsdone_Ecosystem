@@ -39,11 +39,29 @@ class Settings(BaseModel):
     # --------------------------------------------------
     DATABASE_URL: Optional[str] = None
     DATABASE_URL_ASYNC: Optional[str] = None
+    DATABASE_URL_SQLALCHEMY: Optional[str] = None
 
     # --------------------------------------------------
     # Langflow
     # --------------------------------------------------
     LANGFLOW_BASE_URL: str = "http://langflow:7860"
+    LANGFLOW_API_KEY: Optional[str] = None
+
+    # --------------------------------------------------
+    # Multi-tenant SaaS: admin API + cifrado de credenciales
+    # --------------------------------------------------
+    ADMIN_API_KEY: str = "dev-admin-key-change-me"
+    CHANNEL_CREDENTIALS_ENCRYPTION_KEY: Optional[str] = None
+
+    # --------------------------------------------------
+    # Canales (webhooks entrantes)
+    # --------------------------------------------------
+    EVOLUTION_API_KEY: Optional[str] = None
+    META_APP_SECRET: Optional[str] = None
+    META_WEBHOOK_VERIFY_TOKEN: Optional[str] = None
+    TELEGRAM_WEBHOOK_SECRET: Optional[str] = None
+    X_CONSUMER_SECRET: Optional[str] = None
+    TIKTOK_CLIENT_SECRET: Optional[str] = None
 
     # --------------------------------------------------
     # Webhook callbacks
@@ -92,8 +110,20 @@ settings = Settings(
 
     DATABASE_URL=os.getenv("DATABASE_URL"),
     DATABASE_URL_ASYNC=os.getenv("DATABASE_URL_ASYNC"),
+    DATABASE_URL_SQLALCHEMY=os.getenv("DATABASE_URL_SQLALCHEMY"),
 
     LANGFLOW_BASE_URL=os.getenv("LANGFLOW_BASE_URL", "http://langflow:7860"),
+    LANGFLOW_API_KEY=os.getenv("LANGFLOW_API_KEY"),
+
+    ADMIN_API_KEY=os.getenv("ADMIN_API_KEY", "dev-admin-key-change-me"),
+    CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
+
+    EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),
+    META_APP_SECRET=os.getenv("META_APP_SECRET"),
+    META_WEBHOOK_VERIFY_TOKEN=os.getenv("META_WEBHOOK_VERIFY_TOKEN"),
+    TELEGRAM_WEBHOOK_SECRET=os.getenv("TELEGRAM_WEBHOOK_SECRET"),
+    X_CONSUMER_SECRET=os.getenv("X_CONSUMER_SECRET"),
+    TIKTOK_CLIENT_SECRET=os.getenv("TIKTOK_CLIENT_SECRET"),
 
     CALLBACK_HMAC_SECRET=os.getenv("CALLBACK_HMAC_SECRET", "dev-secret-change-me"),
     CALLBACK_MAX_RETRIES=int(os.getenv("CALLBACK_MAX_RETRIES", "3")),

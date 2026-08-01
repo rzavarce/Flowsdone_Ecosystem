@@ -21,3 +21,12 @@ try:
     from .response_publisher import OutboundResponse, ResponsePublisherPort  # noqa: F401
 except Exception:
     pass
+
+# ✅ export admin/tenancy repository ports
+from .admin_repositories import (  # noqa: F401
+    AgentRepositoryPort,
+    ChannelConnectionRepositoryPort,
+    ProjectRepositoryPort,
+    TenantRepositoryPort,
+    WorkflowConfigRepositoryPort,
+)

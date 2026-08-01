@@ -490,7 +490,7 @@ services:
       N8N_ENABLE_EXECUTE_COMMAND: ${N8N_ENABLE_EXECUTE_COMMAND}
       N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
       EXECUTIONS_DATA_PRUNE: ${N8N_EXECUTIONS_DATA_PRUNE}
-      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       N8N_LOG_LEVEL: ${N8N_LOG_LEVEL}
       # Permite usar $env.X en expresiones de nodos (Code, HTTP Request, etc.)
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
@@ -500,9 +500,12 @@ services:
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      N8N_OTEL_TRACING_ENABLED: ${N8N_OTEL_TRACING_ENABLED}
-      N8N_OTEL_TRACING_ENDPOINT: ${N8N_OTEL_TRACING_ENDPOINT}
-      N8N_OTEL_TRACING_PROTOCOL: ${N8N_OTEL_TRACING_PROTOCOL}
+      # OJO: esta versión de n8n (2.33.3) lee N8N_OTEL_ENABLED /
+      # N8N_OTEL_EXPORTER_OTLP_ENDPOINT — NO existen N8N_OTEL_TRACING_*
+      # (quedaban de una versión/doc vieja de n8n y no hacían nada).
+      N8N_OTEL_ENABLED: ${N8N_OTEL_TRACING_ENABLED}
+      N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      N8N_OTEL_EXPORTER_SERVICE_NAME: fd-n8n
     depends_on:
       postgres:
         condition: service_healthy
