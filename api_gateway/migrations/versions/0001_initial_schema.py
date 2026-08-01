@@ -119,14 +119,22 @@ def upgrade() -> None:
     )
     op.create_index("ix_channel_connections_project_id", "channel_connections", ["project_id"])
 
-    op.create_table(
-        "workflow_executions",
-        sa.Column("message_id", sa.Text(), primary_key=True),
-        sa.Column("workflow_id", sa.Text(), nullable=False),
-        sa.Column("status", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-    )
+    # workflow_executions puede ya existir en entornos que corrieron el viejo
+    # scripts/init-db.sh (creaba esta tabla a mano antes de que existiera esta
+    # migración). En instalaciones nuevas no existe todavía y hay que crearla;
+    # en las viejas, ya tiene exactamente estas columnas/tipos, así que basta
+    # con dejarla como está.
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if "workflow_executions" not in inspector.get_table_names():
+        op.create_table(
+            "workflow_executions",
+            sa.Column("message_id", sa.Text(), primary_key=True),
+            sa.Column("workflow_id", sa.Text(), nullable=False),
+            sa.Column("status", sa.Text(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        )
 
 
 def downgrade() -> None:
