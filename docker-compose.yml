@@ -533,6 +533,13 @@ services:
       OTEL_ENABLED: ${OTEL_ENABLED}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
       OTEL_SERVICE_NAME: fd-gateway
+    # API_RELOAD_FLAGS vacío (default en prod) = sin --reload: si el lifespan
+    # falla al arrancar, uvicorn corta el proceso y "restart: always" reintenta
+    # solo. En dev, .env define API_RELOAD_FLAGS=--reload --reload-dir ...
+    # para hot-reload contra el bind mount de abajo.
+    command: >
+      uvicorn api_gateway.app.main:app --host 0.0.0.0 --port 8000
+      ${API_RELOAD_FLAGS:-}
     ports:
       - "${API_PORT}:8000"
     volumes:

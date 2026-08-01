@@ -18,5 +18,10 @@ COPY api_gateway ./api_gateway
 
 ENV PYTHONUNBUFFERED=1
 
-# CMD ["uvicorn", "api_gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-CMD ["uvicorn", "api_gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/api_gateway"]
+# Default seguro para correr la imagen suelta (docker run) sin pasar por
+# compose: sin --reload, así un fallo de arranque termina el proceso y deja
+# que la política de restart del orquestador reintente, en vez de quedar
+# colgado en el reloader de uvicorn sin reintentar nunca.
+# docker-compose.yml pisa esto con su propio "command:" (API_RELOAD_FLAGS).
+CMD ["uvicorn", "api_gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# CMD ["uvicorn", "api_gateway.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/api_gateway"]

@@ -537,6 +537,16 @@ Langfuse **no** escucha en el puerto por defecto de Next.js (`3000`) desde el ho
 
 n8n 2.33.3 lee `N8N_OTEL_ENABLED` / `N8N_OTEL_EXPORTER_OTLP_ENDPOINT` — **no** `N8N_OTEL_TRACING_ENABLED`/`N8N_OTEL_TRACING_ENDPOINT`/`N8N_OTEL_TRACING_PROTOCOL` (nombres de una doc/versión vieja que esta versión ignora silenciosamente, sin error). Si tu `n8n` no manda nada, confirmá con `docker exec <n8n> printenv | grep OTEL` que las variables que ve el proceso son las correctas — ya están arregladas en `docker-compose.yml`, pero si algún override local las vuelve a poner mal, este es el síntoma (silencio total, ni logs de error).
 
+### `api` devuelve 502 (Bad Gateway) en Traefik y no se recupera solo
+
+Pasa cuando una dependencia (Kafka, RabbitMQ) no estaba lista en el momento exacto en que `api` arrancó, y el lifespan de FastAPI falla en el startup. Con `API_RELOAD_FLAGS` seteado (dev, `--reload`), uvicorn deja vivo el proceso *reloader* aunque el arranque haya fallado — el contenedor queda "Up" indefinidamente pero nunca vuelve a intentar levantar la app, así que `restart: always` nunca se dispara. En prod (`API_RELOAD_FLAGS` vacío) esto no debería pasar: sin `--reload`, un fallo de arranque termina el proceso del todo y Docker reintenta solo. Si de todas formas ves esto:
+
+```bash
+docker logs fd_gateway --tail 20          # confirmar el error real (ej. KafkaConnectionError)
+# arreglar la dependencia que esté caída, después:
+docker compose restart api
+```
+
 ### Langfuse crashea en loop / "JavaScript heap out of memory"
 
 V8 necesita headroom bajo el límite del contenedor. No bajar `LANGFUSE_MEM_LIMIT`/`LANGFUSE_WORKER_MEM_LIMIT` de ~2560m, y mantener `NODE_OPTIONS=--max-old-space-size=2048` en el environment de `langfuse-web`.
