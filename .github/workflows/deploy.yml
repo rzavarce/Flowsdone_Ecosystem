@@ -20,7 +20,7 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          script_stop_on_error: true
+          script_stop: true
           script: |
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
