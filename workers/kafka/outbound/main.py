@@ -10,6 +10,7 @@ from api_gateway.app.core.config import settings
 from api_gateway.app.core.logging import setup_logging
 from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
 from api_gateway.app.domain.models.message_envelope import MessageEnvelope
+from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("kafka.outbound.worker")
@@ -28,6 +29,8 @@ async def main() -> None:
         "kafka.outbound.worker.starting",
         extra={"topic": settings.KAFKA_TOPIC, "group_id": "gateway-outbound"},
     )
+
+    await ensure_topics_exist()
 
     gateway_url = getattr(settings, "GATEWAY_INTERNAL_URL", None) or "http://api:8000"
     endpoint = f"{gateway_url}/internal/outbound"

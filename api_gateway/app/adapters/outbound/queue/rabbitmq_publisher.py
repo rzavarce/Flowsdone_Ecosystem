@@ -60,7 +60,9 @@ class RabbitMQPublisher(MessagePublisherPort):
 
         logger.info("rabbitmq.publisher.stopped")
 
-    async def publish(self, event: Any) -> None:
+    async def publish(self, event: Any, *, key: str | None = None) -> None:
+        # `key` es específico del particionado de Kafka (ver KafkaPublisher);
+        # RabbitMQ ya enruta por routing_key, así que se ignora acá.
         if not self._exchange:
             raise RuntimeError("RabbitMQPublisher not started")
 

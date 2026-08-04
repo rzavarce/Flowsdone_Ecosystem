@@ -8,6 +8,7 @@ from api_gateway.app.core.logging import setup_logging
 
 from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
 from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
 
 from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
 from api_gateway.app.adapters.outbound.db.idempotency_repository import (
@@ -38,6 +39,8 @@ async def main() -> None:
             "bootstrap_servers": settings.KAFKA_BOOTSTRAP_SERVERS,
         },
     )
+
+    await ensure_topics_exist()
 
     # --------------------------------------------------------------
     # Database (idempotency)

@@ -182,7 +182,9 @@ class HandleOutboundResponseUseCase:
         # ----------------------------------------------------------
         if self.publisher:
             try:
-                await self.publisher.publish(response_envelope.model_dump())
+                await self.publisher.publish(
+                    response_envelope.model_dump(), key=response_envelope.channel
+                )
 
                 logger.info(
                     "handle.outbound.message.published",
