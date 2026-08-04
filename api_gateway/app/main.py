@@ -26,6 +26,7 @@ from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
 from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
 from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
 from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 
 from .infrastructure.database import create_engine, create_sessionmaker
 
@@ -169,6 +170,7 @@ async def lifespan(app: FastAPI):
     app.state.agent_repo = SqlAlchemyAgentRepository(db_sessionmaker)
     app.state.workflow_config_repo = SqlAlchemyWorkflowConfigRepository(db_sessionmaker)
     app.state.channel_connection_repo = SqlAlchemyChannelConnectionRepository(db_sessionmaker)
+    app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
     logger.info("database.repositories.ready")
 

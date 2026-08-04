@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .agents import router as agents_router
+from .channel_apps import router as channel_apps_router
 from .channel_connections import router as channel_connections_router
 from .projects import router as projects_router
 from .tenants import router as tenants_router
@@ -14,5 +15,6 @@ for _sub_router in (
     agents_router,
     workflows_router,
     channel_connections_router,
+    channel_apps_router,
 ):
     router.include_router(_sub_router)

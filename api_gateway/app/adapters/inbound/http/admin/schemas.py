@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from .....domain.models.channel_app import ChannelAppProvider
 from .....domain.models.channel_connection import ChannelType
 
 
@@ -157,6 +158,29 @@ class ChannelConnectionOut(BaseModel):
     channel_type: ChannelType
     external_id: str
     display_name: Optional[str] = None
+    has_credentials: bool
+    config: Dict[str, Any]
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+# ---------------------------------------------------------------------
+# Channel apps (credenciales de la App compartida por proveedor)
+# ---------------------------------------------------------------------
+
+class ChannelAppUpsert(BaseModel):
+    credentials: Dict[str, Any] = Field(default_factory=dict)
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ChannelAppOut(BaseModel):
+    """
+    Nunca expone `credentials` en claro, igual que ChannelConnectionOut.
+    """
+
+    id: UUID
+    provider: ChannelAppProvider
     has_credentials: bool
     config: Dict[str, Any]
     status: str

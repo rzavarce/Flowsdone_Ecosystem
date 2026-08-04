@@ -10,13 +10,13 @@ from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import JSONResponse
 
 from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
-from .....core.config import settings
 
 logger = logging.getLogger("channels.twitter")
 
 router = APIRouter(prefix="/webhooks/twitter", tags=["channels:twitter"])
 
 CHANNEL_TYPE = "twitter"
+APP_PROVIDER = "twitter"
 
 
 def _hmac_sha256_base64(secret: str, message: str) -> str:
@@ -30,11 +30,14 @@ async def crc_challenge(request: Request) -> JSONResponse:
     X/Twitter Account Activity API: valida la suscripción del webhook
     respondiendo un HMAC-SHA256 del crc_token, firmado con el consumer secret.
     """
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
+    consumer_secret = channel_app.credentials.get("consumer_secret") if channel_app else None
+
     crc_token = request.query_params.get("crc_token")
-    if not crc_token or not settings.X_CONSUMER_SECRET:
+    if not crc_token or not consumer_secret:
         raise HTTPException(status_code=400, detail="missing crc_token or consumer secret")
 
-    response_token = "sha256=" + _hmac_sha256_base64(settings.X_CONSUMER_SECRET, crc_token)
+    response_token = "sha256=" + _hmac_sha256_base64(consumer_secret, crc_token)
     return JSONResponse(status_code=200, content={"response_token": response_token})
 
 
@@ -43,7 +46,10 @@ async def receive_webhook(request: Request) -> JSONResponse:
     raw_body = await request.body()
     signature = request.headers.get("X-Twitter-Webhooks-Signature")
 
-    if not _verify_signature(raw_body, signature):
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
+    consumer_secret = channel_app.credentials.get("consumer_secret") if channel_app else None
+
+    if not _verify_signature(raw_body, signature, consumer_secret):
         logger.warning("channels.twitter.invalid_signature")
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 
@@ -65,13 +71,13 @@ async def receive_webhook(request: Request) -> JSONResponse:
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
-def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
+def _verify_signature(raw_body: bytes, signature_header: str | None, consumer_secret: str | None) -> bool:
     if not signature_header or not signature_header.startswith("sha256="):
         return False
-    if not settings.X_CONSUMER_SECRET:
+    if not consumer_secret:
         return False
 
-    expected = "sha256=" + _hmac_sha256_base64(settings.X_CONSUMER_SECRET, raw_body.decode("utf-8"))
+    expected = "sha256=" + _hmac_sha256_base64(consumer_secret, raw_body.decode("utf-8"))
     return hmac.compare_digest(expected, signature_header)
 
 

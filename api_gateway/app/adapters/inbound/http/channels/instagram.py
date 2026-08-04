@@ -7,7 +7,6 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse, PlainTextResponse
 
 from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
-from .....core.config import settings
 from .meta_common import handle_verification_challenge, verify_meta_signature
 
 logger = logging.getLogger("channels.instagram")
@@ -15,16 +14,22 @@ logger = logging.getLogger("channels.instagram")
 router = APIRouter(prefix="/webhooks/instagram", tags=["channels:instagram"])
 
 CHANNEL_TYPE = "instagram"
+# Facebook + Instagram comparten una sola Meta App (ver README sección 9 y
+# /internal/admin/channel-apps) — no es por tenant, es la App del SaaS.
+APP_PROVIDER = "meta"
 
 
 @router.get("")
 async def verify_webhook(request: Request) -> PlainTextResponse:
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
+    verify_token = channel_app.credentials.get("webhook_verify_token") if channel_app else None
+
     params = request.query_params
     return handle_verification_challenge(
         mode=params.get("hub.mode"),
         verify_token=params.get("hub.verify_token"),
         challenge=params.get("hub.challenge"),
-        expected_token=settings.META_WEBHOOK_VERIFY_TOKEN,
+        expected_token=verify_token,
     )
 
 
@@ -33,7 +38,10 @@ async def receive_webhook(request: Request) -> JSONResponse:
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
 
-    if not verify_meta_signature(raw_body, signature, settings.META_APP_SECRET or ""):
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
+    app_secret = channel_app.credentials.get("app_secret") if channel_app else None
+
+    if not verify_meta_signature(raw_body, signature, app_secret or ""):
         logger.warning("channels.instagram.invalid_signature")
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 

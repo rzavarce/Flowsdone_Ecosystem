@@ -7,7 +7,6 @@ from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
 from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
-from .....core.config import settings
 
 logger = logging.getLogger("channels.telegram")
 
@@ -22,7 +21,16 @@ async def receive_webhook(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ) -> JSONResponse:
-    if not settings.TELEGRAM_WEBHOOK_SECRET or x_telegram_bot_api_secret_token != settings.TELEGRAM_WEBHOOK_SECRET:
+    # A diferencia de Meta/X/TikTok (una App compartida), cada cliente tiene
+    # su propio bot de Telegram con su propio secret_token — se guarda junto
+    # al resto de sus credenciales en channel_connections, no en channel_apps.
+    channel_connection_repo = request.app.state.channel_connection_repo
+    resolution = await channel_connection_repo.get_by_channel_and_external_id(
+        CHANNEL_TYPE, bot_token
+    )
+    expected_secret = resolution.credentials.get("telegram_webhook_secret") if resolution else None
+
+    if not expected_secret or x_telegram_bot_api_secret_token != expected_secret:
         logger.warning("channels.telegram.invalid_secret")
         return JSONResponse(status_code=401, content={"ok": False, "error": "invalid_secret"})
 

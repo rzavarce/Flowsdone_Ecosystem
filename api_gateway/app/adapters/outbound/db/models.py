@@ -119,6 +119,33 @@ class ChannelConnectionModel(Base):
     )
 
 
+class ChannelAppModel(Base):
+    """
+    Credenciales de la App compartida por proveedor (meta/twitter/tiktok),
+    global para todo el SaaS — no confundir con ChannelConnectionModel, que
+    sí es por proyecto/cliente.
+    """
+
+    __tablename__ = "channel_apps"
+    __table_args__ = (
+        UniqueConstraint("provider", name="uq_channel_apps_provider"),
+        CheckConstraint(
+            "provider IN ('meta','twitter','tiktok')",
+            name="ck_channel_apps_provider",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    credentials: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class WorkflowExecutionModel(Base):
     """
     Tabla ya existente para idempotencia (creada históricamente por

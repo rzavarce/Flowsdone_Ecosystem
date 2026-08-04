@@ -25,6 +25,7 @@ except Exception:
 # ✅ export admin/tenancy repository ports
 from .admin_repositories import (  # noqa: F401
     AgentRepositoryPort,
+    ChannelAppRepositoryPort,
     ChannelConnectionRepositoryPort,
     ProjectRepositoryPort,
     TenantRepositoryPort,
