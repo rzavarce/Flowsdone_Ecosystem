@@ -1,9 +1,9 @@
-from typing import Protocol
+from typing import Optional, Protocol
 from ....application.dto.message_dto import MessageDTO
 
 # ✅ re-export legacy ports (antes estaban en app/domain/ports/outbound.py)
 class MessagePublisherPort(Protocol):
-    async def publish(self, message: MessageDTO) -> None: ...
+    async def publish(self, message: MessageDTO, *, key: Optional[str] = None) -> None: ...
 
 
 class LangflowExecutorPort(Protocol):

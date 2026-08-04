@@ -324,8 +324,20 @@ Si el `channel_connection` no existe para ese `(channel_type, external_id)` (can
 | `TIKTOK_CLIENT_SECRET` | TikTok for Developers |
 | `EVOLUTION_API_KEY` | Ya existía para el propio Evolution API; se reutiliza como shared secret del webhook `apikey` |
 | `LANGFLOW_API_KEY` | **Obligatoria** para que `LangflowExecutor` autentique contra Langflow — ver troubleshooting (sección 15) |
+| `KAFKA_TOPIC_PARTITIONS` | Particiones de `KAFKA_TOPIC`/`DLQ_TOPIC` (default `6`) — ver "Particiones de Kafka por canal" más abajo |
 
 Hoy solo **WhatsApp (Evolution API)** tiene credenciales reales configuradas — Facebook/Instagram/X/Telegram/TikTok están implementados y probados a nivel de verificación de firma, pero necesitan que cargues las apps/bots reales de cada plataforma (`META_APP_SECRET`, tokens de bot, etc.) antes de recibir tráfico real.
+
+### Particiones de Kafka por canal (aislar fallas/carga sin sumar workers)
+
+`IngestMessageUseCase` publica cada mensaje en `KAFKA_TOPIC` (`inbound.messages`) usando el **canal como `key`** de Kafka (`KafkaPublisher.publish(..., key=channel)`). Con eso, Kafka garantiza que todos los mensajes de un mismo canal (`whatsapp_evolution`, `facebook`, `web`, etc.) siempre caen en la **misma partición** y en orden — es la base para poder aislar canales entre sí más adelante, sin tener que definir un worker por canal.
+
+- `api_gateway/app/infrastructure/kafka_admin.py` (`ensure_topics_exist()`) crea `KAFKA_TOPIC`/`DLQ_TOPIC` con `KAFKA_TOPIC_PARTITIONS` particiones (default `6`, env-configurable) si no existen, y **sube** la cantidad de particiones si el tópico ya existía con menos (Kafka no permite bajarlas). Corre solo, al arrancar `api` y los workers de Kafka — no hace falta tocar nada a mano salvo que quieras más de 6.
+- **Hoy, con una sola réplica de `kafka_inbound_worker`**, esto no aísla nada todavía — un único proceso sigue consumiendo las 6 particiones. El aislamiento real se activa el día que escales réplicas del mismo worker:
+  ```bash
+  docker compose up -d --scale kafka_inbound_worker=3
+  ```
+  Kafka reparte automáticamente las particiones entre las réplicas activas del mismo `group_id` (`workflow-workers`). Si un canal tiene un pico o un flow lento, solo la réplica que atiende esa partición se ve afectada — las demás siguen sirviendo el resto de los canales sin cambiar una línea de código. Escalá esto según demanda real en producción, no antes.
 
 ---
 

@@ -82,7 +82,10 @@ class IngestMessageUseCase:
         # -----------------------------------------------------------------
         # 3. Publicación en broker
         # -----------------------------------------------------------------
-        await publisher.publish(envelope.model_dump())
+        # key=channel: en Kafka esto particiona los mensajes por canal, así
+        # un canal lento/con picos no bloquea a los demás una vez que se
+        # escalen réplicas de kafka_inbound_worker (RabbitMQ lo ignora).
+        await publisher.publish(envelope.model_dump(), key=envelope.channel)
 
         logger.info(
             "ingest.message.published",

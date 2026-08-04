@@ -43,7 +43,7 @@ class KafkaPublisher(MessagePublisherPort):
             await self._producer.stop()
             logger.info("kafka.publisher.stopped", extra={"topic": self._topic})
 
-    async def publish(self, event: Any) -> None:
+    async def publish(self, event: Any, *, key: str | None = None) -> None:
         if not self._producer:
             raise RuntimeError("Kafka producer not started")
 
@@ -52,9 +52,10 @@ class KafkaPublisher(MessagePublisherPort):
         await self._producer.send_and_wait(
             topic=self._topic,
             value=payload,
+            key=key.encode("utf-8") if key else None,
         )
 
         logger.info(
             "kafka.message.published",
-            extra={"topic": self._topic},
+            extra={"topic": self._topic, "key": key},
         )

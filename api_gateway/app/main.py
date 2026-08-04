@@ -19,6 +19,8 @@ from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
 from .adapters.outbound.queue.factory import PublisherFactory
 
+from .infrastructure.kafka_admin import ensure_topics_exist
+
 from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
 from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
 from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
@@ -87,6 +89,8 @@ async def lifespan(app: FastAPI):
                 "topic": settings.KAFKA_TOPIC,
             },
         )
+
+        await ensure_topics_exist()
 
         kafka_publisher = KafkaPublisher(
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,

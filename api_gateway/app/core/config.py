@@ -17,6 +17,12 @@ class Settings(BaseModel):
     ENABLE_KAFKA: bool = True
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     KAFKA_TOPIC: str = "inbound.messages"
+    # Particiones de KAFKA_TOPIC/DLQ_TOPIC. Los mensajes se particionan por
+    # canal (key=channel), así que esto es el techo de canales que pueden
+    # aislarse entre sí escalando réplicas de kafka_inbound_worker más
+    # adelante (docker compose up -d --scale kafka_inbound_worker=N), sin
+    # tocar código.
+    KAFKA_TOPIC_PARTITIONS: int = 6
     DLQ_TOPIC: str = "inbound.messages.dlq"
 
     # --------------------------------------------------
@@ -97,6 +103,7 @@ settings = Settings(
     ENABLE_KAFKA=_bool(os.getenv("ENABLE_KAFKA"), True),
     KAFKA_BOOTSTRAP_SERVERS=os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092"),
     KAFKA_TOPIC=os.getenv("KAFKA_TOPIC", "inbound.messages"),
+    KAFKA_TOPIC_PARTITIONS=int(os.getenv("KAFKA_TOPIC_PARTITIONS", "6")),
     DLQ_TOPIC=os.getenv("DLQ_TOPIC", "inbound.messages.dlq"),
 
     ENABLE_RABBITMQ=_bool(os.getenv("ENABLE_RABBITMQ"), False),
