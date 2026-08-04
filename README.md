@@ -221,7 +221,7 @@ docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d postgres -c "\l"
 
 ### Migraciones de `gatewaydb` (Alembic)
 
-El esquema de `gatewaydb` (`tenants`, `projects`, `agents`, `workflows`, `channel_connections`, `workflow_executions`) vive en `api_gateway/migrations/`, gestionado con Alembic (`api_gateway/alembic.ini`). No hay un servicio de Docker que las corra solo. En producción, `.github/workflows/deploy.yml` las corre automáticamente (`docker compose run --rm api alembic ... upgrade head`) después de buildear las imágenes y antes de levantar `api`/los workers. En local se aplican a mano:
+El esquema de `gatewaydb` (`tenants`, `projects`, `agents`, `workflows`, `channel_connections`, `channel_apps`, `workflow_executions`) vive en `api_gateway/migrations/`, gestionado con Alembic (`api_gateway/alembic.ini`). No hay un servicio de Docker que las corra solo. En producción, `.github/workflows/deploy.yml` las corre automáticamente (`docker compose run --rm api alembic ... upgrade head`) después de buildear las imágenes y antes de levantar `api`/los workers. En local se aplican a mano:
 
 ```bash
 # Desde la raíz del repo, contra el postgres del stack ya levantado
@@ -303,30 +303,53 @@ Cada canal tiene su propio endpoint HTTP que entiende el payload **nativo** de e
 
 | Canal | Ruta | Verificación | `external_id` (clave de lookup) |
 |---|---|---|---|
-| Facebook Messenger | `GET/POST /webhooks/facebook` | GET: `hub.verify_token` == `META_WEBHOOK_VERIFY_TOKEN`. POST: `X-Hub-Signature-256` (HMAC-SHA256 con `META_APP_SECRET`) | `entry[].id` (Page ID) |
-| Instagram DM | `GET/POST /webhooks/instagram` | Igual que Facebook (misma Meta App) | `entry[].id` (IG Business Account ID) |
-| X / Twitter | `GET/POST /webhooks/twitter` | GET: CRC challenge firmado con `X_CONSUMER_SECRET`. POST: `X-Twitter-Webhooks-Signature` | `for_user_id` |
+| Facebook Messenger | `GET/POST /webhooks/facebook` | GET: `hub.verify_token` == `channel_apps.meta.webhook_verify_token`. POST: `X-Hub-Signature-256` (HMAC-SHA256 con `channel_apps.meta.app_secret`) | `entry[].id` (Page ID) |
+| Instagram DM | `GET/POST /webhooks/instagram` | Igual que Facebook (misma Meta App, mismo `channel_apps.meta`) | `entry[].id` (IG Business Account ID) |
+| X / Twitter | `GET/POST /webhooks/twitter` | GET: CRC challenge firmado con `channel_apps.twitter.consumer_secret`. POST: `X-Twitter-Webhooks-Signature` | `for_user_id` |
 | WhatsApp (Evolution API) | `POST /webhooks/whatsapp` | Header `apikey` == `EVOLUTION_API_KEY` | `instance` (nombre de la instancia Evolution) |
-| Telegram | `POST /webhooks/telegram/{bot_token}` | Header `X-Telegram-Bot-Api-Secret-Token` == `TELEGRAM_WEBHOOK_SECRET` | `{bot_token}` (path) |
-| TikTok | `POST /webhooks/tiktok` | Header `TikTok-Signature` (HMAC-SHA256 con `TIKTOK_CLIENT_SECRET`) | `data.open_id` |
+| Telegram | `POST /webhooks/telegram/{bot_token}` | Header `X-Telegram-Bot-Api-Secret-Token` == `channel_connections.credentials.telegram_webhook_secret` de esa conexión | `{bot_token}` (path) |
+| TikTok | `POST /webhooks/tiktok` | Header `TikTok-Signature` (HMAC-SHA256 con `channel_apps.tiktok.client_secret`) | `data.open_id` |
 
 Si el `channel_connection` no existe para ese `(channel_type, external_id)` (canal sin registrar todavía en el admin API), el webhook responde `200` igual (para que la plataforma no reintente infinito) pero no publica nada — queda logueado como `*.not_routable`.
 
-**Variables de entorno nuevas** (agregalas a `.env`, placeholders en `env.example.txt`):
+### Secrets de canal: App compartida (`channel_apps`) vs. credenciales por conexión
+
+Hay dos categorías, y no son intercambiables:
+
+- **Meta (Facebook+Instagram), X y TikTok firman *todos* los webhooks de *todas* las páginas/cuentas suscriptas con el secret de una sola App** — así funcionan esas plataformas, no es una limitación nuestra. El modelo de este SaaS es **una única App compartida por proveedor** para todos los tenants (igual que ManyChat/Chatfuel/Intercom): evita que cada cliente tenga que pasar por App Review/Business Verification de Meta solo para conectar su página. Estos secrets viven en la tabla `channel_apps` (cifrados igual que `channel_connections.credentials`), gestionable vía admin API — **ya no están en `.env`**:
+  ```bash
+  KEY="$ADMIN_API_KEY"
+
+  # Facebook + Instagram comparten esta misma App
+  curl -s -X PUT http://localhost:8000/internal/admin/channel-apps/meta \
+    -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+    -d '{"credentials": {"app_secret": "...", "webhook_verify_token": "..."}}'
+
+  curl -s -X PUT http://localhost:8000/internal/admin/channel-apps/twitter \
+    -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+    -d '{"credentials": {"consumer_secret": "..."}}'
+
+  curl -s -X PUT http://localhost:8000/internal/admin/channel-apps/tiktok \
+    -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+    -d '{"credentials": {"client_secret": "..."}}'
+  ```
+  `GET /internal/admin/channel-apps` nunca expone `credentials` en claro (mismo patrón que `channel_connections`, solo `has_credentials: bool`).
+
+- **Telegram es la excepción**: cada cliente tiene su propio bot, y Telegram permite un `secret_token` distinto por bot (configurado vía `setWebhook`). Por eso ese secret **no** va en `channel_apps` — va en `channel_connections.credentials.telegram_webhook_secret` de la conexión de ese cliente, igual que el resto de sus credenciales (sección 8).
+
+Si mañana un cliente enterprise exige traer su propia App de Meta/X/TikTok en vez de usar la compartida, es un caso especial a resolver puntualmente (agregar el override en esa `channel_connection`) — no está soportado de forma genérica hoy.
+
+**Otras variables de entorno relevantes:**
 
 | Variable | Para qué |
 |---|---|
 | `ADMIN_API_KEY` | Header `X-Admin-Api-Key` del API de administración (sección 8) |
-| `CHANNEL_CREDENTIALS_ENCRYPTION_KEY` | Clave Fernet para cifrar `channel_connections.credentials` |
-| `META_APP_SECRET` / `META_WEBHOOK_VERIFY_TOKEN` | Facebook + Instagram (una sola Meta App para ambos) |
-| `X_CONSUMER_SECRET` | X / Twitter (Account Activity API) |
-| `TELEGRAM_WEBHOOK_SECRET` | Telegram (`secret_token` configurado vía `setWebhook`) |
-| `TIKTOK_CLIENT_SECRET` | TikTok for Developers |
-| `EVOLUTION_API_KEY` | Ya existía para el propio Evolution API; se reutiliza como shared secret del webhook `apikey` |
+| `CHANNEL_CREDENTIALS_ENCRYPTION_KEY` | Clave Fernet para cifrar `channel_connections.credentials` **y** `channel_apps.credentials` |
+| `EVOLUTION_API_KEY` | Shared secret del propio Evolution API — valida el header `apikey` del webhook de WhatsApp |
 | `LANGFLOW_API_KEY` | **Obligatoria** para que `LangflowExecutor` autentique contra Langflow — ver troubleshooting (sección 15) |
 | `KAFKA_TOPIC_PARTITIONS` | Particiones de `KAFKA_TOPIC`/`DLQ_TOPIC` (default `6`) — ver "Particiones de Kafka por canal" más abajo |
 
-Hoy solo **WhatsApp (Evolution API)** tiene credenciales reales configuradas — Facebook/Instagram/X/Telegram/TikTok están implementados y probados a nivel de verificación de firma, pero necesitan que cargues las apps/bots reales de cada plataforma (`META_APP_SECRET`, tokens de bot, etc.) antes de recibir tráfico real.
+Hoy solo **WhatsApp (Evolution API)** tiene credenciales reales configuradas — Facebook/Instagram/X/TikTok están implementados y probados a nivel de verificación de firma, pero necesitan que cargues la App real de cada plataforma en `channel_apps` antes de recibir tráfico real; Telegram necesita un bot real con su `secret_token` en la `channel_connection` correspondiente.
 
 ### Particiones de Kafka por canal (aislar fallas/carga sin sumar workers)
 

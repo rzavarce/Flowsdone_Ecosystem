@@ -4,6 +4,7 @@ from typing import Any, List, Optional, Protocol
 from uuid import UUID
 
 from ....domain.models.agent import Agent
+from ....domain.models.channel_app import ChannelApp
 from ....domain.models.channel_connection import ChannelConnection
 from ....domain.models.channel_resolution import ChannelResolution
 from ....domain.models.project import Project
@@ -78,3 +79,16 @@ class ChannelConnectionRepositoryPort(Protocol):
     async def list_by_project(self, project_id: Optional[UUID] = None) -> List[ChannelConnection]: ...
     async def update(self, channel_connection_id: UUID, **fields: Any) -> Optional[ChannelConnection]: ...
     async def delete(self, channel_connection_id: UUID) -> bool: ...
+
+
+class ChannelAppRepositoryPort(Protocol):
+    """
+    Credenciales de la App compartida por proveedor (meta/twitter/tiktok) —
+    global, no por tenant. `provider` es la clave natural: solo existen 3
+    filas posibles, por eso `upsert` en vez de create/update por id.
+    """
+
+    async def upsert(self, *, provider: str, credentials: dict, config: dict) -> ChannelApp: ...
+    async def get_by_provider(self, provider: str) -> Optional[ChannelApp]: ...
+    async def list(self) -> List[ChannelApp]: ...
+    async def delete(self, provider: str) -> bool: ...

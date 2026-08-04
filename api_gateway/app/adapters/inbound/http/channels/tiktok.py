@@ -9,21 +9,21 @@ from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
 from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
-from .....core.config import settings
 
 logger = logging.getLogger("channels.tiktok")
 
 router = APIRouter(prefix="/webhooks/tiktok", tags=["channels:tiktok"])
 
 CHANNEL_TYPE = "tiktok"
+APP_PROVIDER = "tiktok"
 
 
-def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
+def _verify_signature(raw_body: bytes, signature_header: str | None, client_secret: str | None) -> bool:
     """
     TikTok firma sus webhooks con el header `TikTok-Signature: t=<ts>,s=<sig>`,
     donde sig = HMAC-SHA256(client_secret, f"{ts}.{raw_body}") en hexadecimal.
     """
-    if not signature_header or not settings.TIKTOK_CLIENT_SECRET:
+    if not signature_header or not client_secret:
         return False
 
     parts = dict(
@@ -35,7 +35,7 @@ def _verify_signature(raw_body: bytes, signature_header: str | None) -> bool:
 
     message = f"{timestamp}.{raw_body.decode('utf-8')}"
     expected = hmac.new(
-        settings.TIKTOK_CLIENT_SECRET.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
+        client_secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
     ).hexdigest()
 
     return hmac.compare_digest(expected, signature)
@@ -46,7 +46,10 @@ async def receive_webhook(request: Request) -> JSONResponse:
     raw_body = await request.body()
     signature = request.headers.get("TikTok-Signature")
 
-    if not _verify_signature(raw_body, signature):
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
+    client_secret = channel_app.credentials.get("client_secret") if channel_app else None
+
+    if not _verify_signature(raw_body, signature, client_secret):
         logger.warning("channels.tiktok.invalid_signature")
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 

@@ -62,12 +62,12 @@ class Settings(BaseModel):
     # --------------------------------------------------
     # Canales (webhooks entrantes)
     # --------------------------------------------------
+    # Los secrets de App de Meta/X/TikTok (compartidos por todo el SaaS) y el
+    # secret_token por bot de Telegram ya NO viven acá — se gestionan por
+    # /internal/admin/channel-apps y channel_connections.credentials
+    # respectivamente (ver README sección 9). EVOLUTION_API_KEY sigue siendo
+    # el shared secret de nuestra propia instancia de Evolution API.
     EVOLUTION_API_KEY: Optional[str] = None
-    META_APP_SECRET: Optional[str] = None
-    META_WEBHOOK_VERIFY_TOKEN: Optional[str] = None
-    TELEGRAM_WEBHOOK_SECRET: Optional[str] = None
-    X_CONSUMER_SECRET: Optional[str] = None
-    TIKTOK_CLIENT_SECRET: Optional[str] = None
 
     # --------------------------------------------------
     # Webhook callbacks
@@ -126,11 +126,6 @@ settings = Settings(
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 
     EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),
-    META_APP_SECRET=os.getenv("META_APP_SECRET"),
-    META_WEBHOOK_VERIFY_TOKEN=os.getenv("META_WEBHOOK_VERIFY_TOKEN"),
-    TELEGRAM_WEBHOOK_SECRET=os.getenv("TELEGRAM_WEBHOOK_SECRET"),
-    X_CONSUMER_SECRET=os.getenv("X_CONSUMER_SECRET"),
-    TIKTOK_CLIENT_SECRET=os.getenv("TIKTOK_CLIENT_SECRET"),
 
     CALLBACK_HMAC_SECRET=os.getenv("CALLBACK_HMAC_SECRET", "dev-secret-change-me"),
     CALLBACK_MAX_RETRIES=int(os.getenv("CALLBACK_MAX_RETRIES", "3")),
