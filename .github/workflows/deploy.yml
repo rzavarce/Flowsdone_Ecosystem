@@ -21,6 +21,11 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script_stop: true
+          # Default de appleboy/ssh-action (10m) no alcanza para buildear las
+          # 8 imágenes del stack en frío, en particular evolution (build de
+          # TypeScript con tsup) — sin esto el deploy corta a la mitad del
+          # `docker compose build` con "Run Command Timeout".
+          command_timeout: 40m
           script: |
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
