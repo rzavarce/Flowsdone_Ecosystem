@@ -1,0 +1,1017 @@
+{
+  "info": {
+    "_postman_id": "6e6e44ea-b1a3-4d45-8df3-2fcbb30240cd",
+    "name": "Flowsdone Ecosystem - API Gateway",
+    "description": "Colección de todos los endpoints del api_gateway: admin (tenants/proyectos/agentes/workflows/canales), webhooks por canal (Facebook, Instagram, X, WhatsApp, Telegram, TikTok), webhook genérico (n8n/RabbitMQ) y el callback interno de outbound.\n\nUsá el environment \"Flowsdone - Local\" o \"Flowsdone - Producción\" (variable `baseUrl` + secrets). En producción tenés que cargar los secrets vos mismo en el environment (quedan vacíos a propósito, nunca se commitean valores reales).\n\nOrden recomendado para correr todo de punta a punta (Collection Runner): Admin - Tenants > Admin - Projects > Admin - Agents > Admin - Channel Apps > Admin - Channel Connections > Webhooks - *. Las requests de \"Create\" guardan el id devuelto en variables del environment (tenantId, projectId, agentId, channelConnectionId) para que las siguientes ya las usen solas.\n\nNo incluye el WebSocket /ws (el soporte de WS de Postman varía según versión/cliente) — para probar el webchat interactivo usá `{{baseUrl}}/static/webchat/` en el navegador.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "X-Admin-Api-Key", "type": "string" },
+      { "key": "value", "value": "{{adminApiKey}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Admin - Tenants",
+      "item": [
+        {
+          "name": "Create Tenant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.environment.set('tenantId', json.id);",
+                  "    console.log('tenantId guardado:', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/tenants",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "tenants"]
+            }
+          }
+        },
+        {
+          "name": "List Tenants",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/tenants",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "tenants"]
+            }
+          }
+        },
+        {
+          "name": "Get Tenant",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/tenants/{{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "tenants", "{{tenantId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Tenant",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp (updated)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/tenants/{{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "tenants", "{{tenantId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Tenant",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/tenants/{{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "tenants", "{{tenantId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.environment.set('projectId', json.id);",
+                  "    console.log('projectId guardado:', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenant_id\": \"{{tenantId}}\",\n  \"name\": \"Soporte\",\n  \"slug\": \"soporte\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "projects"]
+            }
+          }
+        },
+        {
+          "name": "List Projects (por tenant)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/projects?tenant_id={{tenantId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "projects"],
+              "query": [{ "key": "tenant_id", "value": "{{tenantId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Project",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "projects", "{{projectId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Soporte (updated)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "projects", "{{projectId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "projects", "{{projectId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Agents",
+      "item": [
+        {
+          "name": "Create Agent",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.environment.set('agentId', json.id);",
+                  "    console.log('agentId guardado:', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"name\": \"Fibrabot\",\n  \"langflow_flow_id\": \"REPLACE-CON-UN-FLOW-ID-REAL-DE-LANGFLOW\",\n  \"is_default\": true,\n  \"config\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/agents",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "agents"]
+            }
+          }
+        },
+        {
+          "name": "List Agents (por proyecto)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/agents?project_id={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "agents"],
+              "query": [{ "key": "project_id", "value": "{{projectId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Agent",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "agents", "{{agentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Agent",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"langflow_flow_id\": \"OTRO-FLOW-ID\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "agents", "{{agentId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Agent",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/agents/{{agentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "agents", "{{agentId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Workflows (n8n)",
+      "item": [
+        {
+          "name": "Create Workflow",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.environment.set('workflowConfigId', json.id);",
+                  "    console.log('workflowConfigId guardado:', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"name\": \"Automatizacion de pedidos\",\n  \"n8n_workflow_id\": \"REPLACE-CON-EL-ID-DEL-WORKFLOW-EN-N8N\",\n  \"trigger_type\": \"webhook\",\n  \"config\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "workflows"]
+            }
+          }
+        },
+        {
+          "name": "List Workflows (por proyecto)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/workflows?project_id={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "workflows"],
+              "query": [{ "key": "project_id", "value": "{{projectId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Workflow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/workflows/{{workflowConfigId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "workflows", "{{workflowConfigId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Workflow",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"inactive\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/workflows/{{workflowConfigId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "workflows", "{{workflowConfigId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Workflow",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/workflows/{{workflowConfigId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "workflows", "{{workflowConfigId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Channel Apps",
+      "description": "App compartida por proveedor (meta cubre Facebook+Instagram, twitter, tiktok) — una sola fila por proveedor para todo el SaaS. Ver README sección 9.",
+      "item": [
+        {
+          "name": "Upsert Channel App - meta",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credentials\": {\n    \"app_secret\": \"{{metaAppSecret}}\",\n    \"webhook_verify_token\": \"{{metaWebhookVerifyToken}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/meta",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "meta"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Channel App - twitter",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credentials\": {\n    \"consumer_secret\": \"{{xConsumerSecret}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/twitter",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "twitter"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Channel App - tiktok",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credentials\": {\n    \"client_secret\": \"{{tiktokClientSecret}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/tiktok",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "tiktok"]
+            }
+          }
+        },
+        {
+          "name": "List Channel Apps",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps"]
+            }
+          }
+        },
+        {
+          "name": "Get Channel App",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/meta",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "meta"]
+            }
+          }
+        },
+        {
+          "name": "Delete Channel App",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/tiktok",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "tiktok"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Channel Connections",
+      "description": "Los external_id usados acá (demo-facebook-page-id, etc.) tienen que coincidir EXACTO con los que mandan las requests de la carpeta \"Webhooks - *\" — ahí van hardcodeados en el body porque se firman con HMAC (no se pueden usar variables en un body firmado). Si los cambiás acá, cambialos también en el webhook correspondiente.",
+      "item": [
+        {
+          "name": "Create Channel Connection - WhatsApp (Evolution)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.environment.set('channelConnectionId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"whatsapp_evolution\",\n  \"external_id\": \"{{demoWhatsappInstance}}\",\n  \"credentials\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "Create Channel Connection - Facebook",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"facebook\",\n  \"external_id\": \"demo-facebook-page-id\",\n  \"credentials\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "Create Channel Connection - Instagram",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"instagram\",\n  \"external_id\": \"demo-instagram-account-id\",\n  \"credentials\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "Create Channel Connection - Twitter/X",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"twitter\",\n  \"external_id\": \"demo-twitter-account-id\",\n  \"credentials\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "Create Channel Connection - TikTok",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"tiktok\",\n  \"external_id\": \"demo-tiktok-open-id\",\n  \"credentials\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "Create Channel Connection - Telegram",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"telegram\",\n  \"external_id\": \"{{telegramBotToken}}\",\n  \"credentials\": {\n    \"telegram_webhook_secret\": \"{{telegramWebhookSecret}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"]
+            }
+          }
+        },
+        {
+          "name": "List Channel Connections (por proyecto)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections?project_id={{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections"],
+              "query": [{ "key": "project_id", "value": "{{projectId}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Channel Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections/{{channelConnectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections", "{{channelConnectionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Channel Connection",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"display_name\": \"Instancia principal\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections/{{channelConnectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections", "{{channelConnectionId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Channel Connection",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-connections/{{channelConnectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-connections", "{{channelConnectionId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - Generic (n8n / RabbitMQ)",
+      "item": [
+        {
+          "name": "POST /webhooks/generic",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"workflow_id\": \"n8n-demo-workflow\",\n  \"conversation_id\": \"conv-demo-1\",\n  \"sender_id\": \"tester\",\n  \"transport\": \"rabbitmq\",\n  \"channel\": \"web\",\n  \"payload\": {\n    \"message\": \"Hola, este es un mensaje de prueba para n8n\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/generic",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "generic"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - Facebook",
+      "item": [
+        {
+          "name": "GET Verify (challenge)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/facebook?hub.mode=subscribe&hub.verify_token={{metaWebhookVerifyToken}}&hub.challenge=test-challenge-123",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "facebook"],
+              "query": [
+                { "key": "hub.mode", "value": "subscribe" },
+                { "key": "hub.verify_token", "value": "{{metaWebhookVerifyToken}}" },
+                { "key": "hub.challenge", "value": "test-challenge-123" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Evento (mensaje nuevo)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.environment.get('metaAppSecret');",
+                  "const hash = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Hub-Signature-256', value: 'sha256=' + hash });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"object\":\"page\",\"entry\":[{\"id\":\"demo-facebook-page-id\",\"messaging\":[{\"sender\":{\"id\":\"psid-123\"},\"recipient\":{\"id\":\"demo-facebook-page-id\"},\"message\":{\"mid\":\"m1\",\"text\":\"Hola desde Facebook\"}}]}]}"
+            },
+            "description": "El external_id (`demo-facebook-page-id`) tiene que existir como channel_connection de tipo facebook (ver carpeta Admin - Channel Connections). El body es literal (sin variables) porque el pre-request script firma exactamente `pm.request.body.raw`.",
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/facebook",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "facebook"]
+            }
+          }
+        },
+        {
+          "name": "POST Evento (firma inválida -> 401 esperado)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Hub-Signature-256", "value": "sha256=0000000000000000000000000000000000000000000000000000000000000000" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"object\":\"page\",\"entry\":[{\"id\":\"demo-facebook-page-id\",\"messaging\":[{\"sender\":{\"id\":\"psid-123\"},\"recipient\":{\"id\":\"demo-facebook-page-id\"},\"message\":{\"mid\":\"m1\",\"text\":\"Hola desde Facebook\"}}]}]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/facebook",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "facebook"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - Instagram",
+      "item": [
+        {
+          "name": "GET Verify (challenge)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/instagram?hub.mode=subscribe&hub.verify_token={{metaWebhookVerifyToken}}&hub.challenge=test-challenge-123",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "instagram"],
+              "query": [
+                { "key": "hub.mode", "value": "subscribe" },
+                { "key": "hub.verify_token", "value": "{{metaWebhookVerifyToken}}" },
+                { "key": "hub.challenge", "value": "test-challenge-123" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Evento (mensaje nuevo)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.environment.get('metaAppSecret');",
+                  "const hash = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Hub-Signature-256', value: 'sha256=' + hash });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"object\":\"instagram\",\"entry\":[{\"id\":\"demo-instagram-account-id\",\"messaging\":[{\"sender\":{\"id\":\"igsid-123\"},\"recipient\":{\"id\":\"demo-instagram-account-id\"},\"message\":{\"mid\":\"m1\",\"text\":\"Hola desde Instagram\"}}]}]}"
+            },
+            "description": "El external_id (`demo-instagram-account-id`) tiene que existir como channel_connection de tipo instagram.",
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/instagram",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "instagram"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - X / Twitter",
+      "item": [
+        {
+          "name": "GET CRC challenge",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const secret = pm.environment.get('xConsumerSecret');",
+                  "const crcToken = pm.request.url.query.get('crc_token');",
+                  "const expected = 'sha256=' + CryptoJS.HmacSHA256(crcToken, secret).toString(CryptoJS.enc.Base64);",
+                  "const json = pm.response.json();",
+                  "pm.test('response_token coincide con el esperado', function () {",
+                  "    pm.expect(json.response_token).to.eql(expected);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/twitter?crc_token=crc-token-abc",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "twitter"],
+              "query": [{ "key": "crc_token", "value": "crc-token-abc" }]
+            }
+          }
+        },
+        {
+          "name": "POST Evento (DM nuevo)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.environment.get('xConsumerSecret');",
+                  "const hash = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Base64);",
+                  "pm.request.headers.upsert({ key: 'X-Twitter-Webhooks-Signature', value: 'sha256=' + hash });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"for_user_id\":\"demo-twitter-account-id\",\"direct_message_events\":[{\"message_create\":{\"sender_id\":\"twitter-user-123\",\"message_data\":{\"text\":\"Hola desde Twitter\"}}}]}"
+            },
+            "description": "El external_id (`demo-twitter-account-id`, = for_user_id) tiene que existir como channel_connection de tipo twitter.",
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/twitter",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "twitter"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - Telegram",
+      "item": [
+        {
+          "name": "POST Mensaje nuevo",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Telegram-Bot-Api-Secret-Token", "value": "{{telegramWebhookSecret}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 1,\n  \"message\": {\n    \"from\": { \"id\": 555 },\n    \"chat\": { \"id\": 999 },\n    \"text\": \"Hola desde Telegram\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/telegram/{{telegramBotToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "telegram", "{{telegramBotToken}}"]
+            }
+          }
+        },
+        {
+          "name": "POST Mensaje (secret inválido -> 401 esperado)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Telegram-Bot-Api-Secret-Token", "value": "secret-incorrecto" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"update_id\": 1,\n  \"message\": {\n    \"from\": { \"id\": 555 },\n    \"chat\": { \"id\": 999 },\n    \"text\": \"Hola desde Telegram\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/telegram/{{telegramBotToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "telegram", "{{telegramBotToken}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - TikTok",
+      "item": [
+        {
+          "name": "POST Evento (mensaje nuevo)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.environment.get('tiktokClientSecret');",
+                  "const ts = Math.floor(Date.now() / 1000).toString();",
+                  "const message = ts + '.' + body;",
+                  "const sig = CryptoJS.HmacSHA256(message, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'TikTok-Signature', value: 't=' + ts + ',s=' + sig });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"data\":{\"open_id\":\"demo-tiktok-open-id\",\"message\":\"Hola desde TikTok\"}}"
+            },
+            "description": "El external_id (`demo-tiktok-open-id`) tiene que existir como channel_connection de tipo tiktok. La firma incluye un timestamp generado en el momento (`t=`), así que no se puede pre-calcular: la corre el pre-request script en cada envío.",
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/tiktok",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "tiktok"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks - WhatsApp (Evolution API)",
+      "item": [
+        {
+          "name": "POST Mensaje nuevo",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "apikey", "value": "{{evolutionApiKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"messages.upsert\",\n  \"instance\": \"{{demoWhatsappInstance}}\",\n  \"data\": {\n    \"key\": { \"remoteJid\": \"5511999998888@s.whatsapp.net\", \"fromMe\": false, \"id\": \"ABC123\" },\n    \"message\": { \"conversation\": \"Hola, necesito ayuda\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "whatsapp"]
+            }
+          }
+        },
+        {
+          "name": "POST Mensaje (apikey inválida -> 401 esperado)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "apikey", "value": "apikey-incorrecta" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": \"messages.upsert\",\n  \"instance\": \"{{demoWhatsappInstance}}\",\n  \"data\": {\n    \"key\": { \"remoteJid\": \"5511999998888@s.whatsapp.net\", \"fromMe\": false, \"id\": \"ABC123\" },\n    \"message\": { \"conversation\": \"Hola, necesito ayuda\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/whatsapp",
+              "host": ["{{baseUrl}}"],
+              "path": ["webhooks", "whatsapp"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Internal - Outbound Callback",
+      "item": [
+        {
+          "name": "POST /internal/outbound",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.request.body.raw;",
+                  "const secret = pm.environment.get('callbackHmacSecret');",
+                  "const sig = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "pm.request.headers.upsert({ key: 'X-Signature', value: sig });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"meta\":{\"message_id\":\"postman-test-1\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"direction\":\"outbound\",\"conversation_id\":\"conv-demo-1\",\"workflow_id\":\"n8n-demo-workflow\"},\"transport\":\"rabbitmq\",\"channel\":\"web\",\"payload\":{\"message\":\"Respuesta de prueba desde Postman\"},\"response_to\":null,\"version\":1}"
+            },
+            "description": "Simula lo que hace rabbitmq_outbound_worker/kafka_outbound_worker: firma el body con CALLBACK_HMAC_SECRET y lo entrega acá para que el gateway lo despache por WebSocket. Con conversation_id=conv-demo-1 no vas a ver nada (no hay ningún WS conectado con ese id), pero sirve para validar que la firma HMAC se acepta (202) o se rechaza (401 con firma mala).",
+            "url": {
+              "raw": "{{baseUrl}}/internal/outbound",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "outbound"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
