@@ -351,6 +351,34 @@ Si mañana un cliente enterprise exige traer su propia App de Meta/X/TikTok en v
 
 Hoy solo **WhatsApp (Evolution API)** tiene credenciales reales configuradas — Facebook/Instagram/X/TikTok están implementados y probados a nivel de verificación de firma, pero necesitan que cargues la App real de cada plataforma en `channel_apps` antes de recibir tráfico real; Telegram necesita un bot real con su `secret_token` en la `channel_connection` correspondiente.
 
+### Envío outbound: la respuesta del workflow vuelve al canal de origen
+
+El `MessageEnvelope` de cada mensaje entrante de un canal (no webchat) lleva
+`meta.channel_connection_id` y `meta.external_conversation_key` (el
+`remoteJid`/`psid`/`chat_id`/... del destinatario). Cuando Langflow
+responde, ese mismo `envelope.meta` viaja intacto hasta
+`HandleOutboundResponseUseCase.deliver()` (llamado desde
+`/internal/outbound` tanto por `kafka_outbound_worker` como por
+`rabbitmq_outbound_worker`), que resuelve el `channel_connection` y
+despacha el mensaje al `ChannelSenderPort` correspondiente
+(`api_gateway/app/adapters/outbound/channels/`):
+
+| Canal | Envío | Credencial nueva requerida |
+|---|---|---|
+| WhatsApp (Evolution API) | `POST {EVOLUTION_API_BASE_URL}/message/sendText/{instance}` | Ninguna — reusa `EVOLUTION_API_KEY` global |
+| Facebook Messenger | Graph API `POST /{page_id}/messages` | `channel_connections.credentials.page_access_token` |
+| Instagram DM | Graph API `POST /{ig_account_id}/messages` | `channel_connections.credentials.page_access_token` |
+| Telegram | `POST {TELEGRAM_API_BASE_URL}/bot{bot_token}/sendMessage` | Ninguna — `external_id` ya es el bot_token |
+| X / Twitter | — | **Stub**: loguea `channel.sender.not_implemented`. Requiere tier de pago de la API de X para DMs + firma OAuth1.0a (no implementada) |
+| TikTok | — | **Stub**: loguea `channel.sender.not_implemented`. TikTok no tiene API pública de envío para apps de terceros fuera de Business Messaging |
+
+Variables nuevas: `EVOLUTION_API_BASE_URL`, `META_GRAPH_API_BASE_URL`,
+`META_GRAPH_API_VERSION`, `TELEGRAM_API_BASE_URL`.
+
+Si el envío a un canal falla (credenciales faltantes, API externa caída,
+etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.deliver.failed`
+— nunca rompe `/internal/outbound` ni reintenta automáticamente.
+
 ### Particiones de Kafka por canal (aislar fallas/carga sin sumar workers)
 
 `IngestMessageUseCase` publica cada mensaje en `KAFKA_TOPIC` (`inbound.messages`) usando el **canal como `key`** de Kafka (`KafkaPublisher.publish(..., key=channel)`). Con eso, Kafka garantiza que todos los mensajes de un mismo canal (`whatsapp_evolution`, `facebook`, `web`, etc.) siempre caen en la **misma partición** y en orden — es la base para poder aislar canales entre sí más adelante, sin tener que definir un worker por canal.

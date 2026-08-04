@@ -70,6 +70,19 @@ class Settings(BaseModel):
     EVOLUTION_API_KEY: Optional[str] = None
 
     # --------------------------------------------------
+    # Canales (envío de mensajes salientes)
+    # --------------------------------------------------
+    EVOLUTION_API_BASE_URL: str = "http://evolution:8080"
+    META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
+    META_GRAPH_API_VERSION: str = "v21.0"
+    TELEGRAM_API_BASE_URL: str = "https://api.telegram.org"
+    # Twitter/TikTok: el envío real todavía no está implementado (ver
+    # channel_sender de esos canales) — estos settings solo existen para
+    # cuando se active, no se usan todavía.
+    TWITTER_API_BASE_URL: Optional[str] = None
+    TIKTOK_API_BASE_URL: Optional[str] = None
+
+    # --------------------------------------------------
     # Webhook callbacks
     # --------------------------------------------------
     CALLBACK_HMAC_SECRET: str = "dev-secret-change-me"
@@ -126,6 +139,13 @@ settings = Settings(
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 
     EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),
+
+    EVOLUTION_API_BASE_URL=os.getenv("EVOLUTION_API_BASE_URL", "http://evolution:8080"),
+    META_GRAPH_API_BASE_URL=os.getenv("META_GRAPH_API_BASE_URL", "https://graph.facebook.com"),
+    META_GRAPH_API_VERSION=os.getenv("META_GRAPH_API_VERSION", "v21.0"),
+    TELEGRAM_API_BASE_URL=os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
+    TWITTER_API_BASE_URL=os.getenv("TWITTER_API_BASE_URL"),
+    TIKTOK_API_BASE_URL=os.getenv("TIKTOK_API_BASE_URL"),
 
     CALLBACK_HMAC_SECRET=os.getenv("CALLBACK_HMAC_SECRET", "dev-secret-change-me"),
     CALLBACK_MAX_RETRIES=int(os.getenv("CALLBACK_MAX_RETRIES", "3")),

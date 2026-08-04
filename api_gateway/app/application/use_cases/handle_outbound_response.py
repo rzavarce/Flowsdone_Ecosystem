@@ -1,9 +1,11 @@
 import logging
 from typing import Any, Dict, Optional
+from uuid import UUID
 
 import httpx
 
 from ...domain.models.message_envelope import MessageEnvelope
+from ...domain.ports.outbound import ChannelConnectionRepositoryPort, ChannelSenderPort
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 
@@ -21,10 +23,14 @@ class HandleOutboundResponseUseCase:
         self,
         publisher: Optional[Any] = None,
         ws_registry: Optional[Any] = None,
+        channel_connection_repo: Optional[ChannelConnectionRepositoryPort] = None,
+        channel_senders: Optional[Dict[str, ChannelSenderPort]] = None,
     ):
         self.publisher = publisher
         self.ws_registry = ws_registry
-    
+        self.channel_connection_repo = channel_connection_repo
+        self.channel_senders = channel_senders or {}
+
 
     def _extract_text(self, value: Any) -> Optional[str]:
         if value is None:
@@ -197,24 +203,66 @@ class HandleOutboundResponseUseCase:
 
     async def deliver(self, envelope: MessageEnvelope) -> None:
         """
-        Entrega un envelope outbound ya procesado al WebSocket del cliente.
-        Llamado desde /internal/outbound cuando el worker reenvía la respuesta
-        al gateway para que la dispatche por WS.
+        Entrega un envelope outbound ya procesado. Llamado desde
+        /internal/outbound cuando el worker (Kafka o RabbitMQ) reenvía la
+        respuesta al gateway.
+
+        - Si viene de webchat, la dispatcha por WebSocket (comportamiento
+          original, sin cambios).
+        - Si viene de un canal nativo (channel_connection_id presente),
+          la envía de vuelta a ese canal con el sender correspondiente.
         """
-        if not self.ws_registry or not envelope.meta.conversation_id:
+        if self.ws_registry and envelope.meta.conversation_id:
+            try:
+                await self.ws_registry.send(
+                    conversation_id=envelope.meta.conversation_id,
+                    message={
+                        "type": "chat.response",
+                        "message": envelope.payload.get("message", ""),
+                    },
+                )
+                logger.info(
+                    "handle.outbound.ws.delivered",
+                    extra={"conversation_id": envelope.meta.conversation_id},
+                )
+            except Exception:
+                logger.error("handle.outbound.ws.deliver.failed", exc_info=True)
+
+        await self._deliver_to_channel(envelope)
+
+    async def _deliver_to_channel(self, envelope: MessageEnvelope) -> None:
+        channel_connection_id = envelope.meta.channel_connection_id
+        if not channel_connection_id or not self.channel_connection_repo:
+            return
+
+        sender = self.channel_senders.get(envelope.channel or "")
+        if not sender:
             return
 
         try:
-            await self.ws_registry.send(
-                conversation_id=envelope.meta.conversation_id,
-                message={
-                    "type": "chat.response",
-                    "message": envelope.payload.get("message", ""),
+            connection = await self.channel_connection_repo.get_by_id(
+                UUID(channel_connection_id)
+            )
+            if not connection:
+                logger.warning(
+                    "handle.outbound.channel.connection_not_found",
+                    extra={"channel_connection_id": channel_connection_id},
+                )
+                return
+
+            await sender.send(
+                external_id=connection.external_id,
+                recipient_id=envelope.meta.external_conversation_key or "",
+                text=envelope.payload.get("message", ""),
+                credentials=connection.credentials,
+            )
+
+            logger.info(
+                "handle.outbound.channel.delivered",
+                extra={
+                    "channel": envelope.channel,
+                    "channel_connection_id": channel_connection_id,
                 },
             )
-            logger.info(
-                "handle.outbound.ws.delivered",
-                extra={"conversation_id": envelope.meta.conversation_id},
-            )
         except Exception:
-            logger.error("handle.outbound.ws.deliver.failed", exc_info=True)
+            logger.error("handle.outbound.channel.deliver.failed", exc_info=True)

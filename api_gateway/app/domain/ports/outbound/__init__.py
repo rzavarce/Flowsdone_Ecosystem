@@ -31,3 +31,6 @@ from .admin_repositories import (  # noqa: F401
     TenantRepositoryPort,
     WorkflowConfigRepositoryPort,
 )
+
+# ✅ export channel sender port (envío outbound a canales nativos)
+from .channel_sender import ChannelSenderPort  # noqa: F401

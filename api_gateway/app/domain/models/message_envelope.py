@@ -13,6 +13,8 @@ class MessageMeta(BaseModel):
     direction: Optional[str] = None
     conversation_id: Optional[str] = None
     workflow_id: Optional[str] = None
+    channel_connection_id: Optional[str] = None
+    external_conversation_key: Optional[str] = None
 
 
 class MessageEnvelope(BaseModel):

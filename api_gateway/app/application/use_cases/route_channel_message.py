@@ -77,4 +77,6 @@ class RouteChannelMessageUseCase:
             transport="kafka",
             payload=payload,
             channel=channel_type,
+            channel_connection_id=str(resolution.channel_connection_id),
+            external_conversation_key=external_conversation_key,
         )
