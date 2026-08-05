@@ -1,3 +1,5 @@
+"""SQLAlchemy implementation of ChannelConnectionRepositoryPort."""
+
 from __future__ import annotations
 
 from typing import Any, List, Optional
@@ -14,6 +16,15 @@ from .models import AgentModel, ChannelConnectionModel, ProjectModel
 
 
 def _to_domain(model: ChannelConnectionModel) -> ChannelConnection:
+    """Convert a ChannelConnectionModel row into a ChannelConnection
+    domain object, decrypting its credentials.
+
+    Args:
+        model (ChannelConnectionModel): The ORM row to convert.
+
+    Returns:
+        ChannelConnection: The equivalent domain object.
+    """
     return ChannelConnection(
         id=model.id,
         project_id=model.project_id,
@@ -30,7 +41,19 @@ def _to_domain(model: ChannelConnectionModel) -> ChannelConnection:
 
 
 class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
+    """Postgres-backed implementation of ChannelConnectionRepositoryPort.
+
+    Credentials are encrypted with Fernet before being persisted (see
+    crypto.py) and decrypted on read.
+    """
+
     def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+        """Build the repository.
+
+        Args:
+            sessionmaker (async_sessionmaker[AsyncSession]): Session
+                factory used to open database sessions.
+        """
         self._sessionmaker = sessionmaker
 
     async def create(
@@ -44,6 +67,22 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
         credentials: dict,
         config: dict,
     ) -> ChannelConnection:
+        """Insert a new channel connection row.
+
+        Args:
+            project_id (UUID): Id of the owning project.
+            agent_id (UUID): Id of the agent that answers messages on
+                this channel.
+            channel_type (str): Channel type (e.g. "whatsapp_evolution",
+                "telegram").
+            external_id (str): Identifier used to route inbound webhooks.
+            display_name (Optional[str]): Optional human-readable label.
+            credentials (dict): Channel credentials to encrypt and store.
+            config (dict): Arbitrary channel configuration.
+
+        Returns:
+            ChannelConnection: The created channel connection.
+        """
         async with self._sessionmaker() as session:
             model = ChannelConnectionModel(
                 project_id=project_id,
@@ -60,6 +99,15 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
             return _to_domain(model)
 
     async def get_by_id(self, channel_connection_id: UUID) -> Optional[ChannelConnection]:
+        """Fetch a channel connection by id.
+
+        Args:
+            channel_connection_id (UUID): Id of the channel connection.
+
+        Returns:
+            Optional[ChannelConnection]: The channel connection, or
+            None if it does not exist.
+        """
         async with self._sessionmaker() as session:
             model = await session.get(ChannelConnectionModel, channel_connection_id)
             return _to_domain(model) if model else None
@@ -67,6 +115,20 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
     async def get_by_channel_and_external_id(
         self, channel_type: str, external_id: str
     ) -> Optional[ChannelResolution]:
+        """Resolve an inbound webhook to its tenant/project/agent.
+
+        Joins across channel_connections, agents, and projects so the
+        message router gets everything it needs in a single query,
+        restricted to active records on all three.
+
+        Args:
+            channel_type (str): Channel type of the incoming webhook.
+            external_id (str): External id carried by the webhook.
+
+        Returns:
+            Optional[ChannelResolution]: A resolution with decrypted
+            credentials, or None if no active connection matches.
+        """
         async with self._sessionmaker() as session:
             stmt = (
                 select(ChannelConnectionModel, AgentModel, ProjectModel)
@@ -97,6 +159,16 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
             )
 
     async def list_by_project(self, project_id: Optional[UUID] = None) -> List[ChannelConnection]:
+        """List channel connections, optionally filtered by project.
+
+        Args:
+            project_id (Optional[UUID]): If given, only return
+                connections owned by this project.
+
+        Returns:
+            List[ChannelConnection]: The matching channel connections,
+            ordered by creation date.
+        """
         async with self._sessionmaker() as session:
             stmt = select(ChannelConnectionModel).order_by(ChannelConnectionModel.created_at)
             if project_id is not None:
@@ -105,6 +177,17 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
             return [_to_domain(m) for m in result.scalars().all()]
 
     async def update(self, channel_connection_id: UUID, **fields: Any) -> Optional[ChannelConnection]:
+        """Update a channel connection's fields.
+
+        Args:
+            channel_connection_id (UUID): Id of the connection to update.
+            **fields (Any): Fields to update; None values are ignored.
+                `credentials`, if given, is re-encrypted.
+
+        Returns:
+            Optional[ChannelConnection]: The updated channel connection,
+            or None if it does not exist.
+        """
         async with self._sessionmaker() as session:
             model = await session.get(ChannelConnectionModel, channel_connection_id)
             if not model:
@@ -123,6 +206,15 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
             return _to_domain(model)
 
     async def delete(self, channel_connection_id: UUID) -> bool:
+        """Delete a channel connection.
+
+        Args:
+            channel_connection_id (UUID): Id of the connection to delete.
+
+        Returns:
+            bool: True if a connection was deleted, False if it did
+            not exist.
+        """
         async with self._sessionmaker() as session:
             model = await session.get(ChannelConnectionModel, channel_connection_id)
             if not model:

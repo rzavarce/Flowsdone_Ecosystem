@@ -1,3 +1,5 @@
+"""SQLAlchemy ORM models for the multi-tenant admin schema."""
+
 from __future__ import annotations
 
 import uuid
@@ -17,10 +19,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base shared by all models in this module."""
 
 
 class TenantModel(Base):
+    """Row for a top-level tenant."""
+
     __tablename__ = "tenants"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -34,6 +38,8 @@ class TenantModel(Base):
 
 
 class ProjectModel(Base):
+    """Row for a project, scoped to a tenant."""
+
     __tablename__ = "projects"
     __table_args__ = (UniqueConstraint("tenant_id", "slug", name="uq_projects_tenant_slug"),)
 
@@ -51,6 +57,8 @@ class ProjectModel(Base):
 
 
 class AgentModel(Base):
+    """Row for a Langflow agent, scoped to a project."""
+
     __tablename__ = "agents"
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_agents_project_name"),)
 
@@ -70,6 +78,8 @@ class AgentModel(Base):
 
 
 class WorkflowConfigModel(Base):
+    """Row for an n8n workflow trigger configuration, scoped to a project."""
+
     __tablename__ = "workflows"
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_workflows_project_name"),)
 
@@ -89,6 +99,11 @@ class WorkflowConfigModel(Base):
 
 
 class ChannelConnectionModel(Base):
+    """Row for a channel connected to a project (WhatsApp/Facebook/
+    Instagram/Telegram/X/TikTok account), unique per (channel_type,
+    external_id).
+    """
+
     __tablename__ = "channel_connections"
     __table_args__ = (
         UniqueConstraint(
@@ -120,10 +135,9 @@ class ChannelConnectionModel(Base):
 
 
 class ChannelAppModel(Base):
-    """
-    Credenciales de la App compartida por proveedor (meta/twitter/tiktok),
-    global para todo el SaaS — no confundir con ChannelConnectionModel, que
-    sí es por proyecto/cliente.
+    """Row for a provider's shared app credentials (meta/twitter/tiktok),
+    global for the whole SaaS. Not to be confused with
+    ChannelConnectionModel, which is per project/client.
     """
 
     __tablename__ = "channel_apps"
@@ -147,11 +161,13 @@ class ChannelAppModel(Base):
 
 
 class WorkflowExecutionModel(Base):
-    """
-    Tabla ya existente para idempotencia (creada históricamente por
-    scripts/init-db.sh). Se incorpora a Alembic con los mismos nombres/tipos
-    que espera adapters/outbound/db/idempotency_repository.py (asyncpg crudo,
-    no se toca).
+    """Row used for idempotency tracking.
+
+    This table predates Alembic (originally created by
+    scripts/init-db.sh) and is incorporated here with the same
+    names/types expected by
+    adapters/outbound/db/idempotency_repository.py, which accesses it
+    through raw asyncpg rather than through this model.
     """
 
     __tablename__ = "workflow_executions"

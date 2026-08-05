@@ -1,3 +1,5 @@
+"""Use case for routing a native channel message to its Langflow agent."""
+
 from __future__ import annotations
 
 import logging
@@ -11,20 +13,32 @@ logger = logging.getLogger("usecase.route_channel_message")
 
 
 class ChannelMessageNotRoutable(Exception):
-    """No existe un channel_connection activo para (channel_type, external_id)."""
+    """Raised when no active channel_connection matches (channel_type, external_id)."""
 
 
 def build_conversation_id(project_id: UUID, channel_type: str, external_conversation_key: str) -> str:
+    """Build a deterministic conversation id for a channel message.
+
+    Args:
+        project_id (UUID): Id of the project the channel connection
+            belongs to.
+        channel_type (str): Channel type (e.g. "whatsapp_evolution",
+            "telegram").
+        external_conversation_key (str): Id of the sender on the
+            external platform (remoteJid, psid, chat_id, ...).
+
+    Returns:
+        str: A conversation id of the form
+        "{project_id}:{channel_type}:{external_conversation_key}".
+    """
     return f"{project_id}:{channel_type}:{external_conversation_key}"
 
 
 class RouteChannelMessageUseCase:
-    """
-    Resuelve (channel_type, external_id) -> tenant/proyecto/agente vía
-    ChannelConnectionRepositoryPort y delega en IngestMessageUseCase (ya
-    existente, no se modifica), forzando transport="kafka" para todo mensaje
-    de canal de chat, según la regla de enrutamiento del gateway: los canales
-    de chat siempre van a Langflow vía Kafka.
+    """Resolves (channel_type, external_id) to a tenant/project/agent via
+    ChannelConnectionRepositoryPort and delegates to IngestMessageUseCase,
+    forcing transport="kafka" for every chat channel message, per the
+    gateway's routing rule: chat channels always go to Langflow via Kafka.
     """
 
     def __init__(
@@ -32,6 +46,14 @@ class RouteChannelMessageUseCase:
         channel_connection_repo: ChannelConnectionRepositoryPort,
         ingest_message_use_case: IngestMessageUseCase,
     ) -> None:
+        """Build the use case.
+
+        Args:
+            channel_connection_repo (ChannelConnectionRepositoryPort):
+                Repository used to resolve inbound channel messages.
+            ingest_message_use_case (IngestMessageUseCase): Use case
+                that builds and publishes the canonical envelope.
+        """
         self.channel_connection_repo = channel_connection_repo
         self.ingest_message_use_case = ingest_message_use_case
 
@@ -44,6 +66,22 @@ class RouteChannelMessageUseCase:
         sender_id: Optional[str],
         payload: Dict[str, Any],
     ) -> None:
+        """Resolve a channel message and ingest it for Langflow processing.
+
+        Args:
+            channel_type (str): Channel type of the incoming message.
+            external_id (str): External id carried by the webhook
+                (instance name, page id, bot token, etc.).
+            external_conversation_key (str): Id of the sender on the
+                external platform (remoteJid, psid, chat_id, ...).
+            sender_id (Optional[str]): Id of the sender, if different
+                from external_conversation_key.
+            payload (Dict[str, Any]): Message payload to ingest.
+
+        Raises:
+            ChannelMessageNotRoutable: If no active channel_connection
+                matches (channel_type, external_id).
+        """
         resolution = await self.channel_connection_repo.get_by_channel_and_external_id(
             channel_type, external_id
         )

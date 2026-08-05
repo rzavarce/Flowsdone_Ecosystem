@@ -1,3 +1,7 @@
+"""Admin HTTP API: tenant/project/agent/workflow/channel CRUD, mounted
+under /internal/admin and protected by require_admin_api_key.
+"""
+
 from fastapi import APIRouter
 
 from .agents import router as agents_router

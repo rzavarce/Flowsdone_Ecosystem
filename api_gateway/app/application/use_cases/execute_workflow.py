@@ -1,16 +1,17 @@
+"""Use case for running a Langflow workflow idempotently."""
+
 import logging
 
 from ...domain.models.message_envelope import MessageEnvelope
-from ...domain.ports.outbound import LangflowExecutorPort
 from ...domain.ports.idempotency import IdempotencyRepositoryPort
+from ...domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("usecase.execute_workflow")
 
 
 class ExecuteWorkflowUseCase:
-    """
-    Executes a Langflow workflow in an idempotent way
-    using a MessageEnvelope as input.
+    """Executes a Langflow workflow in an idempotent way, given a
+    MessageEnvelope as input.
     """
 
     def __init__(
@@ -18,10 +19,31 @@ class ExecuteWorkflowUseCase:
         executor: LangflowExecutorPort,
         idempotency_repo: IdempotencyRepositoryPort,
     ) -> None:
+        """Build the use case.
+
+        Args:
+            executor (LangflowExecutorPort): Executor used to run the
+                Langflow flow.
+            idempotency_repo (IdempotencyRepositoryPort): Repository
+                used to prevent duplicate execution.
+        """
         self.executor = executor
         self.idempotency_repo = idempotency_repo
 
     async def execute(self, envelope: MessageEnvelope) -> dict | None:
+        """Run the workflow for an inbound envelope, skipping duplicates.
+
+        Args:
+            envelope (MessageEnvelope): The inbound envelope to process.
+
+        Returns:
+            dict | None: The raw Langflow result, or None if the
+            message was already claimed by a previous (duplicate) call.
+
+        Raises:
+            Exception: Re-raises any error from the executor after
+                marking the message as failed, so it can be retried.
+        """
         meta = envelope.meta
 
         started = await self.idempotency_repo.try_start(

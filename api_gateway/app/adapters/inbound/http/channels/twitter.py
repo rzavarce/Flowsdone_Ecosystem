@@ -1,3 +1,5 @@
+"""X (Twitter) inbound webhook."""
+
 from __future__ import annotations
 
 import base64
@@ -20,15 +22,35 @@ APP_PROVIDER = "twitter"
 
 
 def _hmac_sha256_base64(secret: str, message: str) -> str:
+    """Compute a base64-encoded HMAC-SHA256 digest.
+
+    Args:
+        secret (str): HMAC secret key.
+        message (str): Message to sign.
+
+    Returns:
+        str: The base64-encoded digest.
+    """
     digest = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
     return base64.b64encode(digest).decode("utf-8")
 
 
 @router.get("")
 async def crc_challenge(request: Request) -> JSONResponse:
-    """
-    X/Twitter Account Activity API: valida la suscripción del webhook
-    respondiendo un HMAC-SHA256 del crc_token, firmado con el consumer secret.
+    """Validate the X/Twitter Account Activity API webhook subscription.
+
+    Responds with an HMAC-SHA256 of the crc_token, signed with the
+    consumer secret, as required by X's CRC challenge.
+
+    Args:
+        request (Request): The incoming FastAPI request; carries the
+            crc_token query parameter.
+
+    Returns:
+        JSONResponse: The signed response_token.
+
+    Raises:
+        HTTPException: 400 if crc_token or the consumer secret is missing.
     """
     channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
     consumer_secret = channel_app.credentials.get("consumer_secret") if channel_app else None
@@ -43,6 +65,14 @@ async def crc_challenge(request: Request) -> JSONResponse:
 
 @router.post("")
 async def receive_webhook(request: Request) -> JSONResponse:
+    """Receive an X Account Activity webhook event and route each DM.
+
+    Args:
+        request (Request): The incoming FastAPI request.
+
+    Returns:
+        JSONResponse: Acknowledges the event to X.
+    """
     raw_body = await request.body()
     signature = request.headers.get("X-Twitter-Webhooks-Signature")
 
@@ -72,6 +102,18 @@ async def receive_webhook(request: Request) -> JSONResponse:
 
 
 def _verify_signature(raw_body: bytes, signature_header: str | None, consumer_secret: str | None) -> bool:
+    """Verify X's X-Twitter-Webhooks-Signature header.
+
+    Args:
+        raw_body (bytes): Raw request body bytes.
+        signature_header (str | None): Value of the
+            X-Twitter-Webhooks-Signature header.
+        consumer_secret (str | None): The app's consumer secret to
+            validate against.
+
+    Returns:
+        bool: True if the signature is present and valid.
+    """
     if not signature_header or not signature_header.startswith("sha256="):
         return False
     if not consumer_secret:
@@ -88,6 +130,16 @@ async def _route_event(
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
+    """Route a single X direct message to its Langflow agent.
+
+    Args:
+        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        account_id (str): X account id the DM was sent to.
+        sender_id (str): Id of the sender.
+        text (str): Message text.
+        raw_event (Dict[str, Any]): The raw X event, kept in the
+            payload for debugging.
+    """
     try:
         await route_use_case.execute(
             channel_type=CHANNEL_TYPE,

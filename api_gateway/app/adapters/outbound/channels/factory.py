@@ -1,3 +1,5 @@
+"""Factory that assembles all available channel senders."""
+
 from __future__ import annotations
 
 from typing import Dict
@@ -12,13 +14,18 @@ from .whatsapp_evolution_sender import WhatsAppEvolutionSender
 
 
 class ChannelSenderFactory:
-    """
-    Arma el mapa channel_type -> ChannelSenderPort usado por
-    HandleOutboundResponseUseCase.deliver() para despachar la respuesta
-    de un workflow al canal nativo que originó la conversación.
+    """Builds the channel_type -> ChannelSenderPort map used by
+    HandleOutboundResponseUseCase.deliver() to dispatch a workflow
+    response to the native channel that originated the conversation.
     """
 
     def build_all(self) -> Dict[str, ChannelSenderPort]:
+        """Instantiate every supported channel sender.
+
+        Returns:
+            Dict[str, ChannelSenderPort]: A dict mapping each supported
+            channel_type to its sender.
+        """
         return {
             "whatsapp_evolution": WhatsAppEvolutionSender(),
             "facebook": FacebookSender(),

@@ -1,3 +1,5 @@
+"""WhatsApp (Evolution API) outbound channel sender."""
+
 from __future__ import annotations
 
 import logging
@@ -12,11 +14,12 @@ logger = logging.getLogger("channels.whatsapp_evolution.sender")
 
 
 class WhatsAppEvolutionSender(ChannelSenderPort):
-    """
-    external_id = instance de Evolution API (mismo valor usado para el
-    routing de webhooks entrantes). El apikey es el shared secret de
-    nuestra propia instancia de Evolution (settings.EVOLUTION_API_KEY),
-    no algo por-conexión.
+    """Sends messages via Evolution API.
+
+    `external_id` is the Evolution instance name (the same value used
+    for inbound webhook routing). The apikey is the shared secret of
+    our own Evolution instance (settings.EVOLUTION_API_KEY), not
+    something per connection.
     """
 
     async def send(
@@ -27,6 +30,15 @@ class WhatsAppEvolutionSender(ChannelSenderPort):
         text: str,
         credentials: Dict[str, Any],
     ) -> None:
+        """Send a text message to a WhatsApp recipient.
+
+        Args:
+            external_id (str): Evolution API instance name.
+            recipient_id (str): WhatsApp remoteJid of the recipient.
+            text (str): Message body to send.
+            credentials (Dict[str, Any]): Unused for WhatsApp; kept for
+                interface consistency with ChannelSenderPort.
+        """
         if not settings.EVOLUTION_API_KEY:
             logger.error(
                 "channel.sender.missing_credentials",

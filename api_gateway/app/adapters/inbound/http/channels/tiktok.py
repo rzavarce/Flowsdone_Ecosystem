@@ -1,3 +1,5 @@
+"""TikTok inbound webhook."""
+
 from __future__ import annotations
 
 import hashlib
@@ -5,7 +7,7 @@ import hmac
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 
 from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
@@ -19,9 +21,19 @@ APP_PROVIDER = "tiktok"
 
 
 def _verify_signature(raw_body: bytes, signature_header: str | None, client_secret: str | None) -> bool:
-    """
-    TikTok firma sus webhooks con el header `TikTok-Signature: t=<ts>,s=<sig>`,
-    donde sig = HMAC-SHA256(client_secret, f"{ts}.{raw_body}") en hexadecimal.
+    """Verify TikTok's webhook signature.
+
+    TikTok signs its webhooks with the `TikTok-Signature: t=<ts>,s=<sig>`
+    header, where sig = HMAC-SHA256(client_secret, f"{ts}.{raw_body}")
+    in hex.
+
+    Args:
+        raw_body (bytes): Raw request body bytes.
+        signature_header (str | None): Value of the TikTok-Signature header.
+        client_secret (str | None): The app's client secret to validate against.
+
+    Returns:
+        bool: True if the signature is present and valid.
     """
     if not signature_header or not client_secret:
         return False
@@ -43,6 +55,14 @@ def _verify_signature(raw_body: bytes, signature_header: str | None, client_secr
 
 @router.post("")
 async def receive_webhook(request: Request) -> JSONResponse:
+    """Receive a TikTok webhook event and route the message.
+
+    Args:
+        request (Request): The incoming FastAPI request.
+
+    Returns:
+        JSONResponse: Acknowledges the event to TikTok.
+    """
     raw_body = await request.body()
     signature = request.headers.get("TikTok-Signature")
 
@@ -72,6 +92,16 @@ async def _route_event(
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
+    """Route a single TikTok message to its Langflow agent.
+
+    Args:
+        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        open_id (str): TikTok open_id, used as both external_id and
+            sender_id.
+        text (str): Message text.
+        raw_event (Dict[str, Any]): The raw TikTok event, kept in the
+            payload for debugging.
+    """
     try:
         await route_use_case.execute(
             channel_type=CHANNEL_TYPE,

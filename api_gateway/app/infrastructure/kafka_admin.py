@@ -1,3 +1,5 @@
+"""Kafka topic provisioning, run at startup by the gateway and its workers."""
+
 import logging
 
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
@@ -14,12 +16,14 @@ REQUIRED_TOPICS = [
 
 
 async def ensure_topics_exist() -> None:
-    """
-    Crea los tópicos requeridos si no existen, y sube su cantidad de
-    particiones si quedaron con menos de KAFKA_TOPIC_PARTITIONS (típicamente
-    porque KAFKA_AUTO_CREATE_TOPICS_ENABLE los creó con 1 sola partición antes
-    de que este admin corriera). Kafka no permite bajar particiones, solo
-    subirlas — nunca se achica un tópico existente acá.
+    """Create required Kafka topics if missing, and grow their partition
+    count if it is below KAFKA_TOPIC_PARTITIONS.
+
+    A topic can end up under-partitioned if
+    KAFKA_AUTO_CREATE_TOPICS_ENABLE created it with a single partition
+    before this admin routine ran. Kafka does not allow shrinking
+    partitions, so this function only ever grows an existing topic,
+    never shrinks it.
     """
     admin = AIOKafkaAdminClient(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
 

@@ -1,3 +1,5 @@
+"""Kafka implementation of MessagePublisherPort."""
+
 import json
 import logging
 from typing import Any
@@ -10,21 +12,27 @@ logger = logging.getLogger("kafka.publisher")
 
 
 class KafkaPublisher(MessagePublisherPort):
-    """
-    Outbound adapter for publishing messages to Kafka.
+    """Outbound adapter for publishing messages to Kafka.
 
     Responsibilities:
-    - Connect to Kafka
-    - Serialize events
-    - Publish them to a configured topic
+        - Connect to Kafka.
+        - Serialize events to JSON.
+        - Publish them to a configured topic.
     """
 
     def __init__(self, bootstrap_servers: str, topic: str) -> None:
+        """Build the publisher.
+
+        Args:
+            bootstrap_servers (str): Kafka bootstrap servers.
+            topic (str): Topic to publish to.
+        """
         self._bootstrap_servers = bootstrap_servers
         self._topic = topic
         self._producer: AIOKafkaProducer | None = None
 
     async def start(self) -> None:
+        """Connect the underlying Kafka producer."""
         self._producer = AIOKafkaProducer(
             bootstrap_servers=self._bootstrap_servers
         )
@@ -39,11 +47,21 @@ class KafkaPublisher(MessagePublisherPort):
         )
 
     async def stop(self) -> None:
+        """Disconnect the underlying Kafka producer, if started."""
         if self._producer:
             await self._producer.stop()
             logger.info("kafka.publisher.stopped", extra={"topic": self._topic})
 
     async def publish(self, event: Any, *, key: str | None = None) -> None:
+        """Publish a JSON-serializable event to the configured topic.
+
+        Args:
+            event (Any): The event to publish; serialized to JSON.
+            key (str | None): Optional partition key.
+
+        Raises:
+            RuntimeError: If the producer has not been started.
+        """
         if not self._producer:
             raise RuntimeError("Kafka producer not started")
 

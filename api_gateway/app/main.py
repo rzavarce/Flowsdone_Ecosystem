@@ -1,3 +1,7 @@
+"""FastAPI application entry point: wires adapters, use cases, and routers
+together at startup and exposes the resulting `app`.
+"""
+
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -6,50 +10,48 @@ from fastapi import FastAPI
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
-from .core.config import settings
-from .core.logging import setup_logging
-
-from .adapters.inbound.http.websocket import router as ws_router
-from .adapters.inbound.http.webhooks import router as webhooks_router
-from .adapters.inbound.http.internal_outbound import router as internal_router
-from .adapters.inbound.http.channels import router as channels_router
 from .adapters.inbound.http.admin import router as admin_router
-
+from .adapters.inbound.http.channels import router as channels_router
+from .adapters.inbound.http.internal_outbound import router as internal_router
+from .adapters.inbound.http.webhooks import router as webhooks_router
+from .adapters.inbound.http.websocket import router as ws_router
+from .adapters.outbound.channels.factory import ChannelSenderFactory
+from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
+from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
+from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
+from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from .adapters.outbound.queue.factory import PublisherFactory
 from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
-from .adapters.outbound.queue.factory import PublisherFactory
-
-from .infrastructure.kafka_admin import ensure_topics_exist
-
-from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
-from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
-from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
-from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
-from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
-from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
-from .adapters.outbound.channels.factory import ChannelSenderFactory
-
-from .infrastructure.database import create_engine, create_sessionmaker
-
 from .application.services.ws_registry import WSRegistry
 from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from .application.use_cases.ingest_message import IngestMessageUseCase
 from .application.use_cases.route_channel_message import RouteChannelMessageUseCase
-
-# ---------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------
+from .core.config import settings
+from .core.logging import setup_logging
+from .infrastructure.database import create_engine, create_sessionmaker
+from .infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("bootstrap")
 
 
-# ---------------------------------------------------------------------
-# Lifespan
-# ---------------------------------------------------------------------
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Build and tear down all application state around the app's lifetime.
+
+    Constructs, in order: the WebSocket registry, the message
+    publishers (Kafka/RabbitMQ) and their factory, the ingest use case,
+    the database engine and admin repositories, the outbound handler
+    (WebSocket + native channel senders), and the channel message
+    router - then yields control to FastAPI. On shutdown, stops the
+    publishers and disposes the database engine.
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+    """
     logger.info(
         "application.startup.begin",
         extra={
@@ -59,20 +61,15 @@ async def lifespan(app: FastAPI):
         },
     )
 
-    # --------------------------------------------------------------
     # WebSocket registry
-    # --------------------------------------------------------------
     ws_registry = WSRegistry()
     app.state.ws_registry = ws_registry
 
     logger.info("ws.registry.initialized")
 
-    # --------------------------------------------------------------
     # Publishers (outbound adapters)
-    # --------------------------------------------------------------
     publishers: dict[str, object] = {}
 
-    # ---------------- Kafka ----------------
     if settings.ENABLE_KAFKA:
         if not settings.KAFKA_BOOTSTRAP_SERVERS or not settings.KAFKA_TOPIC:
             raise RuntimeError(
@@ -100,7 +97,6 @@ async def lifespan(app: FastAPI):
 
         logger.info("kafka.publisher.ready")
 
-    # ---------------- RabbitMQ ----------------
     if settings.ENABLE_RABBITMQ:
         if (
             not settings.RABBITMQ_URL
@@ -133,9 +129,6 @@ async def lifespan(app: FastAPI):
 
         logger.info("rabbitmq.publisher.ready")
 
-    # --------------------------------------------------------------
-    # Publisher Factory
-    # --------------------------------------------------------------
     publisher_factory = PublisherFactory(publishers=publishers)
     app.state.publisher_factory = publisher_factory
 
@@ -144,9 +137,7 @@ async def lifespan(app: FastAPI):
         extra={"transports": list(publishers.keys())},
     )
 
-    # --------------------------------------------------------------
-    # Ingest use case (usado por WebSocket y webhooks)
-    # --------------------------------------------------------------
+    # Ingest use case (used by WebSocket and webhooks)
     ingest_use_case = IngestMessageUseCase(
         publisher_factory=publisher_factory,
     )
@@ -154,9 +145,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("ingest.use_case.initialized")
 
-    # --------------------------------------------------------------
-    # Base de datos (multi-tenant: tenants/projects/agents/workflows/channels)
-    # --------------------------------------------------------------
+    # Database (multi-tenant: tenants/projects/agents/workflows/channels)
     db_engine = create_engine()
     db_sessionmaker = create_sessionmaker(db_engine)
     app.state.db_engine = db_engine
@@ -170,9 +159,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("database.repositories.ready")
 
-    # --------------------------------------------------------------
-    # Outbound handler (WS + envío a canales nativos)
-    # --------------------------------------------------------------
+    # Outbound handler (WebSocket + native channel senders). Built
+    # after the database repositories so it can be given a real
+    # channel_connection_repo.
     outbound_handler = HandleOutboundResponseUseCase(
         ws_registry=ws_registry,
         channel_connection_repo=app.state.channel_connection_repo,
@@ -182,9 +171,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("outbound.handler.initialized")
 
-    # --------------------------------------------------------------
-    # Enrutamiento de mensajes de canal (webhooks nativos -> Kafka -> Langflow)
-    # --------------------------------------------------------------
+    # Channel message routing (native webhooks -> Kafka -> Langflow)
     app.state.route_channel_message_use_case = RouteChannelMessageUseCase(
         channel_connection_repo=app.state.channel_connection_repo,
         ingest_message_use_case=ingest_use_case,
@@ -194,14 +181,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("application.startup.complete")
 
-    # --------------------------------------------------------------
-    # Run application
-    # --------------------------------------------------------------
     yield
 
-    # --------------------------------------------------------------
     # Shutdown
-    # --------------------------------------------------------------
     logger.info("application.shutdown.begin")
 
     if settings.ENABLE_KAFKA:
@@ -224,18 +206,29 @@ async def lifespan(app: FastAPI):
     logger.info("application.shutdown.complete")
 
 
-# ---------------------------------------------------------------------
-# FastAPI app
-# ---------------------------------------------------------------------
-
 app = FastAPI(
     title="Omni API Gateway",
     version="1.0.0",
     lifespan=lifespan,
 )
 
+
 class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles that always disables caching, so webchat widget
+    updates are visible immediately without a hard refresh.
+    """
+
     async def get_response(self, path: str, scope):
+        """Serve a static file with cache-disabling headers.
+
+        Args:
+            path (str): Path of the requested static file.
+            scope: ASGI connection scope.
+
+        Returns:
+            Response: The response, with Cache-Control/Pragma/Expires
+            headers set to disable caching.
+        """
         response = await super().get_response(path, scope)
         if isinstance(response, Response):
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
@@ -246,6 +239,16 @@ class NoCacheStaticFiles(StaticFiles):
 
 @app.middleware("http")
 async def no_cache_static(request, call_next):
+    """Disable caching on any response served under /static/.
+
+    Args:
+        request: The incoming request.
+        call_next: The next handler in the middleware chain.
+
+    Returns:
+        Response: The response, with caching disabled if the path is
+        under /static/.
+    """
     response = await call_next(request)
     if request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

@@ -1,3 +1,5 @@
+"""Telegram inbound webhook."""
+
 from __future__ import annotations
 
 import logging
@@ -21,9 +23,23 @@ async def receive_webhook(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ) -> JSONResponse:
-    # A diferencia de Meta/X/TikTok (una App compartida), cada cliente tiene
-    # su propio bot de Telegram con su propio secret_token — se guarda junto
-    # al resto de sus credenciales en channel_connections, no en channel_apps.
+    """Receive a Telegram Bot API update and route the message.
+
+    Unlike Meta/X/TikTok (a single shared app), each client has their
+    own Telegram bot with its own secret_token, stored alongside the
+    rest of its credentials in channel_connections rather than in
+    channel_apps.
+
+    Args:
+        bot_token (str): Telegram bot token, taken from the webhook
+            path and used as the channel connection's external_id.
+        request (Request): The incoming FastAPI request.
+        x_telegram_bot_api_secret_token (str | None): Secret token
+            Telegram sends in this header, configured via setWebhook.
+
+    Returns:
+        JSONResponse: Acknowledges the update to Telegram.
+    """
     channel_connection_repo = request.app.state.channel_connection_repo
     resolution = await channel_connection_repo.get_by_channel_and_external_id(
         CHANNEL_TYPE, bot_token
@@ -56,6 +72,17 @@ async def _route_event(
     text: str,
     raw_update: Dict[str, Any],
 ) -> None:
+    """Route a single Telegram message to its Langflow agent.
+
+    Args:
+        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        bot_token (str): Telegram bot token the update was sent to.
+        chat_id (str): Telegram chat id.
+        sender_id (str): Id of the sender.
+        text (str): Message text.
+        raw_update (Dict[str, Any]): The raw Telegram update, kept in
+            the payload for debugging.
+    """
     try:
         await route_use_case.execute(
             channel_type=CHANNEL_TYPE,
