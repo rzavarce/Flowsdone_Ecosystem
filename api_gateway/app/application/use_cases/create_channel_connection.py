@@ -92,7 +92,7 @@ class CreateChannelConnectionUseCase:
         registrar = self._webhook_registrars.get(channel_type)
         credentials = dict(credentials)
 
-        if registrar is not None:
+        if registrar is not None and registrar.secret_field is not None:
             credentials.setdefault(registrar.secret_field, self._secret_generator.generate())
 
         connection = await self._channel_connection_repo.create(
@@ -114,7 +114,7 @@ class CreateChannelConnectionUseCase:
         await register_or_compensate(
             registrar=registrar,
             external_id=external_id,
-            secret=credentials[registrar.secret_field],
+            credentials=credentials,
             channel_type=channel_type,
             on_failure=_delete_orphaned_connection,
         )

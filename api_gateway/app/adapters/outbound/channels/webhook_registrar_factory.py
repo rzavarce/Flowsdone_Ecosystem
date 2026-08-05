@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Dict
 
 from ....domain.ports.outbound import WebhookRegistrarPort
+from .meta_webhook_registrar import MetaWebhookRegistrar
 from .telegram_webhook_registrar import TelegramWebhookRegistrar
+
+# Graph API fields to subscribe each Meta-backed channel to. Facebook
+# Messenger also cares about postback/delivery/read events; Instagram
+# DM (via the linked page) only needs "messages" today.
+_FACEBOOK_SUBSCRIBED_FIELDS = "messages,messaging_postbacks,message_deliveries,message_reads"
+_INSTAGRAM_SUBSCRIBED_FIELDS = "messages"
 
 
 class WebhookRegistrarFactory:
@@ -15,7 +22,7 @@ class WebhookRegistrarFactory:
 
     Channels without an entry here simply keep the manual/curl flow —
     adding a new one is a one-line addition, no changes needed to the
-    use case itself.
+    use cases themselves.
     """
 
     def build_all(self) -> Dict[str, WebhookRegistrarPort]:
@@ -27,4 +34,10 @@ class WebhookRegistrarFactory:
         """
         return {
             "telegram": TelegramWebhookRegistrar(),
+            "facebook": MetaWebhookRegistrar(
+                channel="facebook", subscribed_fields=_FACEBOOK_SUBSCRIBED_FIELDS
+            ),
+            "instagram": MetaWebhookRegistrar(
+                channel="instagram", subscribed_fields=_INSTAGRAM_SUBSCRIBED_FIELDS
+            ),
         }

@@ -56,7 +56,9 @@ class DeleteChannelConnectionUseCase:
         registrar = self._webhook_registrars.get(connection.channel_type)
         if registrar is not None:
             try:
-                await registrar.deregister(external_id=connection.external_id)
+                await registrar.deregister(
+                    external_id=connection.external_id, credentials=connection.credentials
+                )
             except Exception:
                 logger.warning(
                     "delete_channel_connection.webhook_deregistration_failed",

@@ -320,11 +320,21 @@ Para Telegram, `POST /internal/admin/channel-connections` ya no requiere pasos m
 - Inmediatamente después de crearla, se llama a `setWebhook` de la Bot API de Telegram (`TelegramWebhookRegistrar`) con `url={PUBLIC_BASE_URL}/webhooks/telegram/{bot_token}` y ese secret — no hace falta correr el curl de `setWebhook` a mano.
 - Si Telegram rechaza el `setWebhook` (bot_token inválido, etc.), la conexión recién creada se borra y el endpoint devuelve `502` — nunca queda un `channel_connection` "fantasma" sin webhook real detrás.
 
-Esta lógica vive en `CreateChannelConnectionUseCase` (`application/use_cases/create_channel_connection.py`), orquestando tres puertos intercambiables: `ChannelConnectionRepositoryPort` (persistencia), `SecretGeneratorPort` (generación del secret, reutilizable por cualquier canal futuro que lo necesite) y `WebhookRegistrarPort` (registro externo; hoy solo `telegram` tiene implementación en `WebhookRegistrarFactory`, agregar un canal nuevo es una entrada más ahí, sin tocar el use case).
+Esta lógica vive en `CreateChannelConnectionUseCase` (`application/use_cases/create_channel_connection.py`), orquestando tres puertos intercambiables: `ChannelConnectionRepositoryPort` (persistencia), `SecretGeneratorPort` (generación del secret, reutilizable por cualquier canal futuro que lo necesite) y `WebhookRegistrarPort` (registro externo; ver `WebhookRegistrarFactory` para qué canales tienen implementación hoy — agregar uno nuevo es una entrada más ahí, sin tocar el use case).
 
 `PATCH /internal/admin/channel-connections/{id}` (`UpdateChannelConnectionUseCase`) sigue la misma lógica cuando el body toca `credentials`: como el repositorio reemplaza `credentials` entero (no lo mergea), un `PATCH` que cambie credenciales sin reenviar `telegram_webhook_secret` preservaría — antes de este cambio, perdería — el secret existente, y si el secret sí cambia, vuelve a llamar a `setWebhook` para que Telegram quede sincronizado (si no, el bot empieza a devolver 401 en silencio). Si el registro falla, las credenciales se revierten a su valor anterior y el endpoint devuelve `502`.
 
 `DELETE /internal/admin/channel-connections/{id}` (`DeleteChannelConnectionUseCase`) llama a `deleteWebhook` antes de borrar la fila, pero a diferencia de create/update es **best-effort**: si Telegram lo rechaza (bot ya borrado por el cliente, API caída, etc.) se loguea como warning y la fila se borra igual — el pedido explícito de borrar no debería quedar bloqueado por el estado de una plataforma externa.
+
+### Facebook/Instagram: suscripción de página automática
+
+`POST /internal/admin/channel-connections` con `channel_type: "facebook"` o `"instagram"` también auto-registra, pero de forma distinta a Telegram: Meta no necesita ningún secret generado por nosotros (la verificación del webhook ya usa el `app_secret` compartido de `channel_apps.meta`), así que `MetaWebhookRegistrar.secret_field` es `None` y no se genera nada. Lo que sí automatiza es la parte que hasta ahora era curl manual: `POST /{page_id}/subscribed_apps` de la Graph API (usando `credentials.page_access_token`, el mismo valor que ya usan `FacebookSender`/`InstagramSender` para enviar mensajes — sección 9), que le dice a Meta "esta página en particular debe mandarle eventos a nuestra app". Si `page_access_token` falta o la Graph API lo rechaza, la conexión recién creada se borra y el endpoint devuelve `502`, igual que con Telegram.
+
+El `PATCH` re-suscribe la página cuando `credentials.page_access_token` cambia (revirtiendo si falla), y el `DELETE` desuscribe con el mismo criterio best-effort que Telegram.
+
+`WebhookRegistrarPort.register()`/`deregister()` reciben el diccionario `credentials` completo (no un `secret` suelto), justamente para que cada canal pueda tomar lo que realmente necesita — el generado (`secret_field`) para Telegram, el `page_access_token` provisto por el admin para Meta — sin forzar a todos los canales a encajar en la forma de Telegram.
+
+Falta configurar por fuera de este flujo (no automatizado, es setup de app, no por conexión): la App de Meta compartida (`channel_apps.meta`, sección 9) y su suscripción a nivel App en el dashboard de Meta (qué campos escucha el Webhooks product) — eso se hace una sola vez para todo el SaaS, no por `channel_connection`.
 
 ### Secrets de canal: App compartida (`channel_apps`) vs. credenciales por conexión
 
