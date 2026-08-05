@@ -312,6 +312,20 @@ Cada canal tiene su propio endpoint HTTP que entiende el payload **nativo** de e
 
 Si el `channel_connection` no existe para ese `(channel_type, external_id)` (canal sin registrar todavía en el admin API), el webhook responde `200` igual (para que la plataforma no reintente infinito) pero no publica nada — queda logueado como `*.not_routable`.
 
+### Telegram: secret y `setWebhook` automáticos
+
+Para Telegram, `POST /internal/admin/channel-connections` ya no requiere pasos manuales por curl:
+
+- Si `credentials` no trae `telegram_webhook_secret`, se genera uno automáticamente (`RandomHexSecretGenerator`, equivalente a `openssl rand -hex 32`) antes de guardar la conexión.
+- Inmediatamente después de crearla, se llama a `setWebhook` de la Bot API de Telegram (`TelegramWebhookRegistrar`) con `url={PUBLIC_BASE_URL}/webhooks/telegram/{bot_token}` y ese secret — no hace falta correr el curl de `setWebhook` a mano.
+- Si Telegram rechaza el `setWebhook` (bot_token inválido, etc.), la conexión recién creada se borra y el endpoint devuelve `502` — nunca queda un `channel_connection` "fantasma" sin webhook real detrás.
+
+Esta lógica vive en `CreateChannelConnectionUseCase` (`application/use_cases/create_channel_connection.py`), orquestando tres puertos intercambiables: `ChannelConnectionRepositoryPort` (persistencia), `SecretGeneratorPort` (generación del secret, reutilizable por cualquier canal futuro que lo necesite) y `WebhookRegistrarPort` (registro externo; hoy solo `telegram` tiene implementación en `WebhookRegistrarFactory`, agregar un canal nuevo es una entrada más ahí, sin tocar el use case).
+
+`PATCH /internal/admin/channel-connections/{id}` (`UpdateChannelConnectionUseCase`) sigue la misma lógica cuando el body toca `credentials`: como el repositorio reemplaza `credentials` entero (no lo mergea), un `PATCH` que cambie credenciales sin reenviar `telegram_webhook_secret` preservaría — antes de este cambio, perdería — el secret existente, y si el secret sí cambia, vuelve a llamar a `setWebhook` para que Telegram quede sincronizado (si no, el bot empieza a devolver 401 en silencio). Si el registro falla, las credenciales se revierten a su valor anterior y el endpoint devuelve `502`.
+
+`DELETE /internal/admin/channel-connections/{id}` (`DeleteChannelConnectionUseCase`) llama a `deleteWebhook` antes de borrar la fila, pero a diferencia de create/update es **best-effort**: si Telegram lo rechaza (bot ya borrado por el cliente, API caída, etc.) se loguea como warning y la fila se borra igual — el pedido explícito de borrar no debería quedar bloqueado por el estado de una plataforma externa.
+
 ### Secrets de canal: App compartida (`channel_apps`) vs. credenciales por conexión
 
 Hay dos categorías, y no son intercambiables:
@@ -344,6 +358,7 @@ Si mañana un cliente enterprise exige traer su propia App de Meta/X/TikTok en v
 | Variable | Para qué |
 |---|---|
 | `ADMIN_API_KEY` | Header `X-Admin-Api-Key` del API de administración (sección 8) |
+| `PUBLIC_BASE_URL` | URL pública del gateway (a diferencia de `GATEWAY_INTERNAL_URL`, que solo resuelve dentro de la red de Docker) — usada para armar la callback URL que Telegram registra vía `setWebhook` (ver sección 9) |
 | `CHANNEL_CREDENTIALS_ENCRYPTION_KEY` | Clave Fernet para cifrar `channel_connections.credentials` **y** `channel_apps.credentials` |
 | `EVOLUTION_API_KEY` | Shared secret del propio Evolution API — valida el header `apikey` del webhook de WhatsApp |
 | `LANGFLOW_API_KEY` | **Obligatoria** para que `LangflowExecutor` autentique contra Langflow — ver troubleshooting (sección 15) |

@@ -80,6 +80,12 @@ class Settings(BaseModel):
     CALLBACK_MAX_RETRIES: int = 3
     CALLBACK_BACKOFF_SECONDS: int = 2
     GATEWAY_INTERNAL_URL: str = "http://api:8000"
+    # Public, internet-reachable base URL of this gateway (unlike
+    # GATEWAY_INTERNAL_URL, which is only reachable inside the Docker
+    # network). Used to build callback URLs that external platforms
+    # must call back into, e.g. Telegram's setWebhook (see
+    # TelegramWebhookRegistrar).
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
 
     # OpenTelemetry (logs + traces)
     OTEL_ENABLED: bool = False
@@ -150,6 +156,7 @@ settings = Settings(
     CALLBACK_BACKOFF_SECONDS=int(os.getenv("CALLBACK_BACKOFF_SECONDS", "2")),
 
     GATEWAY_INTERNAL_URL=os.getenv("GATEWAY_INTERNAL_URL", "http://api:8000"),
+    PUBLIC_BASE_URL=os.getenv("PUBLIC_BASE_URL", "http://localhost:8000"),
 
     OTEL_ENABLED=_bool(os.getenv("OTEL_ENABLED"), False),
     OTEL_EXPORTER_OTLP_ENDPOINT=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),

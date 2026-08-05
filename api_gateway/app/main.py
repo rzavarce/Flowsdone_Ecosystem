@@ -16,6 +16,7 @@ from .adapters.inbound.http.internal_outbound import router as internal_router
 from .adapters.inbound.http.webhooks import router as webhooks_router
 from .adapters.inbound.http.websocket import router as ws_router
 from .adapters.outbound.channels.factory import ChannelSenderFactory
+from .adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
 from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
 from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
@@ -25,10 +26,14 @@ from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowC
 from .adapters.outbound.queue.factory import PublisherFactory
 from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from .adapters.outbound.security.secret_generator import RandomHexSecretGenerator
 from .application.services.ws_registry import WSRegistry
+from .application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
+from .application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
 from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from .application.use_cases.ingest_message import IngestMessageUseCase
 from .application.use_cases.route_channel_message import RouteChannelMessageUseCase
+from .application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from .core.config import settings
 from .core.logging import setup_logging
 from .infrastructure.database import create_engine, create_sessionmaker
@@ -158,6 +163,31 @@ async def lifespan(app: FastAPI):
     app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
     logger.info("database.repositories.ready")
+
+    # Channel connection create/update (auto-generate webhook secrets
+    # and keep external platform registration in sync for channels
+    # that support it, e.g. Telegram). Secret generator and registrars
+    # are shared instances: both use cases must agree on which
+    # channels are auto-registered.
+    secret_generator = RandomHexSecretGenerator()
+    webhook_registrars = WebhookRegistrarFactory().build_all()
+
+    app.state.create_channel_connection_use_case = CreateChannelConnectionUseCase(
+        channel_connection_repo=app.state.channel_connection_repo,
+        secret_generator=secret_generator,
+        webhook_registrars=webhook_registrars,
+    )
+    app.state.update_channel_connection_use_case = UpdateChannelConnectionUseCase(
+        channel_connection_repo=app.state.channel_connection_repo,
+        secret_generator=secret_generator,
+        webhook_registrars=webhook_registrars,
+    )
+    app.state.delete_channel_connection_use_case = DeleteChannelConnectionUseCase(
+        channel_connection_repo=app.state.channel_connection_repo,
+        webhook_registrars=webhook_registrars,
+    )
+
+    logger.info("channel_connection.use_cases.initialized")
 
     # Outbound handler (WebSocket + native channel senders). Built
     # after the database repositories so it can be given a real

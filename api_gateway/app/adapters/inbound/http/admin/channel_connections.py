@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from .....application.services.webhook_registration import WebhookRegistrationError
 from .....domain.models.channel_connection import ChannelConnection
 from .auth import require_admin_api_key
 from .schemas import ChannelConnectionCreate, ChannelConnectionOut, ChannelConnectionUpdate
@@ -38,23 +39,35 @@ async def create_channel_connection(
 ) -> ChannelConnectionOut:
     """Create a channel connection for a project.
 
+    For channels with an auto-registration flow (Telegram today), this
+    also generates the webhook shared secret if not supplied and
+    registers the webhook with the external platform — see
+    CreateChannelConnectionUseCase.
+
     Args:
         body (ChannelConnectionCreate): Channel connection fields to create.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.channel_connection_repo`.
+            `request.app.state.create_channel_connection_use_case`.
 
     Returns:
         ChannelConnectionOut: The created channel connection.
+
+    Raises:
+        HTTPException: 502 if the channel has an auto-registration
+            flow and the external platform rejected it.
     """
-    connection = await request.app.state.channel_connection_repo.create(
-        project_id=body.project_id,
-        agent_id=body.agent_id,
-        channel_type=body.channel_type,
-        external_id=body.external_id,
-        display_name=body.display_name,
-        credentials=body.credentials,
-        config=body.config,
-    )
+    try:
+        connection = await request.app.state.create_channel_connection_use_case.execute(
+            project_id=body.project_id,
+            agent_id=body.agent_id,
+            channel_type=body.channel_type,
+            external_id=body.external_id,
+            display_name=body.display_name,
+            credentials=body.credentials,
+            config=body.config,
+        )
+    except WebhookRegistrationError as exc:
+        raise HTTPException(status_code=502, detail=f"webhook registration failed: {exc}") from exc
     return _to_out(connection)
 
 
@@ -104,22 +117,32 @@ async def update_channel_connection(
 ) -> ChannelConnectionOut:
     """Update a channel connection's fields.
 
+    For channels with an auto-registration flow (Telegram today), a
+    `credentials` update also re-registers the webhook with the
+    external platform, preserving the existing secret unless the
+    caller explicitly overrides it — see UpdateChannelConnectionUseCase.
+
     Args:
         channel_connection_id (UUID): Id of the connection to update.
         body (ChannelConnectionUpdate): Fields to update; unset fields
             are left unchanged.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.channel_connection_repo`.
+            `request.app.state.update_channel_connection_use_case`.
 
     Returns:
         ChannelConnectionOut: The updated channel connection.
 
     Raises:
-        HTTPException: 404 if the channel connection does not exist.
+        HTTPException: 404 if the channel connection does not exist,
+            502 if the channel has an auto-registration flow and the
+            external platform rejected the new registration.
     """
-    connection = await request.app.state.channel_connection_repo.update(
-        channel_connection_id, **body.model_dump(exclude_unset=True)
-    )
+    try:
+        connection = await request.app.state.update_channel_connection_use_case.execute(
+            channel_connection_id, **body.model_dump(exclude_unset=True)
+        )
+    except WebhookRegistrationError as exc:
+        raise HTTPException(status_code=502, detail=f"webhook registration failed: {exc}") from exc
     if not connection:
         raise HTTPException(status_code=404, detail="channel_connection not found")
     return _to_out(connection)
@@ -129,14 +152,20 @@ async def update_channel_connection(
 async def delete_channel_connection(channel_connection_id: UUID, request: Request) -> None:
     """Delete a channel connection.
 
+    For channels with an auto-registration flow (Telegram today), this
+    also deregisters the webhook from the external platform on a
+    best-effort basis — see DeleteChannelConnectionUseCase.
+
     Args:
         channel_connection_id (UUID): Id of the connection to delete.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.channel_connection_repo`.
+            `request.app.state.delete_channel_connection_use_case`.
 
     Raises:
         HTTPException: 404 if the channel connection does not exist.
     """
-    deleted = await request.app.state.channel_connection_repo.delete(channel_connection_id)
+    deleted = await request.app.state.delete_channel_connection_use_case.execute(
+        channel_connection_id
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="channel_connection not found")
