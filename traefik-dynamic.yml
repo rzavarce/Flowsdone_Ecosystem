@@ -69,13 +69,14 @@ http:
       middlewares:
         - webchat-static
 
-    # api.flowsdone.com: mismo backend que chat.flowsdone.com (webchat-svc =
-    # api:8000), pero SIN el middleware de reescritura — acá sí llegan
-    # /internal/admin/*, /webhooks/* y /ws sin modificar. chat.flowsdone.com
-    # queda exclusivamente para servir el estático del widget de demo (más
-    # su propio /ws, que necesita same-origin para funcionar en la demo).
-    api:
-      rule: "Host(`api.flowsdone.com`)"
+    # platform.flowsdone.com: mismo backend que chat.flowsdone.com
+    # (webchat-svc = api:8000), pero SIN el middleware de reescritura — acá
+    # sí llegan /internal/admin/*, /webhooks/* y /ws sin modificar.
+    # chat.flowsdone.com queda exclusivamente para servir el estático del
+    # widget de demo (más su propio /ws, que necesita same-origin para
+    # funcionar en la demo).
+    platform:
+      rule: "Host(`platform.flowsdone.com`)"
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
