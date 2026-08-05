@@ -22,6 +22,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 14. [Observabilidad](#14-observabilidad)
 15. [Troubleshooting](#15-troubleshooting)
 16. [Mantenimiento](#16-mantenimiento)
+17. [Tests](#17-tests)
 
 ---
 
@@ -697,5 +698,33 @@ curl -X POST http://localhost:8080/v1/schema \
   }'
 
 CREATE USER fibralan_user WITH PASSWORD '15WB4FV4d0xn';
+
+---
+
+## 17. Tests
+
+Suite de tests unitarios con `pytest`, en `api_gateway/tests/`, mirroring la estructura de `api_gateway/app/`. No hay tests de integración todavía (nada pega contra Postgres/Kafka/RabbitMQ reales) — cada test mockea los puertos del dominio o la llamada HTTP saliente (`httpx.AsyncClient`), así que corren en milisegundos y no necesitan el stack levantado.
+
+**Instalar y correr:**
+
+```bash
+# Dentro del contenedor (tiene el resto de las deps ya instaladas):
+docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest api_gateway/tests -q"
+
+# O local, si tenés el venv del proyecto activado:
+pip install -e ".[test]"
+pytest
+```
+
+**Qué cubre:**
+
+- `application/use_cases/` — los tres use cases de `channel_connections` (create/update/delete, con sus caminos de rollback), `IngestMessageUseCase`, `RouteChannelMessageUseCase`, `HandleOutboundResponseUseCase` (extracción de texto, callback, WS, entrega a canal nativo).
+- `application/services/` — `register_or_compensate` y `WSRegistry`.
+- `adapters/outbound/` — `RandomHexSecretGenerator`, `TelegramWebhookRegistrar`, `MetaWebhookRegistrar`, las dos factories (`ChannelSenderFactory`, `WebhookRegistrarFactory`), y todos los senders (incluidos los stubs de X/TikTok).
+- `adapters/inbound/http/channels/` — los helpers puros de verificación de firma de cada canal (Meta, X, TikTok, extracción de texto de Evolution), más tests end-to-end vía ASGI (sin DB real, con fakes en `app.state`) para Telegram, Facebook y WhatsApp — los tres patrones de verificación distintos (secret por conexión, firma HMAC de app compartida, apikey estático).
+
+**Qué falta (deliberadamente fuera de este alcance):** tests end-to-end de Instagram/X/TikTok a nivel HTTP (sus helpers de firma sí están cubiertos), y cualquier test de integración contra Postgres/Kafka/RabbitMQ reales o contra el `admin` router completo. Los fakes reutilizables viven en `tests/support/` (`fakes.py` para los puertos, `fake_httpx.py` para las llamadas salientes, `asgi.py` para levantar un router aislado).
+
+No hay CI corriendo esto todavía (por ahora es local, a criterio de quien abre el PR).
 
 

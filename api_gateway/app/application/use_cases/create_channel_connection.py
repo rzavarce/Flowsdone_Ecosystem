@@ -92,8 +92,12 @@ class CreateChannelConnectionUseCase:
         registrar = self._webhook_registrars.get(channel_type)
         credentials = dict(credentials)
 
-        if registrar is not None and registrar.secret_field is not None:
-            credentials.setdefault(registrar.secret_field, self._secret_generator.generate())
+        if (
+            registrar is not None
+            and registrar.secret_field is not None
+            and registrar.secret_field not in credentials
+        ):
+            credentials[registrar.secret_field] = self._secret_generator.generate()
 
         connection = await self._channel_connection_repo.create(
             project_id=project_id,
