@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   test:
@@ -33,6 +36,9 @@ jobs:
 
   deploy:
     needs: test
+    # Solo en push a main (post-merge) - en un evento pull_request este
+    # job no debe correr, o cada PR abierta terminaría deployando al VPS.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
