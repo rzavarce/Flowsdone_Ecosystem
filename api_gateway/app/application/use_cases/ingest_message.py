@@ -32,6 +32,8 @@ class IngestMessageUseCase:
         transport: str,
         payload: Dict[str, Any],
         channel: Optional[str] = None,
+        channel_connection_id: Optional[str] = None,
+        external_conversation_key: Optional[str] = None,
     ) -> None:
         """
         Construye y publica un MessageEnvelope en dirección 'inbound'.
@@ -43,6 +45,11 @@ class IngestMessageUseCase:
             transport: transporte origen (rabbitmq, kafka, websocket, http, ...).
             payload: payload útil del mensaje (ej. {"message": "...", "callback_url": "..."}).
             channel: canal lógico si aplica (webchat, whatsapp, api, etc.).
+            channel_connection_id: id del channel_connection que originó el
+                mensaje, si viene de un canal nativo (no webchat). Necesario
+                en el lado de salida para saber con qué credenciales responder.
+            external_conversation_key: id del destinatario en la plataforma
+                externa (remoteJid, psid, chat_id, ...), si aplica.
         """
 
         # -----------------------------------------------------------------
@@ -55,6 +62,8 @@ class IngestMessageUseCase:
                 direction="inbound",
                 conversation_id=conversation_id,
                 workflow_id=workflow_id,
+                channel_connection_id=channel_connection_id,
+                external_conversation_key=external_conversation_key,
             ),
             transport=transport,
             channel=channel or sender_id,

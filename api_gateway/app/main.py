@@ -27,6 +27,7 @@ from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
 from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
 from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
 from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
+from .adapters.outbound.channels.factory import ChannelSenderFactory
 
 from .infrastructure.database import create_engine, create_sessionmaker
 
@@ -59,15 +60,10 @@ async def lifespan(app: FastAPI):
     )
 
     # --------------------------------------------------------------
-    # WebSocket registry + outbound handler
+    # WebSocket registry
     # --------------------------------------------------------------
     ws_registry = WSRegistry()
-    outbound_handler = HandleOutboundResponseUseCase(
-        ws_registry=ws_registry
-    )
-
     app.state.ws_registry = ws_registry
-    app.state.outbound_handler = outbound_handler
 
     logger.info("ws.registry.initialized")
 
@@ -173,6 +169,18 @@ async def lifespan(app: FastAPI):
     app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
     logger.info("database.repositories.ready")
+
+    # --------------------------------------------------------------
+    # Outbound handler (WS + envío a canales nativos)
+    # --------------------------------------------------------------
+    outbound_handler = HandleOutboundResponseUseCase(
+        ws_registry=ws_registry,
+        channel_connection_repo=app.state.channel_connection_repo,
+        channel_senders=ChannelSenderFactory().build_all(),
+    )
+    app.state.outbound_handler = outbound_handler
+
+    logger.info("outbound.handler.initialized")
 
     # --------------------------------------------------------------
     # Enrutamiento de mensajes de canal (webhooks nativos -> Kafka -> Langflow)
