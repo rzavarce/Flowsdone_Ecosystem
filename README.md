@@ -434,7 +434,8 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 | n8n | https://auto.flowsdone.com |
 | Langfuse | https://langfuse.flowsdone.com |
 | Evolution API | https://evo.flowsdone.com |
-| Webchat / API Gateway | https://chat.flowsdone.com |
+| Webchat (demo del widget) | https://chat.flowsdone.com |
+| Admin API + Webhooks de canal | https://api.flowsdone.com |
 | MinIO Console | https://buckets.flowsdone.com |
 | RedisInsight | https://cache.flowsdone.com |
 | RabbitMQ Scout | https://broker.flowsdone.com |
