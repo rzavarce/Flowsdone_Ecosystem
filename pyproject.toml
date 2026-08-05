@@ -28,6 +28,22 @@ test = [
     "pytest-cov>=5.0.0",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# Sin esto, setuptools intenta adivinar qué carpeta del repo es el
+# paquete instalable y encuentra varias candidatas en la raíz
+# (dockers/, postman/, workers/, volumes/, api_gateway/) - falla con
+# "Multiple top-level packages discovered in a flat-layout". El
+# Dockerfile no lo sufre porque en ese build context solo existe
+# api_gateway/ + pyproject.toml (dockers/postman/workers/... no se
+# copian a la imagen), pero un checkout completo del repo (como el
+# runner de GitHub Actions, o instalar en local desde la raíz) sí ve
+# todas las carpetas y necesita que se lo digamos explícito.
+[tool.setuptools.packages.find]
+include = ["api_gateway*"]
+
 [tool.pytest.ini_options]
 testpaths = ["api_gateway/tests"]
 
