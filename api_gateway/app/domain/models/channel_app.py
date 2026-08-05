@@ -1,3 +1,5 @@
+"""Shared channel provider app credentials domain model."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -10,14 +12,25 @@ ChannelAppProvider = Literal["meta", "twitter", "tiktok"]
 
 
 class ChannelApp(BaseModel):
-    """
-    Credenciales de la App compartida de un proveedor (Meta cubre Facebook +
-    Instagram; una sola App por proveedor para todo el SaaS — ver README
-    sección 9). No es por tenant: `channel_connections` es lo que varía por
-    cliente/canal conectado.
+    """Credentials of a provider's shared app.
 
-    `credentials` viaja en texto plano dentro de la aplicación; el cifrado
-    con Fernet es responsabilidad exclusiva del repositorio (adapters/outbound/db).
+    Meta covers Facebook and Instagram; there is a single app per
+    provider for the whole SaaS, not per tenant. `channel_connections`
+    is what varies per connected client/channel.
+
+    `credentials` travels in plain text within the application;
+    encryption with Fernet is the exclusive responsibility of the
+    repository (adapters/outbound/db).
+
+    Attributes:
+        id (UUID): Unique identifier.
+        provider (ChannelAppProvider): Provider this app belongs to.
+        credentials (Dict[str, Any]): App credentials (plain text
+            in-process, encrypted at rest).
+        config (Dict[str, Any]): Arbitrary app configuration.
+        status (str): Lifecycle status (e.g. "active").
+        created_at (datetime): Creation timestamp.
+        updated_at (datetime): Last update timestamp.
     """
 
     id: UUID

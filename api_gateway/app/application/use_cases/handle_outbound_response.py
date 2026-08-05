@@ -1,3 +1,5 @@
+"""Use case for turning a Langflow result into a delivered response."""
+
 import logging
 from typing import Any, Dict, Optional
 from uuid import UUID
@@ -11,12 +13,14 @@ logger = logging.getLogger("usecase.handle_outbound_response")
 
 
 class HandleOutboundResponseUseCase:
-    """
-    Use case encargado de:
-    - procesar la respuesta del workflow (Langflow)
-    - construir payload final
-    - enviar a callback_url (si existe)
-    - opcional: publicar en broker
+    """Processes a workflow result and delivers it to the caller.
+
+    Responsibilities:
+        - Extract the response text from a Langflow result.
+        - Optionally forward it to a callback URL.
+        - Publish an outbound MessageEnvelope to the broker.
+        - Deliver the final response to WebSocket and/or the native
+          channel sender that corresponds to the conversation.
     """
 
     def __init__(
@@ -26,13 +30,39 @@ class HandleOutboundResponseUseCase:
         channel_connection_repo: Optional[ChannelConnectionRepositoryPort] = None,
         channel_senders: Optional[Dict[str, ChannelSenderPort]] = None,
     ):
+        """Build the use case.
+
+        Args:
+            publisher (Optional[Any]): Broker publisher for the
+                outbound envelope.
+            ws_registry (Optional[Any]): WebSocket registry used to
+                push responses to webchat clients.
+            channel_connection_repo (Optional[ChannelConnectionRepositoryPort]):
+                Repository used to resolve a channel connection's
+                credentials on delivery.
+            channel_senders (Optional[Dict[str, ChannelSenderPort]]):
+                Map of channel_type to its sender, used to deliver to
+                native channels.
+        """
         self.publisher = publisher
         self.ws_registry = ws_registry
         self.channel_connection_repo = channel_connection_repo
         self.channel_senders = channel_senders or {}
 
-
     def _extract_text(self, value: Any) -> Optional[str]:
+        """Recursively extract a human-readable response string.
+
+        Walks common Langflow response shapes (dicts with a
+        message/response/output/... key, lists, nested errors) to find
+        the first non-empty text value.
+
+        Args:
+            value (Any): A Langflow result, or a nested part of one.
+
+        Returns:
+            Optional[str]: The extracted text, or None if no text
+            could be found.
+        """
         if value is None:
             return None
 
@@ -74,10 +104,19 @@ class HandleOutboundResponseUseCase:
         envelope: MessageEnvelope,
         result: Dict[str, Any],
     ) -> None:
+        """Process a Langflow result and publish the outbound response.
 
-        # ----------------------------------------------------------
-        # 1. Extraer mensaje de Langflow
-        # ----------------------------------------------------------
+        Builds the response payload, optionally posts it to the
+        envelope's callback_url, pushes it to WebSocket if the
+        conversation has a live connection, and publishes an outbound
+        MessageEnvelope to the broker for the outbound worker to pick
+        up (which in turn calls deliver()).
+
+        Args:
+            envelope (MessageEnvelope): The inbound envelope that was processed.
+            result (Dict[str, Any]): The raw result returned by the
+                Langflow executor.
+        """
         response_message = self._extract_text(result)
 
         if not response_message:
@@ -88,11 +127,8 @@ class HandleOutboundResponseUseCase:
                     "result_preview": str(result)[:1000],
                 },
             )
-            response_message = "El workflow no devolvió una respuesta válida."
+            response_message = "The workflow did not return a valid response."
 
-        # ----------------------------------------------------------
-        # 2. Construir payload final
-        # ----------------------------------------------------------
         response_payload = {
             "type": "chat.response",
             "response": response_message,
@@ -104,9 +140,7 @@ class HandleOutboundResponseUseCase:
             extra={"message_id": envelope.meta.message_id},
         )
 
-        # ----------------------------------------------------------
-        # 3. CALLBACK HTTP
-        # ----------------------------------------------------------
+        # Optional HTTP callback.
         callback_url = None
 
         try:
@@ -148,9 +182,7 @@ class HandleOutboundResponseUseCase:
                 extra={"message_id": envelope.meta.message_id},
             )
 
-        # ----------------------------------------------------------
-        # ✅ 4. WEBSOCKET (AQUÍ VA 🔥)
-        # ----------------------------------------------------------
+        # Push to WebSocket if the conversation has a live connection.
         if getattr(self, "ws_registry", None) and envelope.meta.conversation_id:
             try:
                 await self.ws_registry.send(
@@ -168,9 +200,7 @@ class HandleOutboundResponseUseCase:
             except Exception:
                 logger.error("handle.outbound.ws.failed", exc_info=True)
 
-        # ----------------------------------------------------------
-        # 5. Construir envelope
-        # ----------------------------------------------------------
+        # Build and publish the outbound envelope.
         try:
             response_envelope = MessageEnvelope(
                 meta=envelope.meta.model_copy(update={"direction": "outbound"}),
@@ -183,9 +213,6 @@ class HandleOutboundResponseUseCase:
             logger.error("handle.outbound.envelope.build.failed", exc_info=True)
             return
 
-        # ----------------------------------------------------------
-        # 6. Publicar en broker
-        # ----------------------------------------------------------
         if self.publisher:
             try:
                 await self.publisher.publish(
@@ -202,15 +229,19 @@ class HandleOutboundResponseUseCase:
                 logger.error("handle.outbound.publish.failed", exc_info=True)
 
     async def deliver(self, envelope: MessageEnvelope) -> None:
-        """
-        Entrega un envelope outbound ya procesado. Llamado desde
-        /internal/outbound cuando el worker (Kafka o RabbitMQ) reenvía la
-        respuesta al gateway.
+        """Deliver an already-processed outbound envelope.
 
-        - Si viene de webchat, la dispatcha por WebSocket (comportamiento
-          original, sin cambios).
-        - Si viene de un canal nativo (channel_connection_id presente),
-          la envía de vuelta a ese canal con el sender correspondiente.
+        Called from /internal/outbound when the Kafka or RabbitMQ
+        worker forwards a response back to the gateway.
+
+        - If it came from webchat, dispatches it over WebSocket
+          (unchanged from the original behavior).
+        - If it came from a native channel (channel_connection_id
+          present), sends it back to that channel with the
+          corresponding sender.
+
+        Args:
+            envelope (MessageEnvelope): The outbound envelope to deliver.
         """
         if self.ws_registry and envelope.meta.conversation_id:
             try:
@@ -231,6 +262,16 @@ class HandleOutboundResponseUseCase:
         await self._deliver_to_channel(envelope)
 
     async def _deliver_to_channel(self, envelope: MessageEnvelope) -> None:
+        """Send an outbound envelope to its originating native channel.
+
+        No-ops if the envelope has no channel_connection_id (webchat)
+        or no matching sender is configured. Never raises: a delivery
+        failure is logged, not propagated, so it cannot break the
+        /internal/outbound request.
+
+        Args:
+            envelope (MessageEnvelope): The outbound envelope to deliver.
+        """
         channel_connection_id = envelope.meta.channel_connection_id
         if not channel_connection_id or not self.channel_connection_repo:
             return

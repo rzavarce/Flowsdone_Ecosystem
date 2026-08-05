@@ -1,3 +1,5 @@
+"""Request-scoped correlation id context variable."""
+
 from contextvars import ContextVar
 
 correlation_id_ctx: ContextVar[str | None] = ContextVar(

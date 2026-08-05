@@ -1,3 +1,7 @@
+"""Native chat channel inbound webhooks (Facebook, Instagram, Telegram,
+TikTok, X, WhatsApp), aggregated under a single router.
+"""
+
 from fastapi import APIRouter
 
 from .facebook import router as facebook_router

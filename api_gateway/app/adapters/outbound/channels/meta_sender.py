@@ -1,3 +1,5 @@
+"""Shared Graph API message-sending logic for Facebook and Instagram."""
+
 from __future__ import annotations
 
 import logging
@@ -18,9 +20,20 @@ async def send_meta_message(
     text: str,
     credentials: Dict[str, Any],
 ) -> None:
-    """
-    Envía un mensaje vía Graph API (compartido por Facebook Messenger e
-    Instagram — mismo endpoint de mensajería, mismo formato de payload).
+    """Send a text message via the Meta Graph API.
+
+    Shared by Facebook Messenger and Instagram, which use the same
+    messaging endpoint and payload shape.
+
+    Args:
+        channel (str): Logical channel name, used only for logging
+            ("facebook" or "instagram").
+        external_id (str): Facebook page id or Instagram business
+            account id.
+        recipient_id (str): Id of the message recipient (psid).
+        text (str): Message body to send.
+        credentials (Dict[str, Any]): Channel credentials; must contain
+            "page_access_token".
     """
     page_access_token = credentials.get("page_access_token")
 

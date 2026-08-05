@@ -1,3 +1,5 @@
+"""Application settings, loaded from environment variables at import time."""
+
 import os
 from typing import Optional
 
@@ -5,29 +7,31 @@ from pydantic import BaseModel, Field
 
 
 class Settings(BaseModel):
-    # --------------------------------------------------
+    """All configuration for the gateway and its workers.
+
+    Values are populated once at import time from environment
+    variables (see the `settings = Settings(...)` call below); the
+    field defaults here only apply when constructing a Settings
+    instance directly (e.g. in tests).
+    """
+
     # Environment
-    # --------------------------------------------------
     ENV: str = "local"
     LOG_LEVEL: str = "INFO"
 
-    # --------------------------------------------------
     # Kafka
-    # --------------------------------------------------
     ENABLE_KAFKA: bool = True
     KAFKA_BOOTSTRAP_SERVERS: str = "kafka:9092"
     KAFKA_TOPIC: str = "inbound.messages"
-    # Particiones de KAFKA_TOPIC/DLQ_TOPIC. Los mensajes se particionan por
-    # canal (key=channel), así que esto es el techo de canales que pueden
-    # aislarse entre sí escalando réplicas de kafka_inbound_worker más
-    # adelante (docker compose up -d --scale kafka_inbound_worker=N), sin
-    # tocar código.
+    # Partitions for KAFKA_TOPIC/DLQ_TOPIC. Messages are partitioned by
+    # channel (key=channel), so this is the ceiling on how many
+    # channels can be isolated from each other by scaling
+    # kafka_inbound_worker replicas later (docker compose up -d
+    # --scale kafka_inbound_worker=N), without touching code.
     KAFKA_TOPIC_PARTITIONS: int = 6
     DLQ_TOPIC: str = "inbound.messages.dlq"
 
-    # --------------------------------------------------
     # RabbitMQ
-    # --------------------------------------------------
     ENABLE_RABBITMQ: bool = False
     RABBITMQ_URL: Optional[str] = None
     RABBITMQ_EXCHANGE: Optional[str] = None
@@ -38,72 +42,66 @@ class Settings(BaseModel):
     RABBITMQ_OUTBOUND_ROUTING_KEY: Optional[str] = None
     RABBITMQ_OUTBOUND_QUEUE: Optional[str] = None
 
-    
-
-    # --------------------------------------------------
-    # Database (NO hard crash)
-    # --------------------------------------------------
+    # Database (no hard crash if unset; only raised when actually used)
     DATABASE_URL: Optional[str] = None
     DATABASE_URL_ASYNC: Optional[str] = None
     DATABASE_URL_SQLALCHEMY: Optional[str] = None
 
-    # --------------------------------------------------
     # Langflow
-    # --------------------------------------------------
     LANGFLOW_BASE_URL: str = "http://langflow:7860"
     LANGFLOW_API_KEY: Optional[str] = None
 
-    # --------------------------------------------------
-    # Multi-tenant SaaS: admin API + cifrado de credenciales
-    # --------------------------------------------------
+    # Multi-tenant SaaS: admin API + credentials encryption
     ADMIN_API_KEY: str = "dev-admin-key-change-me"
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY: Optional[str] = None
 
-    # --------------------------------------------------
-    # Canales (webhooks entrantes)
-    # --------------------------------------------------
-    # Los secrets de App de Meta/X/TikTok (compartidos por todo el SaaS) y el
-    # secret_token por bot de Telegram ya NO viven acá — se gestionan por
-    # /internal/admin/channel-apps y channel_connections.credentials
-    # respectivamente (ver README sección 9). EVOLUTION_API_KEY sigue siendo
-    # el shared secret de nuestra propia instancia de Evolution API.
+    # Channels (inbound webhooks)
+    # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
+    # per-bot Telegram secret_token no longer live here - they are
+    # managed via /internal/admin/channel-apps and
+    # channel_connections.credentials respectively (see README section
+    # 9). EVOLUTION_API_KEY remains the shared secret of our own
+    # Evolution API instance.
     EVOLUTION_API_KEY: Optional[str] = None
 
-    # --------------------------------------------------
-    # Canales (envío de mensajes salientes)
-    # --------------------------------------------------
+    # Channels (outbound message sending)
     EVOLUTION_API_BASE_URL: str = "http://evolution:8080"
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
     META_GRAPH_API_VERSION: str = "v21.0"
     TELEGRAM_API_BASE_URL: str = "https://api.telegram.org"
-    # Twitter/TikTok: el envío real todavía no está implementado (ver
-    # channel_sender de esos canales) — estos settings solo existen para
-    # cuando se active, no se usan todavía.
+    # Twitter/TikTok: real sending is not implemented yet (see the
+    # channel_sender for those channels) - these settings only exist
+    # for when it is activated; they are unused for now.
     TWITTER_API_BASE_URL: Optional[str] = None
     TIKTOK_API_BASE_URL: Optional[str] = None
 
-    # --------------------------------------------------
     # Webhook callbacks
-    # --------------------------------------------------
     CALLBACK_HMAC_SECRET: str = "dev-secret-change-me"
     CALLBACK_MAX_RETRIES: int = 3
     CALLBACK_BACKOFF_SECONDS: int = 2
     GATEWAY_INTERNAL_URL: str = "http://api:8000"
 
-    # --------------------------------------------------
     # OpenTelemetry (logs + traces)
-    # --------------------------------------------------
     OTEL_ENABLED: bool = False
     OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
     OTEL_SERVICE_NAME: str = "fd-service"
 
-    # --------------------------------------------------
     # Misc
-    # --------------------------------------------------
     REQUEST_TIMEOUT_SECONDS: int = 10
 
 
 def _bool(value: Optional[str], default: bool) -> bool:
+    """Parse an environment variable string as a boolean.
+
+    Args:
+        value (Optional[str]): The raw environment variable value, or
+            None if unset.
+        default (bool): Value to return if `value` is None.
+
+    Returns:
+        bool: True if `value` is one of "1", "true", "yes", "on"
+        (case-insensitive); False otherwise; `default` if `value` is None.
+    """
     if value is None:
         return default
     return value.lower() in {"1", "true", "yes", "on"}

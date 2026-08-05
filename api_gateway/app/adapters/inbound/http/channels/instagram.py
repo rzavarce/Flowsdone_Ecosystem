@@ -1,3 +1,5 @@
+"""Instagram DM inbound webhook."""
+
 from __future__ import annotations
 
 import logging
@@ -14,13 +16,23 @@ logger = logging.getLogger("channels.instagram")
 router = APIRouter(prefix="/webhooks/instagram", tags=["channels:instagram"])
 
 CHANNEL_TYPE = "instagram"
-# Facebook + Instagram comparten una sola Meta App (ver README sección 9 y
-# /internal/admin/channel-apps) — no es por tenant, es la App del SaaS.
+# Facebook and Instagram share a single Meta app (see README section 9
+# and /internal/admin/channel-apps) - it is not per tenant, it is the
+# SaaS's own app.
 APP_PROVIDER = "meta"
 
 
 @router.get("")
 async def verify_webhook(request: Request) -> PlainTextResponse:
+    """Handle Meta's webhook subscription verification GET request.
+
+    Args:
+        request (Request): The incoming FastAPI request; carries the
+            hub.mode/hub.verify_token/hub.challenge query parameters.
+
+    Returns:
+        PlainTextResponse: Echoes the challenge if verification succeeds.
+    """
     channel_app = await request.app.state.channel_app_repo.get_by_provider(APP_PROVIDER)
     verify_token = channel_app.credentials.get("webhook_verify_token") if channel_app else None
 
@@ -35,6 +47,14 @@ async def verify_webhook(request: Request) -> PlainTextResponse:
 
 @router.post("")
 async def receive_webhook(request: Request) -> JSONResponse:
+    """Receive an Instagram DM webhook event and route each message.
+
+    Args:
+        request (Request): The incoming FastAPI request.
+
+    Returns:
+        JSONResponse: Acknowledges the event to Meta.
+    """
     raw_body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
 
@@ -70,6 +90,17 @@ async def _route_event(
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
+    """Route a single Instagram DM to its Langflow agent.
+
+    Args:
+        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        ig_account_id (str): Instagram business account id the message
+            was sent to.
+        sender_id (str): Id of the sender.
+        text (str): Message text.
+        raw_event (Dict[str, Any]): The raw Meta event, kept in the
+            payload for debugging.
+    """
     try:
         await route_use_case.execute(
             channel_type=CHANNEL_TYPE,

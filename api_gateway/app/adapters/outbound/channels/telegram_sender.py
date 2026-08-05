@@ -1,3 +1,5 @@
+"""Telegram outbound channel sender."""
+
 from __future__ import annotations
 
 import logging
@@ -12,7 +14,11 @@ logger = logging.getLogger("channels.telegram.sender")
 
 
 class TelegramSender(ChannelSenderPort):
-    """external_id = bot_token (mismo valor usado para el routing entrante)."""
+    """Sends messages via the Telegram Bot API.
+
+    `external_id` is the bot token (the same value used for inbound
+    webhook routing).
+    """
 
     async def send(
         self,
@@ -22,6 +28,15 @@ class TelegramSender(ChannelSenderPort):
         text: str,
         credentials: Dict[str, Any],
     ) -> None:
+        """Send a text message to a Telegram chat.
+
+        Args:
+            external_id (str): Telegram bot token.
+            recipient_id (str): Telegram chat id.
+            text (str): Message body to send.
+            credentials (Dict[str, Any]): Unused for Telegram; kept for
+                interface consistency with ChannelSenderPort.
+        """
         url = f"{settings.TELEGRAM_API_BASE_URL}/bot{external_id}/sendMessage"
 
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT_SECONDS) as client:

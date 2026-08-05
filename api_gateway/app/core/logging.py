@@ -1,17 +1,38 @@
+"""JSON logging setup, with correlation id injection and optional OTel export."""
+
 import logging
 import sys
+
 from pythonjsonlogger import jsonlogger
-from ..core.context import correlation_id_ctx
+
 from ..core.config import settings
+from ..core.context import correlation_id_ctx
 
 
 class CorrelationIdFilter(logging.Filter):
+    """Injects the current request's correlation id into every log record."""
+
     def filter(self, record: logging.LogRecord) -> bool:
+        """Attach correlation_id to the record and always let it through.
+
+        Args:
+            record (logging.LogRecord): The log record being emitted.
+
+        Returns:
+            bool: Always True; this filter only enriches records, it
+            never suppresses them.
+        """
         record.correlation_id = correlation_id_ctx.get()
         return True
 
 
 def _otel_handler() -> logging.Handler | None:
+    """Build an OTLP logging handler if OpenTelemetry export is enabled.
+
+    Returns:
+        logging.Handler | None: A configured handler, or None if
+        OTEL_ENABLED is False or OTEL_EXPORTER_OTLP_ENDPOINT is not set.
+    """
     if not settings.OTEL_ENABLED or not settings.OTEL_EXPORTER_OTLP_ENDPOINT:
         return None
 
@@ -36,6 +57,14 @@ def _otel_handler() -> logging.Handler | None:
 
 
 def setup_logging(level: str):
+    """Configure the root logger for JSON output to stdout.
+
+    Also attaches an OTLP handler when OpenTelemetry export is enabled.
+    Every log record is enriched with the current correlation id.
+
+    Args:
+        level (str): Logging level name (e.g. "INFO", "DEBUG").
+    """
     root = logging.getLogger()
     root.setLevel(level)
 

@@ -1,15 +1,19 @@
+"""RabbitMQ outbound worker: forwards outbound envelopes to the gateway's
+/internal/outbound endpoint, HMAC-signed, so the process holding the
+live WebSocket/channel state can deliver them.
+"""
+
 import asyncio
-import json
-import hmac
 import hashlib
+import hmac
+import json
 import logging
 
 import httpx
 
+from api_gateway.app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
 from api_gateway.app.core.config import settings
 from api_gateway.app.core.logging import setup_logging
-
-from api_gateway.app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
 from api_gateway.app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
@@ -17,6 +21,15 @@ logger = logging.getLogger("rabbitmq.outbound.worker")
 
 
 def sign(body: bytes) -> str:
+    """Compute the HMAC-SHA256 signature sent to /internal/outbound.
+
+    Args:
+        body (bytes): Raw request body bytes.
+
+    Returns:
+        str: The hex-encoded HMAC-SHA256 digest, signed with
+        settings.CALLBACK_HMAC_SECRET.
+    """
     return hmac.new(
         settings.CALLBACK_HMAC_SECRET.encode("utf-8"),
         body,
@@ -25,6 +38,11 @@ def sign(body: bytes) -> str:
 
 
 async def main() -> None:
+    """Wire up dependencies and consume the outbound queue until stopped.
+
+    For each outbound message, forwards it to the gateway's
+    /internal/outbound endpoint over HTTP, signed with an HMAC header.
+    """
     logger.info(
         "rabbitmq.outbound.worker.starting",
         extra={
@@ -40,6 +58,11 @@ async def main() -> None:
     client = httpx.AsyncClient(timeout=10)
 
     async def handler(body: bytes) -> None:
+        """Forward one outbound message to /internal/outbound.
+
+        Args:
+            body (bytes): The raw message body.
+        """
         try:
             envelope = MessageEnvelope.parse(body)
         except Exception:

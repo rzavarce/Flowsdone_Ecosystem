@@ -1,3 +1,5 @@
+"""WhatsApp (Evolution API) inbound webhook."""
+
 from __future__ import annotations
 
 import logging
@@ -17,6 +19,16 @@ CHANNEL_TYPE = "whatsapp_evolution"
 
 
 def _extract_text(message: Dict[str, Any]) -> Optional[str]:
+    """Extract the text body from an Evolution API message object.
+
+    Args:
+        message (Dict[str, Any]): The "message" object from an
+            Evolution API event.
+
+    Returns:
+        Optional[str]: The message text, or None if it has no
+        recognized text field.
+    """
     if "conversation" in message:
         return message["conversation"]
 
@@ -32,6 +44,16 @@ async def receive_webhook(
     request: Request,
     apikey: Optional[str] = Header(default=None),
 ) -> JSONResponse:
+    """Receive an Evolution API webhook event and route the message.
+
+    Args:
+        request (Request): The incoming FastAPI request.
+        apikey (Optional[str]): Evolution API shared secret, validated
+            against settings.EVOLUTION_API_KEY.
+
+    Returns:
+        JSONResponse: Acknowledges the event.
+    """
     if not settings.EVOLUTION_API_KEY or apikey != settings.EVOLUTION_API_KEY:
         logger.warning("channels.whatsapp_evolution.invalid_api_key")
         return JSONResponse(status_code=401, content={"status": "invalid_api_key"})
@@ -65,6 +87,17 @@ async def _route_event(
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
+    """Route a single WhatsApp message to its Langflow agent.
+
+    Args:
+        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        instance (str): Evolution API instance name the message
+            arrived on.
+        remote_jid (str): WhatsApp id of the sender.
+        text (str): Message text.
+        raw_event (Dict[str, Any]): The raw Evolution API event, kept
+            in the payload for debugging.
+    """
     try:
         await route_use_case.execute(
             channel_type=CHANNEL_TYPE,

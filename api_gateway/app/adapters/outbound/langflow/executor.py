@@ -1,3 +1,5 @@
+"""Langflow HTTP executor: runs a flow and normalizes its response."""
+
 import json
 import logging
 from typing import Any
@@ -11,6 +13,8 @@ logger = logging.getLogger("langflow.executor")
 
 
 class LangflowExecutor(LangflowExecutorPort):
+    """Calls the Langflow REST API to run a flow synchronously."""
+
     def __init__(self) -> None:
         headers = {}
         if settings.LANGFLOW_API_KEY:
@@ -29,6 +33,21 @@ class LangflowExecutor(LangflowExecutorPort):
         payload: dict[str, Any],
         conversation_id,
     ) -> dict | None:
+        """Run a Langflow flow and return its parsed response.
+
+        Args:
+            workflow_id (str): Id of the Langflow flow to execute.
+            payload (dict[str, Any]): Input payload; if it has a
+                "message" key, that value is sent as-is, otherwise the
+                whole payload is JSON-encoded as the input text.
+            conversation_id: Id of the conversation, sent as the
+                Langflow session_id for session continuity.
+
+        Returns:
+            dict | None: The parsed JSON response on success, an error
+            dict (`{"error": True, ...}`) on an HTTP error status, or
+            None if Langflow returned an empty body.
+        """
         url = f"/api/v1/run/{workflow_id}"
 
         logger.info(
@@ -40,7 +59,8 @@ class LangflowExecutor(LangflowExecutorPort):
             },
         )
 
-        # ✅ Normalizar payload (UUID → str)
+        # Normalize the payload so UUIDs and other non-JSON-native
+        # values become plain strings before being sent.
         safe_payload = json.loads(
             json.dumps(payload, default=str)
         )

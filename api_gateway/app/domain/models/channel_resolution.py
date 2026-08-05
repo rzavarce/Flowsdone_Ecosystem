@@ -1,3 +1,5 @@
+"""Channel resolution read model, used to route inbound channel messages."""
+
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -9,12 +11,20 @@ from .channel_connection import ChannelType
 
 
 class ChannelResolution(BaseModel):
-    """
-    DTO de solo lectura devuelto por
+    """Read-only DTO returned by
     ChannelConnectionRepositoryPort.get_by_channel_and_external_id().
 
-    Resuelve, en una sola consulta, a qué tenant/proyecto/agente pertenece
-    un mensaje entrante de un canal, con las credenciales ya desencriptadas.
+    Resolves, in a single query, which tenant/project/agent an inbound
+    channel message belongs to, with credentials already decrypted.
+
+    Attributes:
+        tenant_id (UUID): Id of the owning tenant.
+        project_id (UUID): Id of the owning project.
+        agent_id (UUID): Id of the agent that should answer.
+        langflow_flow_id (str): Id of the Langflow flow the agent runs.
+        channel_connection_id (UUID): Id of the matched channel connection.
+        channel_type (ChannelType): Which platform this resolution is for.
+        credentials (Dict[str, Any]): Decrypted channel credentials.
     """
 
     tenant_id: UUID

@@ -1,37 +1,38 @@
+"""Kafka inbound worker: runs Langflow workflows for inbound messages and
+publishes their outbound response back to the same topic.
+"""
+
 import asyncio
 import logging
 
 import asyncpg
 
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
-
 from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
-from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
-from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
-
-from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
 from api_gateway.app.adapters.outbound.db.idempotency_repository import (
     PostgresIdempotencyRepository,
 )
-
+from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
+from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from api_gateway.app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
 from api_gateway.app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from api_gateway.app.core.config import settings
+from api_gateway.app.core.logging import setup_logging
 from api_gateway.app.domain.models.message_envelope import MessageEnvelope
-
-# ---------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------
+from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("kafka.inbound.worker")
 
 
-# ---------------------------------------------------------------------
-# Worker
-# ---------------------------------------------------------------------
-
 async def main() -> None:
+    """Wire up dependencies and consume KAFKA_TOPIC until stopped.
+
+    For each inbound message: runs its Langflow workflow
+    (ExecuteWorkflowUseCase, idempotent via Postgres), then publishes
+    the outbound response back to the same topic
+    (HandleOutboundResponseUseCase), to be picked up by
+    kafka_outbound_worker.
+    """
     logger.info(
         "kafka.inbound.worker.starting",
         extra={
@@ -42,9 +43,7 @@ async def main() -> None:
 
     await ensure_topics_exist()
 
-    # --------------------------------------------------------------
     # Database (idempotency)
-    # --------------------------------------------------------------
     pool = await asyncpg.create_pool(
         dsn=settings.DATABASE_URL_ASYNC,
         min_size=1,
@@ -53,9 +52,7 @@ async def main() -> None:
 
     idempotency_repo = PostgresIdempotencyRepository(pool)
 
-    # --------------------------------------------------------------
     # Langflow executor
-    # --------------------------------------------------------------
     executor = LangflowExecutor()
 
     use_case = ExecuteWorkflowUseCase(
@@ -63,9 +60,7 @@ async def main() -> None:
         executor=executor,
     )
 
-    # --------------------------------------------------------------
     # Outbound publisher (responses)
-    # --------------------------------------------------------------
     publisher = KafkaPublisher(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         topic=settings.KAFKA_TOPIC,
@@ -74,14 +69,19 @@ async def main() -> None:
 
     outbound_use_case = HandleOutboundResponseUseCase(publisher=publisher)
 
-    # --------------------------------------------------------------
-    # Handler
-    # --------------------------------------------------------------
-
     async def handler(body: dict):
+        """Process one Kafka message: run its workflow and publish the response.
+
+        Args:
+            body (dict): The decoded message body.
+
+        Raises:
+            Exception: Re-raised if the body cannot be parsed as a
+                MessageEnvelope, so the message is not committed.
+        """
         try:
             envelope = MessageEnvelope.parse(body)
-        except Exception as e:
+        except Exception:
             logger.error(
                 "Invalid Kafka message",
                 extra={"body": str(body)},
@@ -106,9 +106,6 @@ async def main() -> None:
 
         await outbound_use_case.execute(envelope, result)
 
-    # --------------------------------------------------------------
-    # Kafka consumer
-    # --------------------------------------------------------------
     consumer = KafkaConsumer(
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         topic=settings.KAFKA_TOPIC,
@@ -117,10 +114,6 @@ async def main() -> None:
 
     await consumer.start(handler)
 
-
-# ---------------------------------------------------------------------
-# Entrypoint
-# ---------------------------------------------------------------------
 
 if __name__ == "__main__":
     try:

@@ -1,3 +1,5 @@
+"""X (Twitter) outbound channel sender (stub)."""
+
 from __future__ import annotations
 
 import logging
@@ -9,11 +11,12 @@ logger = logging.getLogger("channels.twitter.sender")
 
 
 class TwitterSender(ChannelSenderPort):
-    """
-    Stub: el envío real de Direct Messages en X requiere su tier de pago
-    de API y firma OAuth1.0a (consumer_key/consumer_secret +
-    access_token/access_token_secret por conexión), que no están
-    implementados todavía. No lanza excepción ni finge éxito.
+    """Stub sender for X (Twitter) Direct Messages.
+
+    Sending real Direct Messages on X requires their paid API tier and
+    OAuth1.0a request signing (consumer_key/consumer_secret plus a
+    per-connection access_token/access_token_secret), none of which is
+    implemented yet. Does not raise and does not pretend to succeed.
     """
 
     async def send(
@@ -24,6 +27,14 @@ class TwitterSender(ChannelSenderPort):
         text: str,
         credentials: Dict[str, Any],
     ) -> None:
+        """Log that sending is not implemented for this channel.
+
+        Args:
+            external_id (str): X account id.
+            recipient_id (str): Id of the intended recipient.
+            text (str): Message body that would have been sent.
+            credentials (Dict[str, Any]): Channel credentials (unused).
+        """
         logger.warning(
             "channel.sender.not_implemented",
             extra={
