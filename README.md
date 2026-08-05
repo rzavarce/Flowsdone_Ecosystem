@@ -737,8 +737,9 @@ Hoy da ~69% total, pero es un número engañoso si se lee suelto: `application/`
 
 ### CI
 
-`.github/workflows/deploy.yml` corre esta suite (con `--cov`, respetando el `fail_under` de `pyproject.toml`) en un job `test` **antes** del job `deploy` (`deploy: needs: test`) — si los tests o la cobertura fallan, no llega a pegarle por SSH al VPS. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), justamente porque la suite no necesita Postgres/Kafka/RabbitMQ reales.
+`.github/workflows/deploy.yml` tiene dos triggers (`push` a `main` y `pull_request` contra `main`) y dos jobs:
 
-Ojo: como el trigger es `push` a `main`, este gate corre **después** del merge (bloquea el deploy, no el merge en sí). Si en algún momento se activa protección de rama con checks obligatorios en PRs, conviene agregar `pull_request` como trigger adicional del job `test` para tener feedback antes de mergear, no solo antes de deployar.
+- **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), con `--cov` respetando el `fail_under` de `pyproject.toml`.
+- **`deploy`** solo corre en el evento `push` (`if: github.event_name == 'push'`) y depende de `test` (`needs: test`) — nunca se dispara desde una PR (evitaría deployar código sin mergear al VPS), y si los tests o la cobertura fallan en el push a `main`, no llega a pegarle por SSH al servidor.
 
 
