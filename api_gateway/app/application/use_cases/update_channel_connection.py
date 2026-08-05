@@ -99,10 +99,12 @@ class UpdateChannelConnectionUseCase:
 
         if credentials is not None and registrar is not None:
             credentials = dict(credentials)
-            credentials.setdefault(
-                registrar.secret_field,
-                existing.credentials.get(registrar.secret_field) or self._secret_generator.generate(),
-            )
+            if registrar.secret_field is not None:
+                credentials.setdefault(
+                    registrar.secret_field,
+                    existing.credentials.get(registrar.secret_field)
+                    or self._secret_generator.generate(),
+                )
 
         connection = await self._channel_connection_repo.update(
             channel_connection_id,
@@ -124,7 +126,7 @@ class UpdateChannelConnectionUseCase:
         await register_or_compensate(
             registrar=registrar,
             external_id=existing.external_id,
-            secret=credentials[registrar.secret_field],
+            credentials=credentials,
             channel_type=existing.channel_type,
             on_failure=_restore_previous_credentials,
         )

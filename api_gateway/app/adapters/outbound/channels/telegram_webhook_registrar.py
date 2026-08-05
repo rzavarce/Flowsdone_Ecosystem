@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, Dict
 
 import httpx
 
@@ -26,13 +27,15 @@ class TelegramWebhookRegistrar:
 
     secret_field = "telegram_webhook_secret"
 
-    async def register(self, *, external_id: str, secret: str) -> None:
+    async def register(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
         """Register the gateway's Telegram webhook for one bot.
 
         Args:
             external_id (str): The bot token.
-            secret (str): Value Telegram must echo back via
-                `X-Telegram-Bot-Api-Secret-Token` on every update.
+            credentials (Dict[str, Any]): Must contain
+                `telegram_webhook_secret` — the value Telegram must
+                echo back via `X-Telegram-Bot-Api-Secret-Token` on
+                every update.
 
         Raises:
             TelegramWebhookRegistrationError: If the Bot API call
@@ -44,7 +47,7 @@ class TelegramWebhookRegistrar:
         await self._call_bot_api(
             bot_token,
             "setWebhook",
-            data={"url": callback_url, "secret_token": secret},
+            data={"url": callback_url, "secret_token": credentials[self.secret_field]},
         )
 
         logger.info(
@@ -52,11 +55,14 @@ class TelegramWebhookRegistrar:
             extra={"channel": "telegram", "callback_url": callback_url},
         )
 
-    async def deregister(self, *, external_id: str) -> None:
+    async def deregister(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
         """Remove the gateway's Telegram webhook for one bot.
 
         Args:
             external_id (str): The bot token.
+            credentials (Dict[str, Any]): Unused — Telegram's
+                deleteWebhook only needs the bot token. Kept for
+                interface consistency with WebhookRegistrarPort.
 
         Raises:
             TelegramWebhookRegistrationError: If the Bot API call
