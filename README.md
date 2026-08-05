@@ -723,8 +723,22 @@ pytest
 - `adapters/outbound/` — `RandomHexSecretGenerator`, `TelegramWebhookRegistrar`, `MetaWebhookRegistrar`, las dos factories (`ChannelSenderFactory`, `WebhookRegistrarFactory`), y todos los senders (incluidos los stubs de X/TikTok).
 - `adapters/inbound/http/channels/` — los helpers puros de verificación de firma de cada canal (Meta, X, TikTok, extracción de texto de Evolution), más tests end-to-end vía ASGI (sin DB real, con fakes en `app.state`) para Telegram, Facebook y WhatsApp — los tres patrones de verificación distintos (secret por conexión, firma HMAC de app compartida, apikey estático).
 
-**Qué falta (deliberadamente fuera de este alcance):** tests end-to-end de Instagram/X/TikTok a nivel HTTP (sus helpers de firma sí están cubiertos), y cualquier test de integración contra Postgres/Kafka/RabbitMQ reales o contra el `admin` router completo. Los fakes reutilizables viven en `tests/support/` (`fakes.py` para los puertos, `fake_httpx.py` para las llamadas salientes, `asgi.py` para levantar un router aislado).
+**Qué falta (deliberadamente fuera de este alcance):** tests end-to-end de Instagram/X/TikTok a nivel HTTP (sus helpers de firma sí están cubiertos), y cualquier test de integración contra Postgres/Kafka/RabbitMQ reales o contra el `admin` router completo (routers CRUD), `adapters/outbound/db/` (repositorios SQLAlchemy), `infrastructure/` o `main.py` (wiring de arranque). Los fakes reutilizables viven en `tests/support/` (`fakes.py` para los puertos, `fake_httpx.py` para las llamadas salientes, `asgi.py` para levantar un router aislado).
 
-No hay CI corriendo esto todavía (por ahora es local, a criterio de quien abre el PR).
+### Cobertura
+
+`pytest-cov` mide cobertura sobre `api_gateway/app` (config en `[tool.coverage.*]` de `pyproject.toml`):
+
+```bash
+docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest --cov --cov-report=term-missing"
+```
+
+Hoy da ~69% total, pero es un número engañoso si se lee suelto: `application/` y la mayor parte de `adapters/` están arriba del 90-100%, mientras que `admin/`, `adapters/outbound/db/`, `infrastructure/` y `main.py` están en 0% (no son parte de esta suite todavía, ver arriba). `fail_under = 65` en `pyproject.toml` es un **piso inicial**, no una meta — dejar margen bajo el actual evita que el gate rompa por fluctuaciones menores, pero la idea es subirlo a medida que se sumen tests a esas capas, nunca bajarlo para acomodar código nuevo sin cubrir.
+
+### CI
+
+`.github/workflows/deploy.yml` corre esta suite (con `--cov`, respetando el `fail_under` de `pyproject.toml`) en un job `test` **antes** del job `deploy` (`deploy: needs: test`) — si los tests o la cobertura fallan, no llega a pegarle por SSH al VPS. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), justamente porque la suite no necesita Postgres/Kafka/RabbitMQ reales.
+
+Ojo: como el trigger es `push` a `main`, este gate corre **después** del merge (bloquea el deploy, no el merge en sí). Si en algún momento se activa protección de rama con checks obligatorios en PRs, conviene agregar `pull_request` como trigger adicional del job `test` para tener feedback antes de mergear, no solo antes de deployar.
 
 

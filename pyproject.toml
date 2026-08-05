@@ -25,7 +25,30 @@ dependencies = [
 test = [
     "pytest>=8.0.0",
     "anyio>=4.0.0",
+    "pytest-cov>=5.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["api_gateway/tests"]
+
+[tool.coverage.run]
+source = ["api_gateway/app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.$",
+]
+# Piso inicial, no aspiracional: hoy application/ y buena parte de
+# adapters/ están cubiertos, pero admin/ (routers CRUD), db/
+# (repositorios SQLAlchemy), infrastructure/ y main.py todavía no
+# tienen tests (ver README sección 17) y arrastran el numero global.
+# 65 da margen bajo el ~69% actual para que el gate no rompa por
+# fluctuaciones menores; conviene subirlo a medida que se sume
+# cobertura en esas capas, no bajarlo para acomodar código nuevo sin
+# tests.
+fail_under = 65

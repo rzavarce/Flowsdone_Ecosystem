@@ -6,7 +6,33 @@ on:
       - main
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias (incluye pytest/pytest-cov)
+        run: pip install -e ".[test]"
+
+      # Suite unitaria (api_gateway/tests/): mockea los puertos del
+      # dominio y httpx.AsyncClient, no pega contra Postgres/Kafka/
+      # RabbitMQ reales - corre sola en el runner, sin levantar el
+      # stack de docker-compose. El piso de cobertura vive en
+      # pyproject.toml ([tool.coverage.report].fail_under) para que
+      # local y CI usen el mismo número.
+      - name: Correr tests con cobertura
+        run: python -m pytest api_gateway/tests --cov --cov-report=term-missing
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
