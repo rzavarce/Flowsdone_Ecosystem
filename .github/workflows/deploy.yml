@@ -40,6 +40,14 @@ jobs:
     # job no debe correr, o cada PR abierta terminaría deployando al VPS.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Si dos merges a main caen seguidos, dos runs de este job podrían
+    # pisarse en el mismo VPS a mitad de `docker compose build`/`up` o
+    # del `alembic upgrade head`. Encola los deploys en vez de dejarlos
+    # correr en paralelo; no cancela el que ya está en curso porque
+    # cortarlo a la mitad puede dejar el VPS en un estado inconsistente.
+    concurrency:
+      group: deploy-vps
+      cancel-in-progress: false
 
     steps:
       - name: Checkout del código
