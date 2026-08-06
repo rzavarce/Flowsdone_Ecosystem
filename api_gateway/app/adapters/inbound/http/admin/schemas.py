@@ -355,3 +355,21 @@ class ChannelAppOut(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class ChannelAppCredentialsOut(BaseModel):
+    """Response body for GET /channel-apps/{provider}/credentials.
+
+    Unlike ChannelAppOut, this exposes `credentials` in plain text -
+    it exists solely so an admin can retrieve a value generated
+    server-side (e.g. Meta's auto-generated `webhook_verify_token`)
+    that they never typed in themselves and have no other way to read
+    before pasting it into the provider's dashboard.
+
+    Attributes:
+        provider (ChannelAppProvider): Provider this app belongs to.
+        credentials (Dict[str, Any]): App credentials in plain text.
+    """
+
+    provider: ChannelAppProvider
+    credentials: Dict[str, Any]
