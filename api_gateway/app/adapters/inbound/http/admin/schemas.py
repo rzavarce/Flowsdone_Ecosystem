@@ -322,7 +322,10 @@ class ChannelAppUpsert(BaseModel):
     """Request body for PUT /channel-apps/{provider}.
 
     Attributes:
-        credentials (Dict[str, Any]): App credentials to encrypt and store.
+        credentials (Dict[str, Any]): App credentials to encrypt and
+            store. For "meta", `webhook_verify_token` is optional: if
+            omitted, it is auto-generated (or the previously stored
+            value is preserved on update) by UpsertChannelAppUseCase.
         config (Dict[str, Any]): Arbitrary app configuration.
     """
 

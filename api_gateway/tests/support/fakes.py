@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from api_gateway.app.domain.models.channel_app import ChannelApp
 from api_gateway.app.domain.models.channel_connection import ChannelConnection
 from api_gateway.app.domain.models.channel_resolution import ChannelResolution
 
@@ -183,16 +184,32 @@ class FakeWSRegistry:
 
 
 class FakeChannelAppRepo:
-    """In-memory stand-in for ChannelAppRepositoryPort.get_by_provider().
+    """In-memory stand-in for ChannelAppRepositoryPort.
 
-    Only what the inbound webhook handlers (facebook/instagram/twitter/
-    tiktok) actually read: an object exposing `.credentials`.
+    Covers both what the inbound webhook handlers (facebook/instagram/
+    twitter/tiktok) read via `get_by_provider`, and what the admin
+    upsert use case needs: `upsert` replaces `credentials`/`config`
+    wholesale, matching SqlAlchemyChannelAppRepository's behavior.
     """
 
     def __init__(self, channel_app: Optional[Any] = None) -> None:
         self.channel_app = channel_app
+        self.upsert_calls: List[Dict[str, Any]] = []
 
     async def get_by_provider(self, provider: str) -> Optional[Any]:
+        return self.channel_app
+
+    async def upsert(self, *, provider: str, credentials: dict, config: dict) -> ChannelApp:
+        self.upsert_calls.append({"provider": provider, "credentials": dict(credentials), "config": dict(config)})
+        now = datetime.now(timezone.utc)
+        self.channel_app = ChannelApp(
+            id=self.channel_app.id if self.channel_app else uuid4(),
+            provider=provider,
+            credentials=credentials,
+            config=config,
+            created_at=self.channel_app.created_at if self.channel_app else now,
+            updated_at=now,
+        )
         return self.channel_app
 
 

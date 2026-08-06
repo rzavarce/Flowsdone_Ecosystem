@@ -34,6 +34,7 @@ from .application.use_cases.handle_outbound_response import HandleOutboundRespon
 from .application.use_cases.ingest_message import IngestMessageUseCase
 from .application.use_cases.route_channel_message import RouteChannelMessageUseCase
 from .application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
+from .application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from .core.config import settings
 from .core.logging import setup_logging
 from .infrastructure.database import create_engine, create_sessionmaker
@@ -185,6 +186,14 @@ async def lifespan(app: FastAPI):
     app.state.delete_channel_connection_use_case = DeleteChannelConnectionUseCase(
         channel_connection_repo=app.state.channel_connection_repo,
         webhook_registrars=webhook_registrars,
+    )
+
+    # Same shared secret_generator: channel_apps (e.g. Meta's
+    # webhook_verify_token) get the same auto-generation treatment as
+    # channel_connections' per-connection secrets.
+    app.state.upsert_channel_app_use_case = UpsertChannelAppUseCase(
+        channel_app_repo=app.state.channel_app_repo,
+        secret_generator=secret_generator,
     )
 
     logger.info("channel_connection.use_cases.initialized")

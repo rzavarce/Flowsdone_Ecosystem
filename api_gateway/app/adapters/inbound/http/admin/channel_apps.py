@@ -80,7 +80,7 @@ async def upsert_channel_app(
     Returns:
         ChannelAppOut: The upserted channel app.
     """
-    channel_app = await request.app.state.channel_app_repo.upsert(
+    channel_app = await request.app.state.upsert_channel_app_use_case.execute(
         provider=provider, credentials=body.credentials, config=body.config
     )
     return _to_out(channel_app)
