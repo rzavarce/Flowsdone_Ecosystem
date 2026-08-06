@@ -380,12 +380,39 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"credentials\": {\n    \"app_secret\": \"{{metaAppSecret}}\",\n    \"webhook_verify_token\": \"{{metaWebhookVerifyToken}}\"\n  }\n}"
+              "raw": "{\n  \"credentials\": {\n    \"app_secret\": \"{{metaAppSecret}}\"\n  }\n}"
             },
+            "description": "webhook_verify_token no se manda: UpsertChannelAppUseCase lo autogenera si falta (y preserva el existente en updates). Corré 'Reveal Channel App Credentials - meta' después para recuperarlo.",
             "url": {
               "raw": "{{baseUrl}}/internal/admin/channel-apps/meta",
               "host": ["{{baseUrl}}"],
               "path": ["internal", "admin", "channel-apps", "meta"]
+            }
+          }
+        },
+        {
+          "name": "Reveal Channel App Credentials - meta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.environment.set('metaWebhookVerifyToken', pm.response.json().credentials.webhook_verify_token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Devuelve credentials en texto plano (a diferencia de Get Channel App). Guarda automáticamente webhook_verify_token en la variable de entorno para pegarlo en el panel de Meta y para que 'Webhooks - Facebook/Instagram > GET Verify' lo use.",
+            "url": {
+              "raw": "{{baseUrl}}/internal/admin/channel-apps/meta/credentials",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "admin", "channel-apps", "meta", "credentials"]
             }
           }
         },
@@ -494,13 +521,27 @@
         },
         {
           "name": "Create Channel Connection - Facebook",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.environment.set('channelConnectionId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"facebook\",\n  \"external_id\": \"demo-facebook-page-id\",\n  \"credentials\": {}\n}"
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"facebook\",\n  \"external_id\": \"{{facebookPageId}}\",\n  \"credentials\": {\n    \"page_access_token\": \"{{facebookPageAccessToken}}\"\n  }\n}"
             },
+            "description": "facebookPageId/facebookPageAccessToken: en el entorno Local apuntan al fixture demo-facebook-page-id que usa la carpeta 'Webhooks - Facebook'; en Producción tienen que ser el Page ID y el Page Access Token reales de la Página que conectaste en el panel de Meta. Esto dispara la auto-suscripción vía Graph API (POST /{page_id}/subscribed_apps) - si el token es inválido, la conexión se crea y se borra en el mismo request (502).",
             "url": {
               "raw": "{{baseUrl}}/internal/admin/channel-connections",
               "host": ["{{baseUrl}}"],
@@ -510,13 +551,27 @@
         },
         {
           "name": "Create Channel Connection - Instagram",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    pm.environment.set('channelConnectionId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"instagram\",\n  \"external_id\": \"demo-instagram-account-id\",\n  \"credentials\": {}\n}"
+              "raw": "{\n  \"project_id\": \"{{projectId}}\",\n  \"agent_id\": \"{{agentId}}\",\n  \"channel_type\": \"instagram\",\n  \"external_id\": \"{{instagramAccountId}}\",\n  \"credentials\": {\n    \"page_access_token\": \"{{instagramPageAccessToken}}\"\n  }\n}"
             },
+            "description": "instagramAccountId/instagramPageAccessToken: en Local apuntan al fixture demo-instagram-account-id de la carpeta 'Webhooks - Instagram'; en Producción, el IG Business Account ID y token reales.",
             "url": {
               "raw": "{{baseUrl}}/internal/admin/channel-connections",
               "host": ["{{baseUrl}}"],

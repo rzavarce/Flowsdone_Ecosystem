@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .....domain.models.channel_app import ChannelApp, ChannelAppProvider
 from .auth import require_admin_api_key
-from .schemas import ChannelAppOut, ChannelAppUpsert
+from .schemas import ChannelAppCredentialsOut, ChannelAppOut, ChannelAppUpsert
 
 router = APIRouter(
     prefix="/channel-apps",
@@ -63,6 +63,34 @@ async def get_channel_app(provider: ChannelAppProvider, request: Request) -> Cha
     if not channel_app:
         raise HTTPException(status_code=404, detail="channel_app not found")
     return _to_out(channel_app)
+
+
+@router.get("/{provider}/credentials", response_model=ChannelAppCredentialsOut)
+async def reveal_channel_app_credentials(
+    provider: ChannelAppProvider, request: Request
+) -> ChannelAppCredentialsOut:
+    """Fetch a provider's app credentials in plain text.
+
+    Exists so an admin can retrieve a server-generated value (e.g.
+    Meta's auto-generated `webhook_verify_token`) that was never typed
+    in by anyone and would otherwise be unrecoverable after creation -
+    ChannelAppOut/`_to_out` deliberately strip credentials.
+
+    Args:
+        provider (ChannelAppProvider): Provider identifier.
+        request (Request): The incoming FastAPI request; used to reach
+            `request.app.state.channel_app_repo`.
+
+    Returns:
+        ChannelAppCredentialsOut: The provider and its credentials.
+
+    Raises:
+        HTTPException: 404 if not configured.
+    """
+    channel_app = await request.app.state.channel_app_repo.get_by_provider(provider)
+    if not channel_app:
+        raise HTTPException(status_code=404, detail="channel_app not found")
+    return ChannelAppCredentialsOut(provider=channel_app.provider, credentials=channel_app.credentials)
 
 
 @router.put("/{provider}", response_model=ChannelAppOut)
