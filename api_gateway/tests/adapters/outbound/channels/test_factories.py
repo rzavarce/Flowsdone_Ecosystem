@@ -14,9 +14,11 @@ from api_gateway.app.adapters.outbound.channels.meta_webhook_registrar import Me
 from api_gateway.app.adapters.outbound.channels.telegram_webhook_registrar import (
     TelegramWebhookRegistrar,
 )
+from api_gateway.app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
 from api_gateway.app.adapters.outbound.channels.webhook_registrar_factory import (
     WebhookRegistrarFactory,
 )
+from api_gateway.app.application.services.ws_registry import WSRegistry
 from api_gateway.app.domain.models.channel_connection import ChannelType
 
 ALL_CHANNEL_TYPES = set(ChannelType.__args__)
@@ -26,6 +28,19 @@ def test_channel_sender_factory_covers_every_channel_type():
     senders = ChannelSenderFactory().build_all()
 
     assert set(senders.keys()) == ALL_CHANNEL_TYPES
+
+
+def test_channel_sender_factory_wires_voice_dependencies_into_its_sender():
+    call_session_registry = WSRegistry()
+
+    senders = ChannelSenderFactory().build_all(
+        call_session_registry=call_session_registry, voice_provider="a-voice-provider"
+    )
+
+    voice_sender = senders["voice"]
+    assert isinstance(voice_sender, TwilioVoiceSender)
+    assert voice_sender._call_session_registry is call_session_registry
+    assert voice_sender._voice_provider == "a-voice-provider"
 
 
 def test_webhook_registrar_factory_covers_the_auto_registered_channels():

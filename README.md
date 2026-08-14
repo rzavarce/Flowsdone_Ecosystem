@@ -23,14 +23,16 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 15. [Troubleshooting](#15-troubleshooting)
 16. [Mantenimiento](#16-mantenimiento)
 17. [Tests](#17-tests)
+18. [Canal de voz (Twilio ConversationRelay)](#18-canal-de-voz-twilio-conversationrelay)
+19. [Softphone de prueba (demo)](#19-softphone-de-prueba-demo)
 
 ---
 
 ## 1. Qué hace este proyecto
 
-Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) multi-tenant que recibe mensajes desde distintos canales (webchat propio, Facebook Messenger, Instagram, X/Twitter, WhatsApp vía Evolution API, Telegram, TikTok) y los enruta según una regla fija:
+Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) multi-tenant que recibe mensajes desde distintos canales (webchat propio, Facebook Messenger, Instagram, X/Twitter, WhatsApp vía Evolution API, Telegram, TikTok, voz vía Twilio — sección 18) y los enruta según una regla fija:
 
-- **Mensajería conversacional de cualquier canal → siempre Kafka → Langflow.** Todo webhook de canal (sección 9) resuelve a qué tenant/proyecto/agente pertenece y publica en Kafka; `kafka_inbound_worker` ejecuta el agente en Langflow y la respuesta vuelve por WebSocket/callback.
+- **Mensajería conversacional de cualquier canal → siempre Kafka → Langflow.** Todo webhook de canal (sección 9) resuelve a qué tenant/proyecto/agente pertenece y publica en Kafka; `kafka_inbound_worker` ejecuta el agente en Langflow y la respuesta vuelve por WebSocket/callback. El canal de voz sigue la misma regla pero con un topic y un worker propios (`VOICE_KAFKA_TOPIC` / `kafka_voice_worker`, sección 18) para no competir con los canales de texto.
 - **Disparo de automatizaciones de n8n → siempre RabbitMQ.** El endpoint genérico `/webhooks/generic` (o cualquier caller interno) publica en RabbitMQ; un workflow de n8n con un nodo **RabbitMQ Trigger** lo consume directamente (no pasa por Langflow) y puede responder publicando en la cola de salida (ver sección 13).
 
 El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus propios proyectos, canales conectados (credenciales cifradas), agentes de Langflow y automatizaciones de n8n — ver sección 8.
@@ -102,6 +104,8 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
   Traefik (file provider, traefik-dynamic.yml) ──▶ HTTPS por dominio ──▶ cada servicio
 ```
 
+> 📞 **Canal de voz (no está en el diagrama de arriba, ver sección 18):** sigue el mismo principio (webhook → resolver tenant/proyecto/agente → Kafka → Langflow → entrega de vuelta), pero con su propio topic (`VOICE_KAFKA_TOPIC`) y worker dedicado (`kafka_voice_worker`), y con Twilio ConversationRelay haciendo STT/TTS por WebSocket en vez de un webhook de texto simple.
+
 > ⚠️ **Caveat conocido:** `rabbitmq_inbound_worker` (heredado de antes de que existiera esta separación) sigue escuchando la misma cola/routing key (`rag_worker_queue` / `inbound.message`) y trata cualquier mensaje `transport=rabbitmq` como si fuera para Langflow. Mientras no se lo desactive, un mensaje dirigido a n8n también dispara (en paralelo) un intento fallido de `rabbitmq_inbound_worker` contra Langflow con un `workflow_id` que no existe ahí — no rompe nada, pero genera una segunda respuesta de error. Si no vas a usar el camino "RabbitMQ → Langflow" (no es el diseño de este proyecto), podés `docker compose stop rabbitmq_inbound_worker` con seguridad.
 
 ---
@@ -113,6 +117,7 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
 | `api` | build (`dockers/Dockerfile.api`) | Gateway FastAPI: ingesta HTTP/WS, publica a Kafka/RabbitMQ, sirve el webchat estático y `/internal/outbound` |
 | `kafka_inbound_worker` / `kafka_outbound_worker` | build (`dockers/Dockerfile.worker`) | Camino de mensajería (canales → Langflow): consumen/publican en Kafka, llaman a Langflow, entregan la respuesta |
 | `rabbitmq_inbound_worker` / `rabbitmq_outbound_worker` | build (`dockers/Dockerfile.worker`) | `outbound` entrega al gateway la respuesta que publique un workflow de n8n. `inbound` es un remanente que también llama a Langflow sobre RabbitMQ — ver el caveat de la sección 2, hoy el camino real hacia n8n es el `RabbitMQ Trigger` node (sección 13) |
+| `kafka_voice_worker` | build (`dockers/Dockerfile.worker`) | Canal de voz (Twilio, sección 18): consume `VOICE_KAFKA_TOPIC`, ejecuta el agente en Langflow y entrega la respuesta directo a `/internal/outbound` — un solo worker, no un par inbound/outbound como el resto |
 | `langflow` | build (`dockers/Dockerfile.langflow`) | Orquestación de IA — el único lugar con lógica de agentes/prompts |
 | `n8n` | `n8nio/n8n:2.33.3` | Automatización/triggers. Llama a Langflow por HTTP, no usa AI Agent |
 | `evolution` | build (`./evolution-api`, vendorizado) | Gateway de WhatsApp (Evolution API v2.3.7) |
@@ -302,6 +307,8 @@ Filtros disponibles: `GET /internal/admin/projects?tenant_id=...`, `GET /interna
 
 Cada canal tiene su propio endpoint HTTP que entiende el payload **nativo** de esa plataforma, lo verifica, resuelve el `channel_connection` (sección 8) y publica en Kafka hacia Langflow — nunca hace falta armar el envelope a mano (eso lo sigue haciendo `/webhooks/generic` para casos genéricos/n8n).
 
+> El canal de voz (Twilio) sigue esta misma idea pero no encaja en la tabla de abajo (webhook + WebSocket de streaming, no un solo request/response) — documentado aparte en la sección 18.
+
 | Canal | Ruta | Verificación | `external_id` (clave de lookup) |
 |---|---|---|---|
 | Facebook Messenger | `GET/POST /webhooks/facebook` | GET: `hub.verify_token` == `channel_apps.meta.webhook_verify_token`. POST: `X-Hub-Signature-256` (HMAC-SHA256 con `channel_apps.meta.app_secret`) | `entry[].id` (Page ID) |
@@ -426,6 +433,9 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 | Webchat (demo) | http://localhost:8000/static/webchat/ (`?caso=langflow` o `?caso=n8n`, ver sección 13) |
 | Admin API (tenants/proyectos/agentes/canales) | http://localhost:8000/internal/admin/* (sección 8) |
 | Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
+| Webhook de voz (Twilio) | http://localhost:8000/webhooks/voice — sin el nombre del proveedor en la ruta, a propósito (sección 18) |
+| WebSocket de streaming de voz | ws://localhost:8000/voice/stream/{call_sid} (lo abre Twilio, no se usa a mano — sección 18) |
+| Softphone de prueba (demo) | http://localhost:8000/static/voice_demo/ (sección 19) |
 | Langflow | http://localhost:7860 |
 | Langfuse | http://localhost:4100 |
 | n8n | http://localhost:5678 |
@@ -467,6 +477,8 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 | RabbitMQ Scout | https://broker.flowsdone.com |
 | Weaviate GUI | https://vector.flowsdone.com |
 | OpenSearch Dashboards | https://logs.flowsdone.com |
+
+El canal de voz (sección 18) y su softphone de prueba (sección 19) no tienen dominio propio — cuelgan del mismo `platform.flowsdone.com` que ya usan el admin API y los webhooks de texto, sin reescritura de path.
 
 ---
 
@@ -741,5 +753,198 @@ Hoy da ~69% total, pero es un número engañoso si se lee suelto: `application/`
 
 - **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), con `--cov` respetando el `fail_under` de `pyproject.toml`.
 - **`deploy`** solo corre en el evento `push` (`if: github.event_name == 'push'`) y depende de `test` (`needs: test`) — nunca se dispara desde una PR (evitaría deployar código sin mergear al VPS), y si los tests o la cobertura fallan en el push a `main`, no llega a pegarle por SSH al servidor.
+
+---
+
+## 18. Canal de voz (Twilio ConversationRelay)
+
+Transforma la plataforma de agentes en un voicebot telefónico: alguien llama a un número de Twilio, y el mismo agente de Langflow que responde por WhatsApp/Telegram/webchat le contesta por voz. Sigue la arquitectura hexagonal del resto del proyecto — módulo aislado dentro de `api_gateway`, no un microservicio separado (aunque queda desacoplado por puertos + topic propio como para poder extraerlo más adelante sin reescribir lógica).
+
+**Cómo funciona (Twilio ConversationRelay, no Media Streams crudo):** Twilio hace el STT/TTS por su cuenta. Nuestro backend nunca toca audio — recibe/envía **texto** por un WebSocket, exactamente como cualquier otro canal de texto en tiempo real. El "cerebro" sigue siendo 100% Langflow; Twilio es puro transporte de voz, tan "tonto" como Evolution API lo es para WhatsApp.
+
+```
+Llamada entrante
+   │ POST /webhooks/voice  (TwiML — sin "twilio" en la ruta, a propósito)
+   ▼
+api ── resuelve ChannelConnection(channel_type="voice") + ChannelApp("twilio")
+   │   ── verifica X-Twilio-Signature
+   │   ── guarda la sesión de la llamada en Redis (TTL)
+   │   ── responde TwiML: <Connect><ConversationRelay url="wss://.../voice/stream/{call_sid}"/></Connect>
+   ▼
+Twilio abre WS a /voice/stream/{call_sid}  (frames: setup / prompt / interrupt / dtmf / end)
+   ▼
+api (WS) ── por cada "prompt" (turno transcrito) → mismo RouteChannelMessageUseCase que usan
+   │         los demás canales, con transport="kafka_voice"
+   ▼
+Kafka: VOICE_KAFKA_TOPIC ("voice.messages") — topic propio, separado de inbound.messages
+   ▼
+kafka_voice_worker ── ExecuteWorkflowUseCase (Langflow, mismo flow que ya usás en otros canales)
+   │                 ── POST /internal/outbound (HMAC) — el mismo endpoint genérico que ya
+   │                    usan kafka_outbound_worker/rabbitmq_outbound_worker, sin ruta nueva
+   ▼
+api ── TwilioVoiceSender empuja la respuesta al WebSocket abierto → Twilio la dice en voz alta
+```
+
+Por qué es **un solo worker** y no un par inbound/outbound como el resto de los canales: el topic propio (`VOICE_KAFKA_TOPIC`) ya aísla la voz de los demás canales, que es lo que de verdad importa; republicar la propia respuesta a Kafka para que otro worker la vuelva a consumir sería una vuelta extra sin beneficio.
+
+### Puesta en marcha
+
+```bash
+KEY="$ADMIN_API_KEY"
+
+# 1. Migración (channel_type "voice" + provider "twilio")
+docker compose run --rm api alembic -c api_gateway/alembic.ini upgrade head
+
+# 2. App compartida de Twilio (Account SID + Auth Token, una sola para todo el SaaS —
+#    mismo modelo que Meta/X/TikTok en la sección 9)
+curl -s -X PUT http://localhost:8000/internal/admin/channel-apps/twilio \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"credentials": {"account_sid": "AC...", "auth_token": "..."}}'
+
+# 3. Conexión del número (el número específico, como la instance de Evolution o el bot_token
+#    de Telegram). `config.provider` es quién implementa VoiceProviderPort para este número —
+#    hoy solo "twilio", pero deja la puerta abierta a otro proveedor de voz sin tocar el resto.
+curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
+  -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{
+        "project_id":"<project_id>",
+        "agent_id":"<agent_id>",
+        "channel_type":"voice",
+        "external_id":"+1XXXXXXXXXX",
+        "config":{"provider":"twilio"}
+      }'
+
+# 4. En la consola de Twilio (o vía API), configurar el Voice Webhook del número:
+#    https://<PUBLIC_BASE_URL>/webhooks/voice  (POST)
+```
+
+`config` acepta más claves opcionales, sin volver a tocar código: `voice`/`tts_provider` (personalizar la voz TTS, ver más abajo) y `human_transfer_number`/`human_transfer_phrases` (transferencia a un agente humano, ver más abajo).
+
+### Diseño: por qué el webhook no identifica al proveedor
+
+Ni `/webhooks/voice` ni `wss://.../voice/stream/{call_sid}` mencionan "twilio" en la ruta — deliberado. Internamente sí se modela quién es el proveedor (`ChannelConnection.config.provider`, `ChannelApp.provider`), pero nunca se expone en una URL pública. Dos razones:
+
+- Si mañana se suma otro proveedor de voz, la URL pública no cambia — solo se agrega una implementación más de `VoiceProviderPort` (Strategy: firma, TwiML, parseo de frames), sin tocar routers ni casos de uso.
+- No revela en la superficie pública qué tecnología corre detrás.
+
+### Variables de entorno nuevas
+
+| Variable | Para qué |
+|---|---|
+| `VOICE_KAFKA_TOPIC` | Topic Kafka dedicado a voz (default `voice.messages`), separado de `KAFKA_TOPIC` |
+| `VOICE_KAFKA_TOPIC_PARTITIONS` | Particiones de `VOICE_KAFKA_TOPIC` (default `3`) |
+| `KAFKA_VOICE_WORKER_MEM_LIMIT` / `_CPUS` | Límites de recursos del contenedor `kafka_voice_worker` |
+| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Conexión a Redis para `CallSessionRepositoryPort` (estado efímero de la llamada entre el webhook TwiML y el WebSocket, que llegan como dos requests separados) — reusa los mismos valores que ya usa el resto del stack |
+| `CALL_SESSION_TTL_SECONDS` | TTL de la sesión de llamada en Redis (default `7200`), cota superior de duración de una llamada |
+
+No hay `TWILIO_ACCOUNT_SID`/`AUTH_TOKEN` en `.env`: siguiendo el mismo patrón que Meta/X/TikTok (sección 9), esas credenciales viven exclusivamente en `channel_apps`/`channel_connections` vía el admin API, nunca en variables de entorno.
+
+### Personalizar la voz (TTS) por número
+
+`ChannelConnection.config` acepta `voice`/`tts_provider`/`language`, que se pasan directo como atributos del TwiML `<ConversationRelay>` — cambiarla es un `PATCH`, sin recrear nada:
+
+```bash
+curl -X PATCH http://localhost:8000/internal/admin/channel-connections/<id> \
+  -H "X-Admin-Api-Key: $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"config": {"provider": "twilio", "tts_provider": "Amazon", "voice": "Polly.Mia-Neural"}}'
+```
+
+⚠️ **No mandes `language` salvo que también configures transcripción (STT).** Twilio trata `language` como un set todo-o-nada: si lo definís, exige que `transcriptionProvider`/`speechModel` también estén presentes, o rechaza la llamada entera con el error [64101](https://www.twilio.com/docs/errors/64101) ("Incomplete value set..."), que se manifiesta como una llamada que corta sola con un mensaje en inglés que Twilio inyecta. Para solo cambiar la voz/acento, alcanza con `voice` + `tts_provider`.
+
+### Transferencia a un agente humano ("handoff")
+
+Requisito legal habitual: siempre ofrecer la opción de hablar con una persona. Se implementa con el mecanismo de **handoff** de ConversationRelay — no es la app la que controla la llamada telefónica directamente, sino que le devolvemos el control a Twilio para que haga un `<Dial>` a otro número:
+
+```
+Caller dice una frase de transferencia (config)
+   ▼
+api (WS /voice/stream/{call_sid}) ── detecta la frase (determinístico, NO depende del LLM)
+   │                               ── NO enruta ese turno a Langflow/Kafka
+   │                               ── manda {"type":"end","handoffData":"{...}"} por el WS
+   ▼
+Twilio termina ConversationRelay y hace un nuevo POST a la action_url del <Connect> original
+   ▼
+api (POST /webhooks/voice/handoff) ── verifica firma, lee handoffData, responde <Dial>+34...</Dial>
+   ▼
+Twilio bridgea la llamada al número humano
+```
+
+La detección de frases es **determinística** (substring, case-insensitive, `stream.py:_matches_human_transfer_phrase`) y corre antes de tocar Langflow — a propósito, para que el cumplimiento legal no dependa de que el LLM interprete bien la intención.
+
+Configuración por conexión (mismo mecanismo que la voz — `ChannelConnection.config`):
+
+```bash
+curl -X PATCH http://localhost:8000/internal/admin/channel-connections/<id> \
+  -H "X-Admin-Api-Key: $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{
+        "config": {
+          "provider": "twilio",
+          "human_transfer_number": "+34601491522",
+          "human_transfer_phrases": ["hablar con una persona", "agente humano", "quiero un operador"]
+        }
+      }'
+```
+
+Si `human_transfer_number` no está configurado, el `<Connect>` inicial no lleva `action` y esta feature queda desactivada para esa conexión (sin costo de webhook extra). No hay matching difuso ni normalización de acentos todavía — ver limitaciones.
+
+### Limitaciones conocidas (documentadas, no resueltas todavía)
+
+- **Una sola partición efectiva por ahora:** `IngestMessageUseCase` particiona por `key=channel` (igual que los demás canales), así que hoy todas las llamadas de voz caen en la misma partición de `VOICE_KAFKA_TOPIC` — no hay paralelismo real entre llamadas concurrentes. Con el volumen inicial no es un problema; si crece, hace falta particionar por `call_sid`, lo que implica generalizar la partition-key strategy de `IngestMessageUseCase` (afecta también a los canales de texto, por eso se dejó fuera de esta feature).
+- **DLQ de `VOICE_KAFKA_TOPIC` no implementada** — mismo estado que `DLQ_TOPIC` del resto del gateway (el topic se crea pero nada publica ahí todavía).
+- **Sin eventos de control de llamada** (call_started/ended, DTMF) como topic/analítica separada — queda para una iteración futura si hace falta.
+- **Detección de frases de transferencia sin normalización** — substring plano en minúsculas, sin manejo de acentos/tildes ni fuzzy matching. Si el STT transcribe "quiero hablar con una persona" con alguna variación no cubierta en `human_transfer_phrases`, no dispara. Complementarlo con detección por DTMF ("marcar 0") es una opción más robusta, no implementada todavía.
+
+---
+
+## 19. Softphone de prueba (demo)
+
+Herramienta de dev/testing — **no** es parte del canal de voz de producción (sección 18). Deja llamar por WebRTC (Twilio Voice JS SDK) desde el navegador al mismo `/webhooks/voice` que usa una llamada real, sin gastar minutos ni necesitar un teléfono. Vive en `static/voice_demo/`, mismo patrón que el widget de webchat (`static/webchat/`, sección 10).
+
+El TwiML App que usa el softphone apunta su Voice Request URL al mismo `/webhooks/voice` de siempre — no hay lógica de backend nueva para la llamada en sí, solo un endpoint que emite el Access Token que el SDK necesita para autenticar al navegador contra Twilio (`GET /voice-demo/token`, `adapters/inbound/http/voice_demo.py`).
+
+### Puesta en marcha
+
+```bash
+# 1. Crear la API Key y el TwiML App en Twilio (una sola vez), usando el Account SID/
+#    Auth Token ya guardados como ChannelApp "twilio" (sección 18):
+uv run python -c "
+from twilio.rest import Client
+client = Client('<account_sid>', '<auth_token>')
+app = client.applications.create(
+    friendly_name='Flowsdone Voice Demo Softphone',
+    voice_url='<PUBLIC_BASE_URL>/webhooks/voice', voice_method='POST',
+)
+key = client.new_keys.create(friendly_name='voice-demo-softphone')
+print('TWIML_APP_SID=' + app.sid)
+print('API_KEY_SID=' + key.sid)
+print('API_KEY_SECRET=' + key.secret)
+"
+
+# 2. Completar en .env: VOICE_DEMO_TWILIO_ACCOUNT_SID/_API_KEY_SID/_API_KEY_SECRET/_TWIML_APP_SID
+#    (ver env.example.txt para el detalle de cada una)
+
+# 3. Recrear api y abrir en el navegador
+docker compose up -d --force-recreate api
+```
+
+Luego abrí `http://localhost:8000/static/voice_demo/index.html?to=+1XXXXXXXXXX` (o el dominio público) — pide permiso de micrófono, y el botón "Llamar" dispara `device.connect({params: {To: "+1XXXXXXXXXX"}})`, que Twilio traduce en una request a `/webhooks/voice` con `To=+1XXXXXXXXXX` y `From=client:<identity>` — el mismo webhook de siempre, sin cambios.
+
+### Exponer el stack local a internet (`scripts/dev/voice_demo_tunnel.sh`)
+
+Para que el softphone funcione, **Twilio** (no tu navegador) tiene que poder alcanzar `/webhooks/voice` — si estás probando en un entorno sin dominio público real, hace falta un túnel. El script automatiza todo con [Cloudflare Tunnel](https://github.com/cloudflare/cloudflared) (quick tunnel, sin cuenta ni dominio propio):
+
+```bash
+scripts/dev/voice_demo_tunnel.sh start
+# - Descarga cloudflared si hace falta (scripts/dev/cloudflared, gitignored)
+# - Levanta el túnel y captura la URL pública (https://xxxx.trycloudflare.com)
+# - Sobreescribe PUBLIC_BASE_URL en .env con esa URL y recrea el contenedor api
+# - Apunta el TwiML App de Twilio (VOICE_DEMO_TWILIO_TWIML_APP_SID) a esa URL
+# - Imprime el link del softphone listo para abrir
+
+scripts/dev/voice_demo_tunnel.sh stop
+# Revierte PUBLIC_BASE_URL al valor original y recrea api
+```
+
+⚠️ Mientras el túnel está activo, `PUBLIC_BASE_URL` en `.env` **no** es el dominio real — no confundir con un problema de DNS/Traefik si `platform.flowsdone.com` deja de responder como esperás durante una sesión de pruebas. Correr `stop` antes de volver a tocar producción.
 
 

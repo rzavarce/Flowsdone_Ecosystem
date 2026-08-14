@@ -15,6 +15,7 @@ ChannelType = Literal[
     "whatsapp_evolution",
     "telegram",
     "tiktok",
+    "voice",
 ]
 
 
@@ -40,7 +41,10 @@ class ChannelConnection(BaseModel):
         display_name (Optional[str]): Optional human-readable label.
         credentials (Dict[str, Any]): Channel credentials (plain text
             in-process, encrypted at rest).
-        config (Dict[str, Any]): Arbitrary channel configuration.
+        config (Dict[str, Any]): Arbitrary channel configuration. For
+            channel_type="voice", carries {"provider": "twilio"} (or a
+            future voice provider), used to pick the matching
+            VoiceProviderPort implementation without a dedicated column.
         status (str): Lifecycle status (e.g. "active").
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.

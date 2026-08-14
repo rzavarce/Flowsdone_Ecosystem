@@ -544,6 +544,8 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - flowsdone-net
     mem_limit: ${API_MEM_LIMIT}
@@ -596,6 +598,34 @@ services:
       - flowsdone-net
     mem_limit: ${KAFKA_OUTBOUND_WORKER_MEM_LIMIT}
     cpus: ${KAFKA_OUTBOUND_WORKER_CPUS}
+
+  # Voice channel: dedicated worker/topic, kept isolated from the text
+  # channels' kafka_inbound_worker/kafka_outbound_worker pair so a
+  # burst of calls never competes with them for capacity.
+  kafka_voice_worker:
+    <<: *common
+    build:
+      context: .
+      dockerfile: dockers/Dockerfile.worker
+    command: python -m workers.kafka.voice.main
+    env_file: .env
+    environment:
+      GATEWAY_INTERNAL_URL: ${GATEWAY_INTERNAL_URL}
+      CALLBACK_HMAC_SECRET: ${CALLBACK_HMAC_SECRET}
+      OTEL_ENABLED: ${OTEL_ENABLED}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: fd-kafka-voice-worker
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      langflow:
+        condition: service_started
+    networks:
+      - flowsdone-net
+    mem_limit: ${KAFKA_VOICE_WORKER_MEM_LIMIT}
+    cpus: ${KAFKA_VOICE_WORKER_CPUS}
 
   # ------------------------------------------------------------------
   # WORKERS — RABBITMQ

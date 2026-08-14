@@ -156,6 +156,7 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
                 channel_connection_id=connection.id,
                 channel_type=connection.channel_type,
                 credentials=decrypt_credentials(connection.credentials),
+                config=connection.config or {},
             )
 
     async def list_by_project(self, project_id: Optional[UUID] = None) -> List[ChannelConnection]:

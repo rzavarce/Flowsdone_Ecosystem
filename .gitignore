@@ -17,3 +17,7 @@ evolution-api/
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Downloaded dev tooling binary, not source - scripts/dev/voice_demo_tunnel.sh
+# fetches it on demand.
+scripts/dev/cloudflared

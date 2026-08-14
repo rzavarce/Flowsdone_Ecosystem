@@ -5,13 +5,16 @@ to support the use cases under test — no real I/O, no framework.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+from api_gateway.app.domain.models.call_session import CallSession
 from api_gateway.app.domain.models.channel_app import ChannelApp
 from api_gateway.app.domain.models.channel_connection import ChannelConnection
 from api_gateway.app.domain.models.channel_resolution import ChannelResolution
+from api_gateway.app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -44,6 +47,7 @@ def make_channel_resolution(**overrides: Any) -> ChannelResolution:
         channel_connection_id=uuid4(),
         channel_type="telegram",
         credentials={},
+        config={},
     )
     defaults.update(overrides)
     return ChannelResolution(**defaults)
@@ -233,6 +237,122 @@ class FakeRouteChannelMessageUseCase:
             )
 
             raise ChannelMessageNotRoutable("no channel_connection matches")
+
+
+def make_call_session(**overrides: Any) -> CallSession:
+    """Build a CallSession with sane defaults, overridable per test."""
+    defaults: Dict[str, Any] = dict(
+        call_sid="CA123",
+        channel_connection_id=uuid4(),
+        project_id=uuid4(),
+        agent_id=uuid4(),
+        langflow_flow_id="flow-123",
+        from_number="+15550001111",
+        to_number="+15559998888",
+        provider="twilio",
+        status="ringing",
+        started_at=datetime.now(timezone.utc),
+    )
+    defaults.update(overrides)
+    return CallSession(**defaults)
+
+
+class FakeVoiceProvider:
+    """Configurable stand-in for VoiceProviderPort.
+
+    `verify_webhook_signature` always returns `signature_valid`;
+    `parse_relay_frame` only understands "prompt" (with voicePrompt
+    text) and passes every other type through as-is - enough to drive
+    the voice inbound routers without a real Twilio payload.
+    """
+
+    provider_name = "twilio"
+
+    def __init__(self, signature_valid: bool = True) -> None:
+        self.signature_valid = signature_valid
+        self.built_twiml_for: List[str] = []
+        self.built_twiml_calls: List[Dict[str, Any]] = []
+        self.built_frames: List[Dict[str, Any]] = []
+        self.built_handoff_for: List[str] = []
+        self.built_handoff_calls: List[Dict[str, Any]] = []
+
+    def verify_webhook_signature(
+        self, *, url: str, form_params: Dict[str, str], signature: str, auth_token: str
+    ) -> bool:
+        return self.signature_valid
+
+    def build_twiml_connect(
+        self,
+        *,
+        stream_url: str,
+        voice: Optional[str] = None,
+        language: Optional[str] = None,
+        tts_provider: Optional[str] = None,
+        transcription_language: Optional[str] = None,
+        transcription_provider: Optional[str] = None,
+        speech_model: Optional[str] = None,
+        action_url: Optional[str] = None,
+    ) -> str:
+        self.built_twiml_for.append(stream_url)
+        self.built_twiml_calls.append(
+            {
+                "stream_url": stream_url,
+                "voice": voice,
+                "language": language,
+                "tts_provider": tts_provider,
+                "transcription_language": transcription_language,
+                "transcription_provider": transcription_provider,
+                "speech_model": speech_model,
+                "action_url": action_url,
+            }
+        )
+        return f'<Response><Connect><ConversationRelay url="{stream_url}"/></Connect></Response>'
+
+    def parse_relay_frame(self, raw: Dict[str, Any]) -> VoiceRelayEvent:
+        frame_type = raw.get("type")
+        call_sid = raw.get("callSid", "")
+        if frame_type == "prompt":
+            return VoiceRelayEvent(
+                type="prompt", call_sid=call_sid, text=raw.get("voicePrompt"), raw=raw
+            )
+        return VoiceRelayEvent(type=frame_type, call_sid=call_sid, raw=raw)
+
+    def build_relay_text_frame(self, *, text: str, last: bool = True) -> Dict[str, Any]:
+        frame = {"type": "text", "token": text, "last": last}
+        self.built_frames.append(frame)
+        return frame
+
+    def build_relay_end_frame(self, *, handoff_data: Dict[str, Any]) -> Dict[str, Any]:
+        frame = {"type": "end", "handoffData": json.dumps(handoff_data)}
+        self.built_frames.append(frame)
+        return frame
+
+    def build_handoff_twiml(self, *, phone_number: str, caller_id: Optional[str] = None) -> str:
+        self.built_handoff_for.append(phone_number)
+        self.built_handoff_calls.append({"phone_number": phone_number, "caller_id": caller_id})
+        return f"<Response><Dial>{phone_number}</Dial></Response>"
+
+
+class FakeCallSessionRepo:
+    """In-memory stand-in for CallSessionRepositoryPort."""
+
+    def __init__(self, session: Optional[CallSession] = None) -> None:
+        self.sessions: Dict[str, CallSession] = {}
+        if session:
+            self.sessions[session.call_sid] = session
+        self.saved: List[CallSession] = []
+        self.deleted: List[str] = []
+
+    async def save(self, session: CallSession, *, ttl_seconds: int) -> None:
+        self.sessions[session.call_sid] = session
+        self.saved.append(session)
+
+    async def get(self, call_sid: str) -> Optional[CallSession]:
+        return self.sessions.get(call_sid)
+
+    async def delete(self, call_sid: str) -> None:
+        self.sessions.pop(call_sid, None)
+        self.deleted.append(call_sid)
 
 
 class FakeChannelSender:

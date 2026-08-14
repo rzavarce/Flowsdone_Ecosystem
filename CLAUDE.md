@@ -88,7 +88,8 @@ Cada vez que se aborde una nueva tarea, seguir GitFlow sin excepción:
    - Ejecutar la suite de tests localmente y confirmar que pasa antes de hacer push
 3. **Al terminar la tarea**:
    - Hacer push de la rama al remoto
-   - Preparar y generar el **link de la Pull Request** (rama origen → `develop`, o → `main` si es `hotfix`), con:
+   - **Antes de generar el link de la PR, preguntar siempre si hay algún otro requerimiento pendiente** (cambios adicionales, ajustes, algo que revisar) y esperar confirmación antes de continuar
+   - Una vez confirmado que no hay más requerimientos, preparar y generar el **link de la Pull Request** (rama origen → `develop`, o → `main` si es `hotfix`), con:
      - Título descriptivo de la tarea
      - Resumen de los cambios
      - Referencia al issue/tarea si existe

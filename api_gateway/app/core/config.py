@@ -30,6 +30,19 @@ class Settings(BaseModel):
     # --scale kafka_inbound_worker=N), without touching code.
     KAFKA_TOPIC_PARTITIONS: int = 6
     DLQ_TOPIC: str = "inbound.messages.dlq"
+    # Dedicated topic for the voice channel, kept separate from
+    # KAFKA_TOPIC so a burst of calls never delays/competes with text
+    # channels for kafka_inbound_worker capacity.
+    VOICE_KAFKA_TOPIC: str = "voice.messages"
+    VOICE_KAFKA_TOPIC_PARTITIONS: int = 3
+
+    # Redis (voice call session state, see CallSessionRepositoryPort)
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: Optional[str] = None
+    # Upper bound on call duration; the session is looked up once when
+    # the streaming WebSocket connects, shortly after this is written.
+    CALL_SESSION_TTL_SECONDS: int = 7200
 
     # RabbitMQ
     ENABLE_RABBITMQ: bool = False
@@ -92,6 +105,15 @@ class Settings(BaseModel):
     OTEL_EXPORTER_OTLP_ENDPOINT: Optional[str] = None
     OTEL_SERVICE_NAME: str = "fd-service"
 
+    # Voice demo softphone (dev/testing only, see .env). Optional: the
+    # /voice-demo/token endpoint 404s if unset, rather than failing
+    # gateway startup - unlike the production voice channel, this is
+    # not required for the app to run.
+    VOICE_DEMO_TWILIO_ACCOUNT_SID: Optional[str] = None
+    VOICE_DEMO_TWILIO_API_KEY_SID: Optional[str] = None
+    VOICE_DEMO_TWILIO_API_KEY_SECRET: Optional[str] = None
+    VOICE_DEMO_TWILIO_TWIML_APP_SID: Optional[str] = None
+
     # Misc
     REQUEST_TIMEOUT_SECONDS: int = 10
 
@@ -122,6 +144,13 @@ settings = Settings(
     KAFKA_TOPIC=os.getenv("KAFKA_TOPIC", "inbound.messages"),
     KAFKA_TOPIC_PARTITIONS=int(os.getenv("KAFKA_TOPIC_PARTITIONS", "6")),
     DLQ_TOPIC=os.getenv("DLQ_TOPIC", "inbound.messages.dlq"),
+    VOICE_KAFKA_TOPIC=os.getenv("VOICE_KAFKA_TOPIC", "voice.messages"),
+    VOICE_KAFKA_TOPIC_PARTITIONS=int(os.getenv("VOICE_KAFKA_TOPIC_PARTITIONS", "3")),
+
+    REDIS_HOST=os.getenv("REDIS_HOST", "redis"),
+    REDIS_PORT=int(os.getenv("REDIS_PORT", "6379")),
+    REDIS_PASSWORD=os.getenv("REDIS_PASSWORD"),
+    CALL_SESSION_TTL_SECONDS=int(os.getenv("CALL_SESSION_TTL_SECONDS", "7200")),
 
     ENABLE_RABBITMQ=_bool(os.getenv("ENABLE_RABBITMQ"), False),
     RABBITMQ_URL=os.getenv("RABBITMQ_URL"),
@@ -161,6 +190,11 @@ settings = Settings(
     OTEL_ENABLED=_bool(os.getenv("OTEL_ENABLED"), False),
     OTEL_EXPORTER_OTLP_ENDPOINT=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
     OTEL_SERVICE_NAME=os.getenv("OTEL_SERVICE_NAME", "fd-service"),
+
+    VOICE_DEMO_TWILIO_ACCOUNT_SID=os.getenv("VOICE_DEMO_TWILIO_ACCOUNT_SID"),
+    VOICE_DEMO_TWILIO_API_KEY_SID=os.getenv("VOICE_DEMO_TWILIO_API_KEY_SID"),
+    VOICE_DEMO_TWILIO_API_KEY_SECRET=os.getenv("VOICE_DEMO_TWILIO_API_KEY_SECRET"),
+    VOICE_DEMO_TWILIO_TWIML_APP_SID=os.getenv("VOICE_DEMO_TWILIO_TWIML_APP_SID"),
 
     REQUEST_TIMEOUT_SECONDS=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "10")),
 )

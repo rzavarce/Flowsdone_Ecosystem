@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .channel_connection import ChannelType
 
@@ -25,6 +25,8 @@ class ChannelResolution(BaseModel):
         channel_connection_id (UUID): Id of the matched channel connection.
         channel_type (ChannelType): Which platform this resolution is for.
         credentials (Dict[str, Any]): Decrypted channel credentials.
+        config (Dict[str, Any]): The connection's arbitrary config (e.g.
+            voice/language/tts_provider for channel_type="voice").
     """
 
     tenant_id: UUID
@@ -34,3 +36,4 @@ class ChannelResolution(BaseModel):
     channel_connection_id: UUID
     channel_type: ChannelType
     credentials: Dict[str, Any]
+    config: Dict[str, Any] = Field(default_factory=dict)

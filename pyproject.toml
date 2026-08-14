@@ -19,6 +19,9 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.30.0",
     "alembic>=1.13.0",
     "cryptography>=42.0.0",
+    "twilio>=9.0.0",
+    "redis>=5.0.0",
+    "python-multipart>=0.0.20",
 ]
 
 [project.optional-dependencies]
