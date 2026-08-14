@@ -7,12 +7,15 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from redis.asyncio import Redis
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 from .adapters.inbound.http.admin import router as admin_router
 from .adapters.inbound.http.channels import router as channels_router
 from .adapters.inbound.http.internal_outbound import router as internal_router
+from .adapters.inbound.http.voice import router as voice_router
+from .adapters.inbound.http.voice_demo import router as voice_demo_router
 from .adapters.inbound.http.webhooks import router as webhooks_router
 from .adapters.inbound.http.websocket import router as ws_router
 from .adapters.outbound.channels.factory import ChannelSenderFactory
@@ -27,6 +30,8 @@ from .adapters.outbound.queue.factory import PublisherFactory
 from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
 from .adapters.outbound.security.secret_generator import RandomHexSecretGenerator
+from .adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
+from .adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
 from .application.services.ws_registry import WSRegistry
 from .application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
 from .application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
@@ -48,12 +53,15 @@ logger = logging.getLogger("bootstrap")
 async def lifespan(app: FastAPI):
     """Build and tear down all application state around the app's lifetime.
 
-    Constructs, in order: the WebSocket registry, the message
-    publishers (Kafka/RabbitMQ) and their factory, the ingest use case,
-    the database engine and admin repositories, the outbound handler
-    (WebSocket + native channel senders), and the channel message
-    router - then yields control to FastAPI. On shutdown, stops the
-    publishers and disposes the database engine.
+    Constructs, in order: the WebSocket registry, the voice call
+    registry and its Redis-backed session store, the message
+    publishers (Kafka/RabbitMQ, including the voice channel's
+    dedicated Kafka topic) and their factory, the ingest use case, the
+    database engine and admin repositories, the outbound handler
+    (WebSocket + native channel senders, including voice), and the
+    channel message router - then yields control to FastAPI. On
+    shutdown, stops the publishers, closes the Redis client, and
+    disposes the database engine.
 
     Args:
         app (FastAPI): The FastAPI application instance.
@@ -71,7 +79,30 @@ async def lifespan(app: FastAPI):
     ws_registry = WSRegistry()
     app.state.ws_registry = ws_registry
 
+    # Voice call registry (separate instance/keyspace from ws_registry:
+    # keyed by call_sid rather than conversation_id, so the voice
+    # module never shares mutable state with webchat).
+    call_session_registry = WSRegistry()
+    app.state.call_session_registry = call_session_registry
+
     logger.info("ws.registry.initialized")
+
+    # Voice call session storage (Redis) and provider adapter. Built
+    # unconditionally - unlike Kafka/RabbitMQ, voice has no on/off
+    # flag; a call simply cannot be routed if channel_apps/twilio is
+    # never configured, exactly like any other channel with missing
+    # credentials.
+    redis_client = Redis(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+        decode_responses=True,
+    )
+    app.state.redis_client = redis_client
+    app.state.call_session_repo = RedisCallSessionRepository(redis_client)
+    app.state.voice_provider = TwilioVoiceProviderAdapter()
+
+    logger.info("voice.dependencies.initialized")
 
     # Publishers (outbound adapters)
     publishers: dict[str, object] = {}
@@ -102,6 +133,21 @@ async def lifespan(app: FastAPI):
         publishers["kafka"] = kafka_publisher
 
         logger.info("kafka.publisher.ready")
+
+        # Dedicated publisher/topic for the voice channel (see
+        # VOICE_KAFKA_TOPIC), kept separate from KAFKA_TOPIC so a
+        # burst of calls never competes with text channels for
+        # kafka_inbound_worker capacity.
+        voice_kafka_publisher = KafkaPublisher(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            topic=settings.VOICE_KAFKA_TOPIC,
+        )
+        await voice_kafka_publisher.start()
+
+        app.state.voice_kafka_publisher = voice_kafka_publisher
+        publishers["kafka_voice"] = voice_kafka_publisher
+
+        logger.info("kafka.voice_publisher.ready", extra={"topic": settings.VOICE_KAFKA_TOPIC})
 
     if settings.ENABLE_RABBITMQ:
         if (
@@ -204,7 +250,10 @@ async def lifespan(app: FastAPI):
     outbound_handler = HandleOutboundResponseUseCase(
         ws_registry=ws_registry,
         channel_connection_repo=app.state.channel_connection_repo,
-        channel_senders=ChannelSenderFactory().build_all(),
+        channel_senders=ChannelSenderFactory().build_all(
+            call_session_registry=call_session_registry,
+            voice_provider=app.state.voice_provider,
+        ),
     )
     app.state.outbound_handler = outbound_handler
 
@@ -230,6 +279,16 @@ async def lifespan(app: FastAPI):
         if kafka_pub:
             await kafka_pub.stop()
             logger.info("kafka.publisher.stopped")
+
+        voice_kafka_pub = getattr(app.state, "voice_kafka_publisher", None)
+        if voice_kafka_pub:
+            await voice_kafka_pub.stop()
+            logger.info("kafka.voice_publisher.stopped")
+
+    redis_client = getattr(app.state, "redis_client", None)
+    if redis_client:
+        await redis_client.aclose()
+        logger.info("redis.client.closed")
 
     if settings.ENABLE_RABBITMQ:
         rabbit_pub = getattr(app.state, "rabbitmq_publisher", None)
@@ -305,4 +364,6 @@ app.include_router(ws_router)
 app.include_router(webhooks_router)
 app.include_router(internal_router)
 app.include_router(channels_router)
+app.include_router(voice_router)
+app.include_router(voice_demo_router)
 app.include_router(admin_router)

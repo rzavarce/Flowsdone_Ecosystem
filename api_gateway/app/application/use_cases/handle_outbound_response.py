@@ -8,6 +8,7 @@ import httpx
 
 from ...domain.models.message_envelope import MessageEnvelope
 from ...domain.ports.outbound import ChannelConnectionRepositoryPort, ChannelSenderPort
+from ..services.langflow_result import extract_text_from_langflow_result
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 
@@ -52,9 +53,10 @@ class HandleOutboundResponseUseCase:
     def _extract_text(self, value: Any) -> Optional[str]:
         """Recursively extract a human-readable response string.
 
-        Walks common Langflow response shapes (dicts with a
-        message/response/output/... key, lists, nested errors) to find
-        the first non-empty text value.
+        Thin wrapper around the shared
+        `application.services.langflow_result.extract_text_from_langflow_result`,
+        kept as a method for backward compatibility with existing
+        callers/tests.
 
         Args:
             value (Any): A Langflow result, or a nested part of one.
@@ -63,41 +65,7 @@ class HandleOutboundResponseUseCase:
             Optional[str]: The extracted text, or None if no text
             could be found.
         """
-        if value is None:
-            return None
-
-        if isinstance(value, str):
-            stripped = value.strip()
-            return stripped or None
-
-        if isinstance(value, dict):
-            for key in ("message", "response", "output", "content", "text", "answer", "result"):
-                if key in value:
-                    extracted = self._extract_text(value[key])
-                    if extracted:
-                        return extracted
-
-            for key in ("detail", "error"):
-                if key in value:
-                    extracted = self._extract_text(value[key])
-                    if extracted:
-                        return extracted
-
-            for key in ("outputs", "data", "results"):
-                if key in value:
-                    extracted = self._extract_text(value[key])
-                    if extracted:
-                        return extracted
-
-            return None
-
-        if isinstance(value, list):
-            for item in value:
-                extracted = self._extract_text(item)
-                if extracted:
-                    return extracted
-
-        return None
+        return extract_text_from_langflow_result(value)
 
     async def execute(
         self,

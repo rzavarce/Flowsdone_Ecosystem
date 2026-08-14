@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-ChannelAppProvider = Literal["meta", "twitter", "tiktok"]
+ChannelAppProvider = Literal["meta", "twitter", "tiktok", "twilio"]
 
 
 class ChannelApp(BaseModel):
@@ -16,7 +16,9 @@ class ChannelApp(BaseModel):
 
     Meta covers Facebook and Instagram; there is a single app per
     provider for the whole SaaS, not per tenant. `channel_connections`
-    is what varies per connected client/channel.
+    is what varies per connected client/channel. For "twilio", this
+    holds the SaaS-wide Account SID + Auth Token; the specific phone
+    number lives in a channel_connections row with channel_type="voice".
 
     `credentials` travels in plain text within the application;
     encryption with Fernet is the exclusive responsibility of the

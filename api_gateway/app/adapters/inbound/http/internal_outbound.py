@@ -4,12 +4,11 @@ back to the gateway process that holds the live WebSocket/channel state.
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
+from ....application.services.hmac_signing import verify
 from ....core.config import settings
 from ....domain.models.message_envelope import MessageEnvelope
 
@@ -21,6 +20,11 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 def verify_hmac(body: bytes, signature: str | None) -> bool:
     """Verify the HMAC-SHA256 signature of an internal request body.
 
+    Thin wrapper around the shared
+    `application.services.hmac_signing.verify`, kept as a
+    module-level function for backward compatibility with existing
+    callers/tests.
+
     Args:
         body (bytes): Raw request body bytes.
         signature (str | None): Value of the X-Signature header.
@@ -28,14 +32,7 @@ def verify_hmac(body: bytes, signature: str | None) -> bool:
     Returns:
         bool: True if the signature is present and valid.
     """
-    if not signature:
-        return False
-    expected = hmac.new(
-        settings.CALLBACK_HMAC_SECRET.encode("utf-8"),
-        body,
-        hashlib.sha256,
-    ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    return verify(body, signature, settings.CALLBACK_HMAC_SECRET)
 
 
 @router.post("/outbound", status_code=202)

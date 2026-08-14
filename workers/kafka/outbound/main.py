@@ -4,14 +4,13 @@ live WebSocket/channel state can deliver them.
 """
 
 import asyncio
-import hashlib
-import hmac
 import json
 import logging
 
 import httpx
 
 from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
+from api_gateway.app.application.services.hmac_signing import sign
 from api_gateway.app.core.config import settings
 from api_gateway.app.core.logging import setup_logging
 from api_gateway.app.domain.models.message_envelope import MessageEnvelope
@@ -19,23 +18,6 @@ from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("kafka.outbound.worker")
-
-
-def sign(body: bytes) -> str:
-    """Compute the HMAC-SHA256 signature sent to /internal/outbound.
-
-    Args:
-        body (bytes): Raw request body bytes.
-
-    Returns:
-        str: The hex-encoded HMAC-SHA256 digest, signed with
-        settings.CALLBACK_HMAC_SECRET.
-    """
-    return hmac.new(
-        settings.CALLBACK_HMAC_SECRET.encode("utf-8"),
-        body,
-        hashlib.sha256,
-    ).hexdigest()
 
 
 async def main() -> None:
@@ -68,7 +50,7 @@ async def main() -> None:
 
         # Stable, UUID-safe serialization so the signature is deterministic.
         body = json.dumps(raw, separators=(",", ":"), sort_keys=True, default=str).encode("utf-8")
-        sig = sign(body)
+        sig = sign(body, settings.CALLBACK_HMAC_SECRET)
 
         resp = await client.post(
             endpoint,

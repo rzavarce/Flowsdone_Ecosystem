@@ -12,6 +12,7 @@ logger = logging.getLogger("kafka.admin")
 REQUIRED_TOPICS = [
     (settings.KAFKA_TOPIC, settings.KAFKA_TOPIC_PARTITIONS),
     (settings.DLQ_TOPIC, settings.KAFKA_TOPIC_PARTITIONS),
+    (settings.VOICE_KAFKA_TOPIC, settings.VOICE_KAFKA_TOPIC_PARTITIONS),
 ]
 
 

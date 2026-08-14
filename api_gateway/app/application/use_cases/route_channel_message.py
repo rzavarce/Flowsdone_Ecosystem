@@ -37,8 +37,10 @@ def build_conversation_id(project_id: UUID, channel_type: str, external_conversa
 class RouteChannelMessageUseCase:
     """Resolves (channel_type, external_id) to a tenant/project/agent via
     ChannelConnectionRepositoryPort and delegates to IngestMessageUseCase,
-    forcing transport="kafka" for every chat channel message, per the
-    gateway's routing rule: chat channels always go to Langflow via Kafka.
+    defaulting to transport="kafka" for every chat channel message, per
+    the gateway's routing rule: chat channels always go to Langflow via
+    a broker. Voice passes transport="kafka_voice" explicitly, so its
+    turns land on a topic dedicated to voice instead of inbound.messages.
     """
 
     def __init__(
@@ -65,6 +67,7 @@ class RouteChannelMessageUseCase:
         external_conversation_key: str,
         sender_id: Optional[str],
         payload: Dict[str, Any],
+        transport: str = "kafka",
     ) -> None:
         """Resolve a channel message and ingest it for Langflow processing.
 
@@ -73,10 +76,15 @@ class RouteChannelMessageUseCase:
             external_id (str): External id carried by the webhook
                 (instance name, page id, bot token, etc.).
             external_conversation_key (str): Id of the sender on the
-                external platform (remoteJid, psid, chat_id, ...).
+                external platform (remoteJid, psid, chat_id, call_sid,
+                ...).
             sender_id (Optional[str]): Id of the sender, if different
                 from external_conversation_key.
             payload (Dict[str, Any]): Message payload to ingest.
+            transport (str): Broker transport key to publish through,
+                resolved via PublisherFactory (e.g. "kafka" for chat
+                channels, "kafka_voice" for the voice channel's
+                dedicated topic).
 
         Raises:
             ChannelMessageNotRoutable: If no active channel_connection
@@ -112,7 +120,7 @@ class RouteChannelMessageUseCase:
             workflow_id=resolution.langflow_flow_id,
             conversation_id=conversation_id,
             sender_id=sender_id,
-            transport="kafka",
+            transport=transport,
             payload=payload,
             channel=channel_type,
             channel_connection_id=str(resolution.channel_connection_id),

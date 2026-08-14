@@ -65,5 +65,28 @@ async def test_resolved_channel_ingests_with_namespaced_conversation_id():
     assert envelope["meta"]["channel_connection_id"] == str(resolution.channel_connection_id)
     assert envelope["meta"]["external_conversation_key"] == "chat-1"
     assert envelope["channel"] == "telegram"
-    # RouteChannelMessageUseCase always forces transport="kafka" for chat channels.
+    # RouteChannelMessageUseCase defaults to transport="kafka" for chat channels.
     assert publisher_factory.requested_transports == ["kafka"]
+
+
+async def test_transport_can_be_overridden_for_the_voice_channel():
+    resolution = make_channel_resolution(channel_type="voice", langflow_flow_id="flow-9")
+    repo = FakeChannelConnectionRepo(resolution=resolution)
+    publisher_factory = FakePublisherFactory()
+    ingest = IngestMessageUseCase(publisher_factory=publisher_factory)
+    use_case = RouteChannelMessageUseCase(repo, ingest)
+
+    await use_case.execute(
+        channel_type="voice",
+        external_id="+15559998888",
+        external_conversation_key="CA123",
+        sender_id="+15550001111",
+        payload={"message": "hola"},
+        transport="kafka_voice",
+    )
+
+    # The voice channel routes to its own dedicated topic instead of
+    # the default "kafka" transport, keeping it isolated from text
+    # channels without RouteChannelMessageUseCase knowing about Kafka
+    # topics itself.
+    assert publisher_factory.requested_transports == ["kafka_voice"]
