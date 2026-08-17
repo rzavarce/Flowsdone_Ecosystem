@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from ...domain.models.message import Message
+from api_gateway.app.domain.models.message import Message
 
 
 class MessageDTO(BaseModel):

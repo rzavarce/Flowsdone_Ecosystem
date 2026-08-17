@@ -15,15 +15,15 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
-from ...domain.models.message_envelope import MessageEnvelope, MessageMeta
-from ...domain.models.session import Session
-from ...domain.ports.outbound import (
+from api_gateway.app.domain.models.message_envelope import MessageEnvelope, MessageMeta
+from api_gateway.app.domain.models.session import Session
+from api_gateway.app.domain.ports.outbound import (
     AppConnectorPort,
     ChannelConnectionRepositoryPort,
     SessionHistoryRepositoryPort,
     SessionRepositoryPort,
 )
-from ..use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from api_gateway.app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 
 logger = logging.getLogger("switchboard")
 

@@ -6,8 +6,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_admin_api_key
-from .schemas import TenantCreate, TenantOut, TenantUpdate
+from api_gateway.app.adapters.inbound.http.admin.auth import require_admin_api_key
+from api_gateway.app.adapters.inbound.http.admin.schemas import TenantCreate, TenantOut, TenantUpdate
 
 router = APIRouter(
     prefix="/tenants",

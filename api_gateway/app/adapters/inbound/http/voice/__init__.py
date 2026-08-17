@@ -8,9 +8,9 @@ changes what is configured on the telephony side.
 
 from fastapi import APIRouter
 
-from .handoff import router as handoff_router
-from .stream import router as stream_router
-from .webhook import router as webhook_router
+from api_gateway.app.adapters.inbound.http.voice.handoff import router as handoff_router
+from api_gateway.app.adapters.inbound.http.voice.stream import router as stream_router
+from api_gateway.app.adapters.inbound.http.voice.webhook import router as webhook_router
 
 router = APIRouter()
 

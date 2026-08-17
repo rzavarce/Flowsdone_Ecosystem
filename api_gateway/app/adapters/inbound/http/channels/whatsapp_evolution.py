@@ -8,8 +8,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
-from .....application.services.switchboard import ChannelMessageNotRoutable
-from .....core.config import settings
+from api_gateway.app.application.services.switchboard import ChannelMessageNotRoutable
+from api_gateway.app.core.config import settings
 
 logger = logging.getLogger("channels.whatsapp_evolution")
 

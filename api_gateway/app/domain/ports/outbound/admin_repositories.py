@@ -7,13 +7,13 @@ from __future__ import annotations
 from typing import Any, List, Optional, Protocol
 from uuid import UUID
 
-from ....domain.models.agent import Agent
-from ....domain.models.channel_app import ChannelApp
-from ....domain.models.channel_connection import ChannelConnection
-from ....domain.models.channel_resolution import ChannelResolution
-from ....domain.models.project import Project
-from ....domain.models.tenant import Tenant
-from ....domain.models.workflow_config import WorkflowConfig
+from api_gateway.app.domain.models.agent import Agent
+from api_gateway.app.domain.models.channel_app import ChannelApp
+from api_gateway.app.domain.models.channel_connection import ChannelConnection
+from api_gateway.app.domain.models.channel_resolution import ChannelResolution
+from api_gateway.app.domain.models.project import Project
+from api_gateway.app.domain.models.tenant import Tenant
+from api_gateway.app.domain.models.workflow_config import WorkflowConfig
 
 
 class TenantRepositoryPort(Protocol):

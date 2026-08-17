@@ -7,14 +7,14 @@ from uuid import UUID
 
 import httpx
 
-from ...domain.models.message_envelope import MessageEnvelope
-from ...domain.ports.outbound import (
+from api_gateway.app.domain.models.message_envelope import MessageEnvelope
+from api_gateway.app.domain.ports.outbound import (
     ChannelConnectionRepositoryPort,
     ChannelSenderPort,
     SessionHistoryRepositoryPort,
     SessionRepositoryPort,
 )
-from ..services.langflow_result import extract_text_from_langflow_result
+from api_gateway.app.application.services.langflow_result import extract_text_from_langflow_result
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 

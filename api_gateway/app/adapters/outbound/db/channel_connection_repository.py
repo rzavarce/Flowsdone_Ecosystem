@@ -8,11 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.channel_connection import ChannelConnection
-from ....domain.models.channel_resolution import ChannelResolution
-from ....domain.ports.outbound import ChannelConnectionRepositoryPort
-from .crypto import decrypt_credentials, encrypt_credentials
-from .models import AgentModel, ChannelConnectionModel, ProjectModel
+from api_gateway.app.domain.models.channel_connection import ChannelConnection
+from api_gateway.app.domain.models.channel_resolution import ChannelResolution
+from api_gateway.app.domain.ports.outbound import ChannelConnectionRepositoryPort
+from api_gateway.app.adapters.outbound.db.crypto import decrypt_credentials, encrypt_credentials
+from api_gateway.app.adapters.outbound.db.models import AgentModel, ChannelConnectionModel, ProjectModel
 
 
 def _to_domain(model: ChannelConnectionModel) -> ChannelConnection:

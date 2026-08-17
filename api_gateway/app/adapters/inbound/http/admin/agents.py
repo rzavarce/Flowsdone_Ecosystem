@@ -7,8 +7,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_admin_api_key
-from .schemas import AgentCreate, AgentOut, AgentUpdate
+from api_gateway.app.adapters.inbound.http.admin.auth import require_admin_api_key
+from api_gateway.app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate
 
 router = APIRouter(
     prefix="/agents",

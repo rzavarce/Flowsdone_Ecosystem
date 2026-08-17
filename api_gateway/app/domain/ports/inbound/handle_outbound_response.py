@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from ....domain.ports.outbound.response_publisher import OutboundResponse
+from api_gateway.app.domain.ports.outbound.response_publisher import OutboundResponse
 
 
 class HandleOutboundResponsePort(Protocol):

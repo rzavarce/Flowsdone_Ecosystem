@@ -7,7 +7,7 @@ import uuid
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from ..core.context import correlation_id_ctx
+from api_gateway.app.core.context import correlation_id_ctx
 
 logger = logging.getLogger("api")
 

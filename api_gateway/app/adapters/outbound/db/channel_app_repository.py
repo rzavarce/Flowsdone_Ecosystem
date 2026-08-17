@@ -7,10 +7,10 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.channel_app import ChannelApp
-from ....domain.ports.outbound import ChannelAppRepositoryPort
-from .crypto import decrypt_credentials, encrypt_credentials
-from .models import ChannelAppModel
+from api_gateway.app.domain.models.channel_app import ChannelApp
+from api_gateway.app.domain.ports.outbound import ChannelAppRepositoryPort
+from api_gateway.app.adapters.outbound.db.crypto import decrypt_credentials, encrypt_credentials
+from api_gateway.app.adapters.outbound.db.models import ChannelAppModel
 
 
 def _to_domain(model: ChannelAppModel) -> ChannelApp:

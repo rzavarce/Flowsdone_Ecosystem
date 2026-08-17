@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Dict
 
-from ....domain.ports.outbound import WebhookRegistrarPort
-from .meta_webhook_registrar import MetaWebhookRegistrar
-from .telegram_webhook_registrar import TelegramWebhookRegistrar
+from api_gateway.app.domain.ports.outbound import WebhookRegistrarPort
+from api_gateway.app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
+from api_gateway.app.adapters.outbound.channels.telegram_webhook_registrar import TelegramWebhookRegistrar
 
 # Graph API fields to subscribe each Meta-backed channel to. Facebook
 # Messenger also cares about postback/delivery/read events; Instagram

@@ -8,9 +8,9 @@ import logging
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
-from ....application.services.hmac_signing import verify
-from ....core.config import settings
-from ....domain.models.message_envelope import MessageEnvelope
+from api_gateway.app.application.services.hmac_signing import verify
+from api_gateway.app.core.config import settings
+from api_gateway.app.domain.models.message_envelope import MessageEnvelope
 
 logger = logging.getLogger("internal.outbound")
 

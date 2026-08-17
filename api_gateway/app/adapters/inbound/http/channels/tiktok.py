@@ -10,7 +10,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 
-from .....application.services.switchboard import ChannelMessageNotRoutable
+from api_gateway.app.application.services.switchboard import ChannelMessageNotRoutable
 
 logger = logging.getLogger("channels.tiktok")
 

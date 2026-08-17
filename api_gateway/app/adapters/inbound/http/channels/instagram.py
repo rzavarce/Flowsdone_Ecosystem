@@ -8,8 +8,8 @@ from typing import Any, Dict
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from .....application.services.switchboard import ChannelMessageNotRoutable
-from .meta_common import handle_verification_challenge, verify_meta_signature
+from api_gateway.app.application.services.switchboard import ChannelMessageNotRoutable
+from api_gateway.app.adapters.inbound.http.channels.meta_common import handle_verification_challenge, verify_meta_signature
 
 logger = logging.getLogger("channels.instagram")
 

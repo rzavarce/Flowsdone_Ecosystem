@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, Protocol
 from uuid import UUID
 
-from ...models.session import MessageDirection
+from api_gateway.app.domain.models.session import MessageDirection
 
 SessionEventType = str
 """One of "started" / "app_switched" / "closed" - kept as a plain str

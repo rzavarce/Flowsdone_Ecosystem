@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import Header, HTTPException
 
-from .....core.config import settings
+from api_gateway.app.core.config import settings
 
 
 async def require_admin_api_key(x_admin_api_key: Optional[str] = Header(default=None)) -> None:

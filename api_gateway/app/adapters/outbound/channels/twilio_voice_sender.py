@@ -12,8 +12,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from ....application.services.ws_registry import WSRegistry
-from ....domain.ports.outbound import ChannelSenderPort, VoiceProviderPort
+from api_gateway.app.application.services.ws_registry import WSRegistry
+from api_gateway.app.domain.ports.outbound import ChannelSenderPort, VoiceProviderPort
 
 logger = logging.getLogger("channels.voice.sender")
 

@@ -11,44 +11,44 @@ from redis.asyncio import Redis
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
-from .adapters.inbound.http.admin import router as admin_router
-from .adapters.inbound.http.channels import router as channels_router
-from .adapters.inbound.http.internal_outbound import router as internal_router
-from .adapters.inbound.http.voice import router as voice_router
-from .adapters.inbound.http.voice_demo import router as voice_demo_router
-from .adapters.inbound.http.webhooks import router as webhooks_router
-from .adapters.inbound.http.websocket import router as ws_router
-from .adapters.outbound.apps.factory import AppConnectorFactory
-from .adapters.outbound.channels.factory import ChannelSenderFactory
-from .adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
-from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
-from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
-from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
-from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
-from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
-from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
-from .adapters.outbound.queue.factory import PublisherFactory
-from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
-from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
-from .adapters.outbound.security.secret_generator import RandomHexSecretGenerator
-from .adapters.outbound.session.postgres_session_history_repository import (
+from api_gateway.app.adapters.inbound.http.admin import router as admin_router
+from api_gateway.app.adapters.inbound.http.channels import router as channels_router
+from api_gateway.app.adapters.inbound.http.internal_outbound import router as internal_router
+from api_gateway.app.adapters.inbound.http.voice import router as voice_router
+from api_gateway.app.adapters.inbound.http.voice_demo import router as voice_demo_router
+from api_gateway.app.adapters.inbound.http.webhooks import router as webhooks_router
+from api_gateway.app.adapters.inbound.http.websocket import router as ws_router
+from api_gateway.app.adapters.outbound.apps.factory import AppConnectorFactory
+from api_gateway.app.adapters.outbound.channels.factory import ChannelSenderFactory
+from api_gateway.app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
+from api_gateway.app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from api_gateway.app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
+from api_gateway.app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+from api_gateway.app.adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
+from api_gateway.app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
+from api_gateway.app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from api_gateway.app.adapters.outbound.queue.factory import PublisherFactory
+from api_gateway.app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from api_gateway.app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from api_gateway.app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
+from api_gateway.app.adapters.outbound.session.postgres_session_history_repository import (
     PostgresSessionHistoryRepository,
 )
-from .adapters.outbound.session.redis_session_repository import RedisSessionRepository
-from .adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
-from .adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
-from .application.services.switchboard import Switchboard
-from .application.services.ws_registry import WSRegistry
-from .application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
-from .application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
-from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
-from .application.use_cases.ingest_message import IngestMessageUseCase
-from .application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
-from .application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
-from .core.config import settings
-from .core.logging import setup_logging
-from .infrastructure.database import create_engine, create_sessionmaker
-from .infrastructure.kafka_admin import ensure_topics_exist
+from api_gateway.app.adapters.outbound.session.redis_session_repository import RedisSessionRepository
+from api_gateway.app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
+from api_gateway.app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
+from api_gateway.app.application.services.switchboard import Switchboard
+from api_gateway.app.application.services.ws_registry import WSRegistry
+from api_gateway.app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
+from api_gateway.app.application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
+from api_gateway.app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from api_gateway.app.application.use_cases.ingest_message import IngestMessageUseCase
+from api_gateway.app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
+from api_gateway.app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from api_gateway.app.core.config import settings
+from api_gateway.app.core.logging import setup_logging
+from api_gateway.app.infrastructure.database import create_engine, create_sessionmaker
+from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("bootstrap")

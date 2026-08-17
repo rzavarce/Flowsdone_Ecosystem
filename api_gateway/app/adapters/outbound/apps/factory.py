@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ....domain.ports.outbound import AppConnectorPort
-from .langflow_app_connector import LangflowAppConnector
+from api_gateway.app.domain.ports.outbound import AppConnectorPort
+from api_gateway.app.adapters.outbound.apps.langflow_app_connector import LangflowAppConnector
 
 
 class AppConnectorFactory:

@@ -7,8 +7,8 @@ from typing import Optional
 
 from redis.asyncio import Redis
 
-from ....domain.models.session import Session
-from ....domain.ports.outbound import SessionRepositoryPort
+from api_gateway.app.domain.models.session import Session
+from api_gateway.app.domain.ports.outbound import SessionRepositoryPort
 
 logger = logging.getLogger("switchboard.session_repository")
 

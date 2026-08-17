@@ -8,9 +8,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.workflow_config import WorkflowConfig
-from ....domain.ports.outbound import WorkflowConfigRepositoryPort
-from .models import WorkflowConfigModel
+from api_gateway.app.domain.models.workflow_config import WorkflowConfig
+from api_gateway.app.domain.ports.outbound import WorkflowConfigRepositoryPort
+from api_gateway.app.adapters.outbound.db.models import WorkflowConfigModel
 
 
 def _to_domain(model: WorkflowConfigModel) -> WorkflowConfig:

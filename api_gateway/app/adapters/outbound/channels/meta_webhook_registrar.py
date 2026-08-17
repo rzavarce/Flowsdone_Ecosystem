@@ -16,7 +16,7 @@ from typing import Any, Dict
 
 import httpx
 
-from ....core.config import settings
+from api_gateway.app.core.config import settings
 
 logger = logging.getLogger("channels.meta.webhook_registrar")
 

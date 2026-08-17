@@ -8,9 +8,9 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.session import MessageDirection
-from ....domain.ports.outbound import SessionHistoryRepositoryPort
-from ..db.models import SessionEventModel, SessionMessageModel
+from api_gateway.app.domain.models.session import MessageDirection
+from api_gateway.app.domain.ports.outbound import SessionHistoryRepositoryPort
+from api_gateway.app.adapters.outbound.db.models import SessionEventModel, SessionMessageModel
 
 
 class PostgresSessionHistoryRepository(SessionHistoryRepositoryPort):

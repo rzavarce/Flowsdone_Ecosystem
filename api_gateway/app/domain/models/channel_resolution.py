@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .channel_connection import ChannelType
+from api_gateway.app.domain.models.channel_connection import ChannelType
 
 
 class ChannelResolution(BaseModel):

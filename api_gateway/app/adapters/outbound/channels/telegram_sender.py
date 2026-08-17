@@ -7,8 +7,8 @@ from typing import Any, Dict
 
 import httpx
 
-from ....core.config import settings
-from ....domain.ports.outbound import ChannelSenderPort
+from api_gateway.app.core.config import settings
+from api_gateway.app.domain.ports.outbound import ChannelSenderPort
 
 logger = logging.getLogger("channels.telegram.sender")
 

@@ -9,7 +9,7 @@ from `domain.ports.outbound`.
 
 from typing import Optional, Protocol
 
-from ....application.dto.message_dto import MessageDTO
+from api_gateway.app.application.dto.message_dto import MessageDTO
 
 
 class MessagePublisherPort(Protocol):
@@ -51,11 +51,11 @@ class LangflowExecutorPort(Protocol):
 
 
 try:
-    from .response_publisher import OutboundResponse, ResponsePublisherPort  # noqa: F401
+    from api_gateway.app.domain.ports.outbound.response_publisher import OutboundResponse, ResponsePublisherPort  # noqa: F401
 except Exception:
     pass
 
-from .admin_repositories import (  # noqa: F401
+from api_gateway.app.domain.ports.outbound.admin_repositories import (  # noqa: F401
     AgentRepositoryPort,
     ChannelAppRepositoryPort,
     ChannelConnectionRepositoryPort,
@@ -64,11 +64,11 @@ from .admin_repositories import (  # noqa: F401
     WorkflowConfigRepositoryPort,
 )
 
-from .app_connector import AppConnectorPort  # noqa: F401
-from .call_session_repository import CallSessionRepositoryPort  # noqa: F401
-from .channel_sender import ChannelSenderPort  # noqa: F401
-from .secret_generator import SecretGeneratorPort  # noqa: F401
-from .session_history_repository import SessionHistoryRepositoryPort  # noqa: F401
-from .session_repository import SessionRepositoryPort  # noqa: F401
-from .voice_provider import VoiceProviderPort  # noqa: F401
-from .webhook_registrar import WebhookRegistrarPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.app_connector import AppConnectorPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.channel_sender import ChannelSenderPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.secret_generator import SecretGeneratorPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.session_history_repository import SessionHistoryRepositoryPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.session_repository import SessionRepositoryPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.voice_provider import VoiceProviderPort  # noqa: F401
+from api_gateway.app.domain.ports.outbound.webhook_registrar import WebhookRegistrarPort  # noqa: F401

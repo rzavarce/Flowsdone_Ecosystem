@@ -6,7 +6,7 @@ import logging
 from typing import Dict
 from uuid import UUID
 
-from ...domain.ports.outbound import ChannelConnectionRepositoryPort, WebhookRegistrarPort
+from api_gateway.app.domain.ports.outbound import ChannelConnectionRepositoryPort, WebhookRegistrarPort
 
 logger = logging.getLogger("usecase.delete_channel_connection")
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Protocol
 
-from ...models.session import Session
+from api_gateway.app.domain.models.session import Session
 
 
 class AppTurnResult:

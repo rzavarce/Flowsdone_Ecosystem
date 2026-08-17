@@ -8,7 +8,7 @@ event.
 
 import aio_pika
 
-from ....domain.ports.outbound.response_publisher import (
+from api_gateway.app.domain.ports.outbound.response_publisher import (
     OutboundResponse,
     ResponsePublisherPort,
 )

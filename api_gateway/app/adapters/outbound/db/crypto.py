@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 from cryptography.fernet import Fernet
 
-from ....core.config import settings
+from api_gateway.app.core.config import settings
 
 
 def _fernet() -> Fernet:

@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import Dict, Optional
 
-from ....application.services.ws_registry import WSRegistry
-from ....domain.ports.outbound import ChannelSenderPort, VoiceProviderPort
-from .facebook_sender import FacebookSender
-from .instagram_sender import InstagramSender
-from .telegram_sender import TelegramSender
-from .tiktok_sender import TikTokSender
-from .twilio_voice_sender import TwilioVoiceSender
-from .twitter_sender import TwitterSender
-from .whatsapp_evolution_sender import WhatsAppEvolutionSender
+from api_gateway.app.application.services.ws_registry import WSRegistry
+from api_gateway.app.domain.ports.outbound import ChannelSenderPort, VoiceProviderPort
+from api_gateway.app.adapters.outbound.channels.facebook_sender import FacebookSender
+from api_gateway.app.adapters.outbound.channels.instagram_sender import InstagramSender
+from api_gateway.app.adapters.outbound.channels.telegram_sender import TelegramSender
+from api_gateway.app.adapters.outbound.channels.tiktok_sender import TikTokSender
+from api_gateway.app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
+from api_gateway.app.adapters.outbound.channels.twitter_sender import TwitterSender
+from api_gateway.app.adapters.outbound.channels.whatsapp_evolution_sender import WhatsAppEvolutionSender
 
 
 class ChannelSenderFactory:

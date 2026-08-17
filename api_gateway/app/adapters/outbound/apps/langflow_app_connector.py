@@ -11,8 +11,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from ....domain.models.session import Session
-from ....domain.ports.outbound import AppConnectorPort
+from api_gateway.app.domain.models.session import Session
+from api_gateway.app.domain.ports.outbound import AppConnectorPort
 
 logger = logging.getLogger("apps.langflow_connector")
 

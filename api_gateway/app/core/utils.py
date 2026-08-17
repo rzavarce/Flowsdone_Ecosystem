@@ -1,6 +1,6 @@
 """Small cross-cutting utility helpers."""
 
-from ..core.context import correlation_id_ctx
+from api_gateway.app.core.context import correlation_id_ctx
 
 
 def get_correlation_id() -> str | None:

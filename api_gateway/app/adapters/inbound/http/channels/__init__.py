@@ -4,12 +4,12 @@ TikTok, X, WhatsApp), aggregated under a single router.
 
 from fastapi import APIRouter
 
-from .facebook import router as facebook_router
-from .instagram import router as instagram_router
-from .telegram import router as telegram_router
-from .tiktok import router as tiktok_router
-from .twitter import router as twitter_router
-from .whatsapp_evolution import router as whatsapp_router
+from api_gateway.app.adapters.inbound.http.channels.facebook import router as facebook_router
+from api_gateway.app.adapters.inbound.http.channels.instagram import router as instagram_router
+from api_gateway.app.adapters.inbound.http.channels.telegram import router as telegram_router
+from api_gateway.app.adapters.inbound.http.channels.tiktok import router as tiktok_router
+from api_gateway.app.adapters.inbound.http.channels.twitter import router as twitter_router
+from api_gateway.app.adapters.inbound.http.channels.whatsapp_evolution import router as whatsapp_router
 
 router = APIRouter()
 

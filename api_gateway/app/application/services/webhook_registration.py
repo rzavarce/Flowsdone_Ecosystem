@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Awaitable, Callable, Dict
 
-from ...domain.ports.outbound import WebhookRegistrarPort
+from api_gateway.app.domain.ports.outbound import WebhookRegistrarPort
 
 logger = logging.getLogger("usecase.webhook_registration")
 

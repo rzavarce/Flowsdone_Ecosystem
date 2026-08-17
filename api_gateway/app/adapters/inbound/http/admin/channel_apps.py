@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .....domain.models.channel_app import ChannelApp, ChannelAppProvider
-from .auth import require_admin_api_key
-from .schemas import ChannelAppCredentialsOut, ChannelAppOut, ChannelAppUpsert
+from api_gateway.app.domain.models.channel_app import ChannelApp, ChannelAppProvider
+from api_gateway.app.adapters.inbound.http.admin.auth import require_admin_api_key
+from api_gateway.app.adapters.inbound.http.admin.schemas import ChannelAppCredentialsOut, ChannelAppOut, ChannelAppUpsert
 
 router = APIRouter(
     prefix="/channel-apps",

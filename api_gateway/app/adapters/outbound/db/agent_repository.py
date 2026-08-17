@@ -8,9 +8,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.agent import Agent
-from ....domain.ports.outbound import AgentRepositoryPort
-from .models import AgentModel
+from api_gateway.app.domain.models.agent import Agent
+from api_gateway.app.domain.ports.outbound import AgentRepositoryPort
+from api_gateway.app.adapters.outbound.db.models import AgentModel
 
 
 def _to_domain(model: AgentModel) -> Agent:
