@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
+from app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
 
 pytestmark = pytest.mark.anyio
 

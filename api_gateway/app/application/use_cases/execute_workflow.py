@@ -2,9 +2,9 @@
 
 import logging
 
-from ...domain.models.message_envelope import MessageEnvelope
-from ...domain.ports.idempotency import IdempotencyRepositoryPort
-from ...domain.ports.outbound import LangflowExecutorPort
+from app.domain.models.message_envelope import MessageEnvelope
+from app.domain.ports.idempotency import IdempotencyRepositoryPort
+from app.domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("usecase.execute_workflow")
 

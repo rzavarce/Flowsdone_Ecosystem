@@ -7,8 +7,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_admin_api_key
-from .schemas import ProjectCreate, ProjectOut, ProjectUpdate
+from app.adapters.inbound.http.admin.auth import require_admin_api_key
+from app.adapters.inbound.http.admin.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 
 router = APIRouter(
     prefix="/projects",

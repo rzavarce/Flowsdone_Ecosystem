@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional, Protocol
 
-from ...models.voice_relay_event import VoiceRelayEvent
+from app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
 class VoiceProviderPort(Protocol):

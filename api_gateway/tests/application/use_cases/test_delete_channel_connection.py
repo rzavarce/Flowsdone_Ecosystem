@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.application.use_cases.delete_channel_connection import (
+from app.application.use_cases.delete_channel_connection import (
     DeleteChannelConnectionUseCase,
 )
 from api_gateway.tests.support.fakes import (

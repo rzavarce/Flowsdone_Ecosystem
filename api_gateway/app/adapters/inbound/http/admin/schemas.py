@@ -8,8 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from .....domain.models.channel_app import ChannelAppProvider
-from .....domain.models.channel_connection import ChannelType
+from app.domain.models.channel_app import ChannelAppProvider
+from app.domain.models.channel_connection import ChannelType
 
 
 # Tenants

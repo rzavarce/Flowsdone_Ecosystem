@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from ....domain.ports.outbound import ChannelSenderPort
+from app.domain.ports.outbound import ChannelSenderPort
 
 logger = logging.getLogger("channels.tiktok.sender")
 

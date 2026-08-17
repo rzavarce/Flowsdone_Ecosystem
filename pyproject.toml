@@ -47,8 +47,20 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["api_gateway*"]
 
+# El código de la app vive físicamente en api_gateway/app/, pero se
+# importa como `app.xxx` (sin el prefijo api_gateway) en TODO el repo
+# -código interno de app/, tests/ y workers/ por igual-, nunca mezclado
+# con `api_gateway.app.xxx`: el código interno de app/ no sabe por qué
+# nombre lo importaron, así que dos nombres para el mismo módulo
+# terminan cargándolo dos veces como clases distintas (roto isinstance/
+# validación Pydantic entre ambas copias). `pythonpath` agrega
+# api_gateway/ a sys.path para que pytest resuelva `app` como paquete
+# de primer nivel sin necesitar un segundo entry en packages.find;
+# Docker hace el equivalente vía PYTHONPATH en dockers/Dockerfile.api
+# y Dockerfile.worker.
 [tool.pytest.ini_options]
 testpaths = ["api_gateway/tests"]
+pythonpath = ["api_gateway"]
 
 [tool.coverage.run]
 source = ["api_gateway/app"]

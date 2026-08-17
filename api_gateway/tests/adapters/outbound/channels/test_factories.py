@@ -9,17 +9,17 @@ right for each platform.
 
 from __future__ import annotations
 
-from api_gateway.app.adapters.outbound.channels.factory import ChannelSenderFactory
-from api_gateway.app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
-from api_gateway.app.adapters.outbound.channels.telegram_webhook_registrar import (
+from app.adapters.outbound.channels.factory import ChannelSenderFactory
+from app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
+from app.adapters.outbound.channels.telegram_webhook_registrar import (
     TelegramWebhookRegistrar,
 )
-from api_gateway.app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
-from api_gateway.app.adapters.outbound.channels.webhook_registrar_factory import (
+from app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
+from app.adapters.outbound.channels.webhook_registrar_factory import (
     WebhookRegistrarFactory,
 )
-from api_gateway.app.application.services.ws_registry import WSRegistry
-from api_gateway.app.domain.models.channel_connection import ChannelType
+from app.application.services.ws_registry import WSRegistry
+from app.domain.models.channel_connection import ChannelType
 
 ALL_CHANNEL_TYPES = set(ChannelType.__args__)
 

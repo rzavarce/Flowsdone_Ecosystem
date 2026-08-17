@@ -5,7 +5,7 @@ import logging
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from aiokafka.admin.new_partitions import NewPartitions
 
-from ..core.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger("kafka.admin")
 

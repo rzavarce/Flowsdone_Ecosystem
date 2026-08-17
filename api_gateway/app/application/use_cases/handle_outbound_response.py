@@ -1,14 +1,20 @@
 """Use case for turning a Langflow result into a delivered response."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
 import httpx
 
-from ...domain.models.message_envelope import MessageEnvelope
-from ...domain.ports.outbound import ChannelConnectionRepositoryPort, ChannelSenderPort
-from ..services.langflow_result import extract_text_from_langflow_result
+from app.domain.models.message_envelope import MessageEnvelope
+from app.domain.ports.outbound import (
+    ChannelConnectionRepositoryPort,
+    ChannelSenderPort,
+    SessionHistoryRepositoryPort,
+    SessionRepositoryPort,
+)
+from app.application.services.langflow_result import extract_text_from_langflow_result
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 
@@ -30,6 +36,9 @@ class HandleOutboundResponseUseCase:
         ws_registry: Optional[Any] = None,
         channel_connection_repo: Optional[ChannelConnectionRepositoryPort] = None,
         channel_senders: Optional[Dict[str, ChannelSenderPort]] = None,
+        session_repo: Optional[SessionRepositoryPort] = None,
+        session_history_repo: Optional[SessionHistoryRepositoryPort] = None,
+        session_ttl_seconds: int = 86400,
     ):
         """Build the use case.
 
@@ -44,11 +53,23 @@ class HandleOutboundResponseUseCase:
             channel_senders (Optional[Dict[str, ChannelSenderPort]]):
                 Map of channel_type to its sender, used to deliver to
                 native channels.
+            session_repo (Optional[SessionRepositoryPort]): Fast (Redis)
+                session state, used to record the delivered turn.
+                Optional - webchat delivery has no Session (it never
+                goes through Switchboard) and callers/tests that don't
+                need history recording can omit it.
+            session_history_repo (Optional[SessionHistoryRepositoryPort]):
+                Durable (Postgres) transcript, appended to on delivery.
+            session_ttl_seconds (int): TTL applied when re-saving the
+                session after recording a delivered turn.
         """
         self.publisher = publisher
         self.ws_registry = ws_registry
         self.channel_connection_repo = channel_connection_repo
         self.channel_senders = channel_senders or {}
+        self.session_repo = session_repo
+        self.session_history_repo = session_history_repo
+        self.session_ttl_seconds = session_ttl_seconds
 
     def _extract_text(self, value: Any) -> Optional[str]:
         """Recursively extract a human-readable response string.
@@ -259,10 +280,11 @@ class HandleOutboundResponseUseCase:
                 )
                 return
 
+            text = envelope.payload.get("message", "")
             await sender.send(
                 external_id=connection.external_id,
                 recipient_id=envelope.meta.external_conversation_key or "",
-                text=envelope.payload.get("message", ""),
+                text=text,
                 credentials=connection.credentials,
             )
 
@@ -273,5 +295,47 @@ class HandleOutboundResponseUseCase:
                     "channel_connection_id": channel_connection_id,
                 },
             )
+
+            await self._record_outbound_turn(envelope.meta.conversation_id, text)
         except Exception:
             logger.error("handle.outbound.channel.deliver.failed", exc_info=True)
+
+    async def _record_outbound_turn(self, conversation_id: Optional[str], text: str) -> None:
+        """Best-effort: append the delivered turn to the session's
+        history and touch its fast-state rolling window, if session
+        ports are wired and a session exists for this conversation.
+
+        Never raises - a failure here must not undo an already-delivered
+        message. No-ops silently when session_repo/session_history_repo
+        were not provided (e.g. webchat delivery, which has no Session)
+        or no session is found.
+
+        Args:
+            conversation_id (Optional[str]): The session id to record
+                against.
+            text (str): The text that was just delivered.
+        """
+        if not self.session_repo or not self.session_history_repo or not conversation_id:
+            return
+
+        try:
+            session = await self.session_repo.get(conversation_id)
+            if session is None:
+                return
+
+            await self.session_history_repo.append_message(
+                session_id=conversation_id,
+                project_id=session.project_id,
+                direction="outbound",
+                text=text,
+                app=session.current_app,
+            )
+            session.record_message(
+                direction="outbound",
+                text=text,
+                app=session.current_app,
+                timestamp=datetime.now(timezone.utc),
+            )
+            await self.session_repo.save(session, ttl_seconds=self.session_ttl_seconds)
+        except Exception:
+            logger.error("handle.outbound.session_record.failed", exc_info=True)

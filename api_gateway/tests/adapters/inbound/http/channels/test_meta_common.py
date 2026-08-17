@@ -9,7 +9,7 @@ import hmac
 import pytest
 from fastapi import HTTPException
 
-from api_gateway.app.adapters.inbound.http.channels.meta_common import (
+from app.adapters.inbound.http.channels.meta_common import (
     handle_verification_challenge,
     verify_meta_signature,
 )

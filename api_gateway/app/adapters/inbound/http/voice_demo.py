@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Query
 from twilio.jwt.access_token import AccessToken
 from twilio.jwt.access_token.grants import VoiceGrant
 
-from ....core.config import settings
+from app.core.config import settings
 
 router = APIRouter(prefix="/voice-demo", tags=["voice-demo"])
 

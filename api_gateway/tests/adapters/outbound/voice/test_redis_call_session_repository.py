@@ -3,39 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Optional
 from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.adapters.outbound.voice.redis_call_session_repository import (
+from app.adapters.outbound.voice.redis_call_session_repository import (
     RedisCallSessionRepository,
 )
-from api_gateway.app.domain.models.call_session import CallSession
+from app.domain.models.call_session import CallSession
+from api_gateway.tests.support.fakes import FakeRedisClient
 
 pytestmark = pytest.mark.anyio
-
-
-class FakeRedisClient:
-    """Minimal in-memory stand-in for redis.asyncio.Redis, only what
-    RedisCallSessionRepository uses.
-    """
-
-    def __init__(self) -> None:
-        self.store: Dict[str, str] = {}
-        self.ttls: Dict[str, int] = {}
-
-    async def set(self, key: str, value: str, *, ex: Optional[int] = None) -> None:
-        self.store[key] = value
-        if ex is not None:
-            self.ttls[key] = ex
-
-    async def get(self, key: str) -> Optional[str]:
-        return self.store.get(key)
-
-    async def delete(self, key: str) -> None:
-        self.store.pop(key, None)
-        self.ttls.pop(key, None)
 
 
 def _session(**overrides) -> CallSession:

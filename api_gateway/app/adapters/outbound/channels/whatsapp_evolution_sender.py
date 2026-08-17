@@ -7,8 +7,8 @@ from typing import Any, Dict
 
 import httpx
 
-from ....core.config import settings
-from ....domain.ports.outbound import ChannelSenderPort
+from app.core.config import settings
+from app.domain.ports.outbound import ChannelSenderPort
 
 logger = logging.getLogger("channels.whatsapp_evolution.sender")
 

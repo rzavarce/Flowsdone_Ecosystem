@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from api_gateway.app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
+from app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
 
 
 def test_generates_hex_string_of_expected_length():

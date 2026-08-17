@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.application.services.webhook_registration import WebhookRegistrationError
-from api_gateway.app.application.use_cases.update_channel_connection import (
+from app.application.services.webhook_registration import WebhookRegistrationError
+from app.application.use_cases.update_channel_connection import (
     UpdateChannelConnectionUseCase,
 )
 from api_gateway.tests.support.fakes import (

@@ -9,8 +9,8 @@ import logging
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels.tiktok_sender import TikTokSender
-from api_gateway.app.adapters.outbound.channels.twitter_sender import TwitterSender
+from app.adapters.outbound.channels.tiktok_sender import TikTokSender
+from app.adapters.outbound.channels.twitter_sender import TwitterSender
 
 pytestmark = pytest.mark.anyio
 

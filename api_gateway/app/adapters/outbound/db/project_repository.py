@@ -8,9 +8,9 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ....domain.models.project import Project
-from ....domain.ports.outbound import ProjectRepositoryPort
-from .models import ProjectModel
+from app.domain.models.project import Project
+from app.domain.ports.outbound import ProjectRepositoryPort
+from app.adapters.outbound.db.models import ProjectModel
 
 
 def _to_domain(model: ProjectModel) -> Project:

@@ -11,7 +11,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException, Request
 from starlette.responses import JSONResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from app.application.services.switchboard import ChannelMessageNotRoutable
 
 logger = logging.getLogger("channels.twitter")
 
@@ -84,7 +84,7 @@ async def receive_webhook(request: Request) -> JSONResponse:
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 
     body = await request.json()
-    route_use_case = request.app.state.route_channel_message_use_case
+    switchboard = request.app.state.switchboard
 
     account_id = body.get("for_user_id")
 
@@ -96,7 +96,7 @@ async def receive_webhook(request: Request) -> JSONResponse:
         if not account_id or not sender_id or not text:
             continue
 
-        await _route_event(route_use_case, account_id, sender_id, text, event)
+        await _route_event(switchboard, account_id, sender_id, text, event)
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
@@ -124,16 +124,16 @@ def _verify_signature(raw_body: bytes, signature_header: str | None, consumer_se
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     account_id: str,
     sender_id: str,
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
-    """Route a single X direct message to its Langflow agent.
+    """Route a single X direct message to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         account_id (str): X account id the DM was sent to.
         sender_id (str): Id of the sender.
         text (str): Message text.
@@ -141,12 +141,13 @@ async def _route_event(
             payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=account_id,
             external_conversation_key=sender_id,
             sender_id=sender_id,
-            payload={"message": text, "raw": raw_event},
+            message_text=text,
+            raw_payload=raw_event,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

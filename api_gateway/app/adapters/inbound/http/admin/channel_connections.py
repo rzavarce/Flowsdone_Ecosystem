@@ -7,10 +7,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .....application.services.webhook_registration import WebhookRegistrationError
-from .....domain.models.channel_connection import ChannelConnection
-from .auth import require_admin_api_key
-from .schemas import ChannelConnectionCreate, ChannelConnectionOut, ChannelConnectionUpdate
+from app.application.services.webhook_registration import WebhookRegistrationError
+from app.domain.models.channel_connection import ChannelConnection
+from app.adapters.inbound.http.admin.auth import require_admin_api_key
+from app.adapters.inbound.http.admin.schemas import ChannelConnectionCreate, ChannelConnectionOut, ChannelConnectionUpdate
 
 router = APIRouter(
     prefix="/channel-connections",

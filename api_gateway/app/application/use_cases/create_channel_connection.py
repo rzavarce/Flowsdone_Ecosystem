@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from ...domain.models.channel_connection import ChannelConnection
-from ...domain.ports.outbound import (
+from app.domain.models.channel_connection import ChannelConnection
+from app.domain.ports.outbound import (
     ChannelConnectionRepositoryPort,
     SecretGeneratorPort,
     WebhookRegistrarPort,
 )
-from ..services.webhook_registration import WebhookRegistrationError, register_or_compensate
+from app.application.services.webhook_registration import WebhookRegistrationError, register_or_compensate
 
 __all__ = ["CreateChannelConnectionUseCase", "WebhookRegistrationError"]
 

@@ -7,7 +7,7 @@ import hmac
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.channels.tiktok import _verify_signature
+from app.adapters.inbound.http.channels.tiktok import _verify_signature
 
 
 def _sign(secret: str, timestamp: str, body: bytes) -> str:

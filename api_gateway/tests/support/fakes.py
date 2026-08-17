@@ -10,11 +10,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from api_gateway.app.domain.models.call_session import CallSession
-from api_gateway.app.domain.models.channel_app import ChannelApp
-from api_gateway.app.domain.models.channel_connection import ChannelConnection
-from api_gateway.app.domain.models.channel_resolution import ChannelResolution
-from api_gateway.app.domain.models.voice_relay_event import VoiceRelayEvent
+from app.domain.models.call_session import CallSession
+from app.domain.models.channel_app import ChannelApp
+from app.domain.models.channel_connection import ChannelConnection
+from app.domain.models.channel_resolution import ChannelResolution
+from app.domain.models.session import Session
+from app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -217,28 +218,6 @@ class FakeChannelAppRepo:
         return self.channel_app
 
 
-class FakeRouteChannelMessageUseCase:
-    """Records calls instead of actually resolving/publishing anything.
-
-    Used to test inbound webhook HTTP handlers in isolation from
-    RouteChannelMessageUseCase's own behavior (covered separately in
-    tests/application/use_cases/test_route_channel_message.py).
-    """
-
-    def __init__(self, not_routable: bool = False) -> None:
-        self.not_routable = not_routable
-        self.calls: List[Dict[str, Any]] = []
-
-    async def execute(self, **kwargs: Any) -> None:
-        self.calls.append(kwargs)
-        if self.not_routable:
-            from api_gateway.app.application.use_cases.route_channel_message import (
-                ChannelMessageNotRoutable,
-            )
-
-            raise ChannelMessageNotRoutable("no channel_connection matches")
-
-
 def make_call_session(**overrides: Any) -> CallSession:
     """Build a CallSession with sane defaults, overridable per test."""
     defaults: Dict[str, Any] = dict(
@@ -375,3 +354,165 @@ class FakeChannelSender:
                 "credentials": credentials,
             }
         )
+
+
+class FakeRedisClient:
+    """Minimal in-memory stand-in for redis.asyncio.Redis, only the
+    get/set/delete subset the Redis-backed repositories use.
+    """
+
+    def __init__(self) -> None:
+        self.store: Dict[str, str] = {}
+        self.ttls: Dict[str, int] = {}
+
+    async def set(self, key: str, value: str, *, ex: Optional[int] = None) -> None:
+        self.store[key] = value
+        if ex is not None:
+            self.ttls[key] = ex
+
+    async def get(self, key: str) -> Optional[str]:
+        return self.store.get(key)
+
+    async def delete(self, key: str) -> None:
+        self.store.pop(key, None)
+        self.ttls.pop(key, None)
+
+
+def make_session(**overrides: Any) -> Session:
+    """Build a Session with sane defaults, overridable per test."""
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=f"{uuid4()}:telegram:chat-1",
+        tenant_id=uuid4(),
+        project_id=uuid4(),
+        channel_type="telegram",
+        channel_connection_id=uuid4(),
+        agent_id=uuid4(),
+        external_conversation_key="chat-1",
+        user_identifier="user-1",
+        current_app="langflow",
+        variables={},
+        last_messages=[],
+        started_at=now,
+        last_activity_at=now,
+        status="active",
+    )
+    defaults.update(overrides)
+    return Session(**defaults)
+
+
+class FakeSessionRepository:
+    """In-memory stand-in for SessionRepositoryPort."""
+
+    def __init__(self, session: Optional[Session] = None) -> None:
+        self.sessions: Dict[str, Session] = {}
+        if session:
+            self.sessions[session.id] = session
+        self.saved: List[Session] = []
+        self.deleted: List[str] = []
+
+    async def get(self, session_id: str) -> Optional[Session]:
+        return self.sessions.get(session_id)
+
+    async def save(self, session: Session, *, ttl_seconds: int) -> None:
+        self.sessions[session.id] = session
+        self.saved.append(session)
+
+    async def delete(self, session_id: str) -> None:
+        self.sessions.pop(session_id, None)
+        self.deleted.append(session_id)
+
+
+class FakeSessionHistoryRepository:
+    """In-memory stand-in for SessionHistoryRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.messages: List[Dict[str, Any]] = []
+        self.events: List[Dict[str, Any]] = []
+
+    async def append_message(
+        self, *, session_id: str, project_id: UUID, direction: str, text: str, app: str
+    ) -> None:
+        self.messages.append(
+            {
+                "session_id": session_id,
+                "project_id": project_id,
+                "direction": direction,
+                "text": text,
+                "app": app,
+            }
+        )
+
+    async def append_event(
+        self,
+        *,
+        session_id: str,
+        project_id: UUID,
+        event_type: str,
+        from_app: Optional[str] = None,
+        to_app: Optional[str] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        self.events.append(
+            {
+                "session_id": session_id,
+                "project_id": project_id,
+                "event_type": event_type,
+                "from_app": from_app,
+                "to_app": to_app,
+                "reason": reason,
+            }
+        )
+
+
+class FakeAppConnector:
+    """Configurable stand-in for AppConnectorPort."""
+
+    def __init__(self, app_name: str = "langflow", result: Optional[Any] = None) -> None:
+        self.app_name = app_name
+        self.result = result
+        self.calls: List[Dict[str, Any]] = []
+
+    async def handle_turn(
+        self, *, session: Session, message_text: str, raw_payload: Dict[str, Any]
+    ) -> Optional[Any]:
+        self.calls.append(
+            {"session": session, "message_text": message_text, "raw_payload": raw_payload}
+        )
+        return self.result
+
+
+class FakeSwitchboard:
+    """Records calls instead of actually resolving/dispatching anything.
+
+    Used to test inbound webhook HTTP handlers in isolation from
+    Switchboard's own behavior (covered separately in
+    tests/application/services/test_switchboard.py).
+    """
+
+    def __init__(self, not_routable: bool = False) -> None:
+        self.not_routable = not_routable
+        self.calls: List[Dict[str, Any]] = []
+
+    async def handle_inbound_turn(self, **kwargs: Any) -> None:
+        self.calls.append(kwargs)
+        if self.not_routable:
+            from app.application.services.switchboard import (
+                ChannelMessageNotRoutable,
+            )
+
+            raise ChannelMessageNotRoutable("no channel_connection matches")
+
+
+class FakeOutboundHandler:
+    """Records delivered envelopes instead of actually delivering them.
+
+    Stands in for HandleOutboundResponseUseCase where only
+    Switchboard._deliver_immediately()'s call to deliver() matters.
+    """
+
+    def __init__(self) -> None:
+        self.delivered: List[Any] = []
+
+    async def deliver(self, envelope: Any) -> None:
+        self.delivered.append(envelope)

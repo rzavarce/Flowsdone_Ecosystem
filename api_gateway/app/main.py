@@ -11,39 +11,44 @@ from redis.asyncio import Redis
 from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
-from .adapters.inbound.http.admin import router as admin_router
-from .adapters.inbound.http.channels import router as channels_router
-from .adapters.inbound.http.internal_outbound import router as internal_router
-from .adapters.inbound.http.voice import router as voice_router
-from .adapters.inbound.http.voice_demo import router as voice_demo_router
-from .adapters.inbound.http.webhooks import router as webhooks_router
-from .adapters.inbound.http.websocket import router as ws_router
-from .adapters.outbound.channels.factory import ChannelSenderFactory
-from .adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
-from .adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
-from .adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
-from .adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
-from .adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
-from .adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
-from .adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
-from .adapters.outbound.queue.factory import PublisherFactory
-from .adapters.outbound.queue.kafka_publisher import KafkaPublisher
-from .adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
-from .adapters.outbound.security.secret_generator import RandomHexSecretGenerator
-from .adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
-from .adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
-from .application.services.ws_registry import WSRegistry
-from .application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
-from .application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
-from .application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
-from .application.use_cases.ingest_message import IngestMessageUseCase
-from .application.use_cases.route_channel_message import RouteChannelMessageUseCase
-from .application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
-from .application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
-from .core.config import settings
-from .core.logging import setup_logging
-from .infrastructure.database import create_engine, create_sessionmaker
-from .infrastructure.kafka_admin import ensure_topics_exist
+from app.adapters.inbound.http.admin import router as admin_router
+from app.adapters.inbound.http.channels import router as channels_router
+from app.adapters.inbound.http.internal_outbound import router as internal_router
+from app.adapters.inbound.http.voice import router as voice_router
+from app.adapters.inbound.http.voice_demo import router as voice_demo_router
+from app.adapters.inbound.http.webhooks import router as webhooks_router
+from app.adapters.inbound.http.websocket import router as ws_router
+from app.adapters.outbound.apps.factory import AppConnectorFactory
+from app.adapters.outbound.channels.factory import ChannelSenderFactory
+from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
+from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
+from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+from app.adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
+from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
+from app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from app.adapters.outbound.queue.factory import PublisherFactory
+from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
+from app.adapters.outbound.session.postgres_session_history_repository import (
+    PostgresSessionHistoryRepository,
+)
+from app.adapters.outbound.session.redis_session_repository import RedisSessionRepository
+from app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
+from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
+from app.application.services.switchboard import Switchboard
+from app.application.services.ws_registry import WSRegistry
+from app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
+from app.application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
+from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
+from app.application.use_cases.ingest_message import IngestMessageUseCase
+from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
+from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.infrastructure.database import create_engine, create_sessionmaker
+from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("bootstrap")
@@ -54,14 +59,16 @@ async def lifespan(app: FastAPI):
     """Build and tear down all application state around the app's lifetime.
 
     Constructs, in order: the WebSocket registry, the voice call
-    registry and its Redis-backed session store, the message
-    publishers (Kafka/RabbitMQ, including the voice channel's
-    dedicated Kafka topic) and their factory, the ingest use case, the
-    database engine and admin repositories, the outbound handler
-    (WebSocket + native channel senders, including voice), and the
-    channel message router - then yields control to FastAPI. On
-    shutdown, stops the publishers, closes the Redis client, and
-    disposes the database engine.
+    registry and its Redis-backed session store, Switchboard's fast
+    (Redis) session repo, the message publishers (Kafka/RabbitMQ,
+    including the voice channel's dedicated Kafka topic) and their
+    factory, the ingest use case, the database engine and admin
+    repositories, Switchboard's durable (Postgres) history repo, the
+    outbound handler (WebSocket + native channel senders, including
+    voice), and the Switchboard itself (the single entry point every
+    channel now routes inbound turns through) - then yields control to
+    FastAPI. On shutdown, stops the publishers, closes the Redis
+    client, and disposes the database engine.
 
     Args:
         app (FastAPI): The FastAPI application instance.
@@ -103,6 +110,12 @@ async def lifespan(app: FastAPI):
     app.state.voice_provider = TwilioVoiceProviderAdapter()
 
     logger.info("voice.dependencies.initialized")
+
+    # Switchboard's fast session state (Redis) - shares the same
+    # redis_client as voice's CallSession store; separate key prefix
+    # keeps the two keyspaces from colliding.
+    session_repo = RedisSessionRepository(redis_client)
+    app.state.session_repo = session_repo
 
     # Publishers (outbound adapters)
     publishers: dict[str, object] = {}
@@ -209,6 +222,11 @@ async def lifespan(app: FastAPI):
     app.state.channel_connection_repo = SqlAlchemyChannelConnectionRepository(db_sessionmaker)
     app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
+    # Switchboard's durable transcript (Postgres) - needs db_sessionmaker,
+    # so it is built here rather than alongside session_repo above.
+    session_history_repo = PostgresSessionHistoryRepository(db_sessionmaker)
+    app.state.session_history_repo = session_history_repo
+
     logger.info("database.repositories.ready")
 
     # Channel connection create/update (auto-generate webhook secrets
@@ -254,18 +272,27 @@ async def lifespan(app: FastAPI):
             call_session_registry=call_session_registry,
             voice_provider=app.state.voice_provider,
         ),
+        session_repo=session_repo,
+        session_history_repo=session_history_repo,
+        session_ttl_seconds=settings.SESSION_TTL_SECONDS,
     )
     app.state.outbound_handler = outbound_handler
 
     logger.info("outbound.handler.initialized")
 
-    # Channel message routing (native webhooks -> Kafka -> Langflow)
-    app.state.route_channel_message_use_case = RouteChannelMessageUseCase(
+    # Switchboard: single entry point for every inbound channel turn.
+    # Built after outbound_handler, which it needs to deliver any
+    # AppConnector result that isn't handled asynchronously.
+    app.state.switchboard = Switchboard(
         channel_connection_repo=app.state.channel_connection_repo,
-        ingest_message_use_case=ingest_use_case,
+        session_repo=session_repo,
+        session_history_repo=session_history_repo,
+        app_connectors=AppConnectorFactory().build_all(ingest_message_use_case=ingest_use_case),
+        outbound_handler=outbound_handler,
+        session_ttl_seconds=settings.SESSION_TTL_SECONDS,
     )
 
-    logger.info("route_channel_message.use_case.initialized")
+    logger.info("switchboard.initialized")
 
     logger.info("application.startup.complete")
 

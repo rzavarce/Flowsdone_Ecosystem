@@ -9,9 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.channels.facebook import router
+from app.adapters.inbound.http.channels.facebook import router
 from api_gateway.tests.support.asgi import client_for_router
-from api_gateway.tests.support.fakes import FakeChannelAppRepo, FakeRouteChannelMessageUseCase
+from api_gateway.tests.support.fakes import FakeChannelAppRepo, FakeSwitchboard
 
 pytestmark = pytest.mark.anyio
 
@@ -53,7 +53,7 @@ async def test_get_verification_rejects_wrong_token():
 
 async def test_post_with_valid_signature_routes_each_message():
     channel_app_repo = FakeChannelAppRepo(SimpleNamespace(credentials={"app_secret": APP_SECRET}))
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
     body = json.dumps(
         {
             "entry": [
@@ -68,7 +68,7 @@ async def test_post_with_valid_signature_routes_each_message():
     ).encode()
 
     async with client_for_router(
-        router, channel_app_repo=channel_app_repo, route_channel_message_use_case=route_use_case
+        router, channel_app_repo=channel_app_repo, switchboard=switchboard
     ) as client:
         response = await client.post(
             "/webhooks/facebook",
@@ -77,18 +77,18 @@ async def test_post_with_valid_signature_routes_each_message():
         )
 
     assert response.status_code == 200
-    assert len(route_use_case.calls) == 1
-    assert route_use_case.calls[0]["external_id"] == "PAGE123"
-    assert route_use_case.calls[0]["external_conversation_key"] == "psid-1"
+    assert len(switchboard.calls) == 1
+    assert switchboard.calls[0]["external_id"] == "PAGE123"
+    assert switchboard.calls[0]["external_conversation_key"] == "psid-1"
 
 
 async def test_post_with_invalid_signature_is_rejected_and_does_not_route():
     channel_app_repo = FakeChannelAppRepo(SimpleNamespace(credentials={"app_secret": APP_SECRET}))
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
     body = json.dumps({"entry": []}).encode()
 
     async with client_for_router(
-        router, channel_app_repo=channel_app_repo, route_channel_message_use_case=route_use_case
+        router, channel_app_repo=channel_app_repo, switchboard=switchboard
     ) as client:
         response = await client.post(
             "/webhooks/facebook",
@@ -97,18 +97,18 @@ async def test_post_with_invalid_signature_is_rejected_and_does_not_route():
         )
 
     assert response.status_code == 401
-    assert route_use_case.calls == []
+    assert switchboard.calls == []
 
 
 async def test_not_routable_message_still_acknowledged_200():
     channel_app_repo = FakeChannelAppRepo(SimpleNamespace(credentials={"app_secret": APP_SECRET}))
-    route_use_case = FakeRouteChannelMessageUseCase(not_routable=True)
+    switchboard = FakeSwitchboard(not_routable=True)
     body = json.dumps(
         {"entry": [{"id": "UNKNOWN_PAGE", "messaging": [{"sender": {"id": "psid-1"}, "message": {"text": "hi"}}]}]}
     ).encode()
 
     async with client_for_router(
-        router, channel_app_repo=channel_app_repo, route_channel_message_use_case=route_use_case
+        router, channel_app_repo=channel_app_repo, switchboard=switchboard
     ) as client:
         response = await client.post(
             "/webhooks/facebook",

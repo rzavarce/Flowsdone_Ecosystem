@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, Protocol
 
-from ...models.call_session import CallSession
+from app.domain.models.call_session import CallSession
 
 
 class CallSessionRepositoryPort(Protocol):

@@ -8,7 +8,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from app.application.services.switchboard import ChannelMessageNotRoutable
 
 logger = logging.getLogger("channels.telegram")
 
@@ -51,7 +51,7 @@ async def receive_webhook(
         return JSONResponse(status_code=401, content={"ok": False, "error": "invalid_secret"})
 
     update = await request.json()
-    route_use_case = request.app.state.route_channel_message_use_case
+    switchboard = request.app.state.switchboard
 
     message = update.get("message") or {}
     text = message.get("text")
@@ -59,23 +59,23 @@ async def receive_webhook(
     sender_id = (message.get("from") or {}).get("id")
 
     if text and chat_id is not None and sender_id is not None:
-        await _route_event(route_use_case, bot_token, str(chat_id), str(sender_id), text, update)
+        await _route_event(switchboard, bot_token, str(chat_id), str(sender_id), text, update)
 
     return JSONResponse(status_code=200, content={"ok": True})
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     bot_token: str,
     chat_id: str,
     sender_id: str,
     text: str,
     raw_update: Dict[str, Any],
 ) -> None:
-    """Route a single Telegram message to its Langflow agent.
+    """Route a single Telegram message to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         bot_token (str): Telegram bot token the update was sent to.
         chat_id (str): Telegram chat id.
         sender_id (str): Id of the sender.
@@ -84,12 +84,13 @@ async def _route_event(
             the payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=bot_token,
             external_conversation_key=chat_id,
             sender_id=sender_id,
-            payload={"message": text, "raw": raw_update},
+            message_text=text,
+            raw_payload=raw_update,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

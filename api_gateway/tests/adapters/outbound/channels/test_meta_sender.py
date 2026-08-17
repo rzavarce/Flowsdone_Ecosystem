@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels import meta_sender as module
-from api_gateway.app.adapters.outbound.channels.facebook_sender import FacebookSender
-from api_gateway.app.adapters.outbound.channels.instagram_sender import InstagramSender
+from app.adapters.outbound.channels import meta_sender as module
+from app.adapters.outbound.channels.facebook_sender import FacebookSender
+from app.adapters.outbound.channels.instagram_sender import InstagramSender
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 
 pytestmark = pytest.mark.anyio

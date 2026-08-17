@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ....domain.ports.outbound import ChannelSenderPort
-from .meta_sender import send_meta_message
+from app.domain.ports.outbound import ChannelSenderPort
+from app.adapters.outbound.channels.meta_sender import send_meta_message
 
 
 class InstagramSender(ChannelSenderPort):

@@ -7,8 +7,8 @@ from typing import Optional
 
 from redis.asyncio import Redis
 
-from ....domain.models.call_session import CallSession
-from ....domain.ports.outbound import CallSessionRepositoryPort
+from app.domain.models.call_session import CallSession
+from app.domain.ports.outbound import CallSessionRepositoryPort
 
 logger = logging.getLogger("channels.voice.call_session_repository")
 

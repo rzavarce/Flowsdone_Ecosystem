@@ -7,18 +7,21 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.application.use_cases import handle_outbound_response as hor_module
-from api_gateway.app.application.use_cases.handle_outbound_response import (
+from app.application.use_cases import handle_outbound_response as hor_module
+from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope, MessageMeta
+from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 from api_gateway.tests.support.fakes import (
     FakeChannelConnectionRepo,
     FakeChannelSender,
     FakePublisher,
+    FakeSessionHistoryRepository,
+    FakeSessionRepository,
     FakeWSRegistry,
     make_channel_connection,
+    make_session,
 )
 
 pytestmark = pytest.mark.anyio
@@ -206,6 +209,77 @@ async def test_deliver_never_raises_when_sender_fails():
 
     # Should not raise, even though the sender always fails.
     await use_case.deliver(envelope)
+
+
+async def test_deliver_records_the_outbound_turn_in_session_history_and_state():
+    connection = make_channel_connection(channel_type="telegram", external_id="123:ABC")
+    channel_repo = FakeChannelConnectionRepo(connection=connection)
+    sender = FakeChannelSender()
+    session = make_session(id="conv-1", current_app="langflow")
+    session_repo = FakeSessionRepository(session=session)
+    session_history_repo = FakeSessionHistoryRepository()
+
+    use_case = HandleOutboundResponseUseCase(
+        channel_connection_repo=channel_repo,
+        channel_senders={"telegram": sender},
+        session_repo=session_repo,
+        session_history_repo=session_history_repo,
+    )
+    envelope = _envelope(channel_connection_id=str(connection.id), external_conversation_key="chat-99")
+    envelope.channel = "telegram"
+    envelope.payload["message"] = "respuesta"
+
+    await use_case.deliver(envelope)
+
+    assert session_history_repo.messages == [
+        {
+            "session_id": "conv-1",
+            "project_id": session.project_id,
+            "direction": "outbound",
+            "text": "respuesta",
+            "app": "langflow",
+        }
+    ]
+    saved_session = session_repo.sessions["conv-1"]
+    assert saved_session.last_messages[-1].text == "respuesta"
+    assert saved_session.last_messages[-1].direction == "outbound"
+
+
+async def test_deliver_skips_session_recording_when_ports_not_wired():
+    connection = make_channel_connection(channel_type="telegram")
+    channel_repo = FakeChannelConnectionRepo(connection=connection)
+    sender = FakeChannelSender()
+
+    # No session_repo/session_history_repo given - e.g. webchat delivery.
+    use_case = HandleOutboundResponseUseCase(
+        channel_connection_repo=channel_repo, channel_senders={"telegram": sender}
+    )
+    envelope = _envelope(channel_connection_id=str(connection.id))
+    envelope.channel = "telegram"
+
+    # Should not raise even without session ports wired.
+    await use_case.deliver(envelope)
+
+
+async def test_deliver_skips_session_recording_when_no_session_exists():
+    connection = make_channel_connection(channel_type="telegram")
+    channel_repo = FakeChannelConnectionRepo(connection=connection)
+    sender = FakeChannelSender()
+    session_repo = FakeSessionRepository()  # empty - no session for "conv-1"
+    session_history_repo = FakeSessionHistoryRepository()
+
+    use_case = HandleOutboundResponseUseCase(
+        channel_connection_repo=channel_repo,
+        channel_senders={"telegram": sender},
+        session_repo=session_repo,
+        session_history_repo=session_history_repo,
+    )
+    envelope = _envelope(channel_connection_id=str(connection.id))
+    envelope.channel = "telegram"
+
+    await use_case.deliver(envelope)
+
+    assert session_history_repo.messages == []
 
 
 async def test_deliver_noop_when_connection_not_found():

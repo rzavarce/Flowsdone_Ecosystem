@@ -6,8 +6,8 @@ from typing import Any
 
 import httpx
 
-from ....core.config import settings
-from ....domain.ports.outbound import LangflowExecutorPort
+from app.core.config import settings
+from app.domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("langflow.executor")
 

@@ -6,7 +6,7 @@ from typing import Any
 
 from aiokafka import AIOKafkaProducer
 
-from ....domain.ports.outbound import MessagePublisherPort
+from app.domain.ports.outbound import MessagePublisherPort
 
 logger = logging.getLogger("kafka.publisher")
 

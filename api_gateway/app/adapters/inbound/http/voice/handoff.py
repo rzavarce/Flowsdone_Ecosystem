@@ -11,7 +11,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
-from .....core.config import settings
+from app.core.config import settings
 
 logger = logging.getLogger("channels.voice.handoff")
 

@@ -15,8 +15,8 @@ from typing import Any, Dict, Mapping, Optional
 from twilio.request_validator import RequestValidator
 from twilio.twiml.voice_response import Connect, VoiceResponse
 
-from ....domain.models.voice_relay_event import VoiceRelayEvent
-from ....domain.ports.outbound import VoiceProviderPort
+from app.domain.models.voice_relay_event import VoiceRelayEvent
+from app.domain.ports.outbound import VoiceProviderPort
 
 logger = logging.getLogger("channels.voice.twilio_provider")
 

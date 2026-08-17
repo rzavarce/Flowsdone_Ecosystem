@@ -4,12 +4,12 @@ under /internal/admin and protected by require_admin_api_key.
 
 from fastapi import APIRouter
 
-from .agents import router as agents_router
-from .channel_apps import router as channel_apps_router
-from .channel_connections import router as channel_connections_router
-from .projects import router as projects_router
-from .tenants import router as tenants_router
-from .workflows import router as workflows_router
+from app.adapters.inbound.http.admin.agents import router as agents_router
+from app.adapters.inbound.http.admin.channel_apps import router as channel_apps_router
+from app.adapters.inbound.http.admin.channel_connections import router as channel_connections_router
+from app.adapters.inbound.http.admin.projects import router as projects_router
+from app.adapters.inbound.http.admin.tenants import router as tenants_router
+from app.adapters.inbound.http.admin.workflows import router as workflows_router
 
 router = APIRouter(prefix="/internal/admin")
 

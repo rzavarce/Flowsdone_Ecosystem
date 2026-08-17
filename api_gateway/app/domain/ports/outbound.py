@@ -9,7 +9,7 @@ package.
 
 from typing import Protocol
 
-from ...application.dto.message_dto import MessageDTO
+from app.application.dto.message_dto import MessageDTO
 
 
 class MessagePublisherPort(Protocol):

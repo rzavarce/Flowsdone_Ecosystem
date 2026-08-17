@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from ...domain.models.channel_app import ChannelApp
-from ...domain.ports.outbound import ChannelAppRepositoryPort, SecretGeneratorPort
+from app.domain.models.channel_app import ChannelApp
+from app.domain.ports.outbound import ChannelAppRepositoryPort, SecretGeneratorPort
 
 __all__ = ["UpsertChannelAppUseCase"]
 

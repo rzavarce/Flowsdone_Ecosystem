@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.application.use_cases.ingest_message import IngestMessageUseCase
+from app.application.use_cases.ingest_message import IngestMessageUseCase
 from api_gateway.tests.support.fakes import FakePublisherFactory
 
 pytestmark = pytest.mark.anyio

@@ -25,6 +25,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 17. [Tests](#17-tests)
 18. [Canal de voz (Twilio ConversationRelay)](#18-canal-de-voz-twilio-conversationrelay)
 19. [Softphone de prueba (demo)](#19-softphone-de-prueba-demo)
+20. [Switchboard + Session (centralita de conmutación)](#20-switchboard--session-centralita-de-conmutación)
 
 ---
 
@@ -60,9 +61,9 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
   │            │ (Graph API)│         │   API)   │        │   │  adapters                │
   └────────────┴────────────┴─────────┴──────────┴────────┘   └─────────────┬────────────┘
                                                                              │
-                            RouteChannelMessageUseCase resuelve             │ transport="kafka"
+                            Switchboard resuelve/crea la Session             │ transport="kafka"
                             (channel_type, external_id) → tenant/           │ SIEMPRE para canales
-                            proyecto/agente (sección 8)                     ▼
+                            proyecto/agente (sección 8, 20)                 ▼
                                                                   ┌──────────────────┐
                                                                   │       Kafka        │
                                                                   └─────────┬──────────┘
@@ -730,16 +731,16 @@ pytest
 
 **Qué cubre:**
 
-- `application/use_cases/` — los tres use cases de `channel_connections` (create/update/delete, con sus caminos de rollback), `IngestMessageUseCase`, `RouteChannelMessageUseCase`, `HandleOutboundResponseUseCase` (extracción de texto, callback, WS, entrega a canal nativo).
-- `application/services/` — `register_or_compensate` y `WSRegistry`.
-- `adapters/outbound/` — `RandomHexSecretGenerator`, `TelegramWebhookRegistrar`, `MetaWebhookRegistrar`, las dos factories (`ChannelSenderFactory`, `WebhookRegistrarFactory`), y todos los senders (incluidos los stubs de X/TikTok).
+- `application/use_cases/` — los tres use cases de `channel_connections` (create/update/delete, con sus caminos de rollback), `IngestMessageUseCase`, `HandleOutboundResponseUseCase` (extracción de texto, callback, WS, entrega a canal nativo, registro del turno saliente en la Session — sección 20).
+- `application/services/` — `register_or_compensate`, `WSRegistry` y `Switchboard` (sección 20: creación/reuso de Session, delegación al `AppConnectorPort` actual, `switch_app()`).
+- `adapters/outbound/` — `RandomHexSecretGenerator`, `TelegramWebhookRegistrar`, `MetaWebhookRegistrar`, las dos factories (`ChannelSenderFactory`, `WebhookRegistrarFactory`), todos los senders (incluidos los stubs de X/TikTok), `RedisSessionRepository`, `LangflowAppConnector` y `AppConnectorFactory` (sección 20).
 - `adapters/inbound/http/channels/` — los helpers puros de verificación de firma de cada canal (Meta, X, TikTok, extracción de texto de Evolution), más tests end-to-end vía ASGI (sin DB real, con fakes en `app.state`) para Telegram, Facebook y WhatsApp — los tres patrones de verificación distintos (secret por conexión, firma HMAC de app compartida, apikey estático).
 
 **Qué falta (deliberadamente fuera de este alcance):** tests end-to-end de Instagram/X/TikTok a nivel HTTP (sus helpers de firma sí están cubiertos), y cualquier test de integración contra Postgres/Kafka/RabbitMQ reales o contra el `admin` router completo (routers CRUD), `adapters/outbound/db/` (repositorios SQLAlchemy), `infrastructure/` o `main.py` (wiring de arranque). Los fakes reutilizables viven en `tests/support/` (`fakes.py` para los puertos, `fake_httpx.py` para las llamadas salientes, `asgi.py` para levantar un router aislado).
 
 ### Cobertura
 
-`pytest-cov` mide cobertura sobre `api_gateway/app` (config en `[tool.coverage.*]` de `pyproject.toml`):
+`pytest-cov` mide cobertura sobre `app` (config en `[tool.coverage.*]` de `pyproject.toml`):
 
 ```bash
 docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest --cov --cov-report=term-missing"
@@ -773,8 +774,9 @@ api ── resuelve ChannelConnection(channel_type="voice") + ChannelApp("twilio
    ▼
 Twilio abre WS a /voice/stream/{call_sid}  (frames: setup / prompt / interrupt / dtmf / end)
    ▼
-api (WS) ── por cada "prompt" (turno transcrito) → mismo RouteChannelMessageUseCase que usan
-   │         los demás canales, con transport="kafka_voice"
+api (WS) ── por cada "prompt" (turno transcrito) → mismo Switchboard.handle_inbound_turn()
+   │         que usan los demás canales (sección 20); LangflowAppConnector infiere
+   │         transport="kafka_voice" solo por channel_type="voice", sin caso especial en el WS
    ▼
 Kafka: VOICE_KAFKA_TOPIC ("voice.messages") — topic propio, separado de inbound.messages
    ▼
@@ -947,4 +949,79 @@ scripts/dev/voice_demo_tunnel.sh stop
 
 ⚠️ Mientras el túnel está activo, `PUBLIC_BASE_URL` en `.env` **no** es el dominio real — no confundir con un problema de DNS/Traefik si `platform.flowsdone.com` deja de responder como esperás durante una sesión de pruebas. Correr `stop` antes de volver a tocar producción.
 
+---
+
+## 20. Switchboard + Session (centralita de conmutación)
+
+Hasta esta feature, todo mensaje entrante de cualquier canal iba **siempre** a Langflow: `RouteChannelMessageUseCase` resolvía `(channel_type, external_id)` → tenant/proyecto/agente y publicaba en Kafka en cada turno, sin ningún estado de conversación persistido entre turnos. `Switchboard` (`application/services/switchboard.py`) reemplaza ese use case como **punto único de entrada** para los 8 canales (Facebook, Instagram, WhatsApp, Telegram, X, TikTok, voz — y webchat sigue aparte, ver más abajo), y agrega lo que faltaba: una `Session` persistida que sabe qué "app" está atendiendo la conversación en este momento, para poder conmutarla en el futuro hacia otros destinos (un sistema de tickets externo, otro bot, correo) sin reescribir el pipeline de canales.
+
+Esta feature construye la **infraestructura** de conmutación (`Switchboard.switch_app()`, ya funcional) pero deliberadamente **no** incluye ningún motor de reglas/frases que la dispare automáticamente — hoy `current_app` siempre arranca en `"langflow"` y solo cambia si algo externo llama a `switch_app()` explícitamente (no hay endpoint HTTP para eso todavía, tampoco: se agrega junto con el primer conector real).
+
+### Dos "sesiones" conviven en voz, a propósito
+
+`CallSession` (Redis, sección 18) resuelve un problema distinto: puente de estado entre el webhook TwiML y el WebSocket de streaming de **una llamada**, de vida corta (TTL `CALL_SESSION_TTL_SECONDS`). La nueva `Session` resuelve el estado conversacional de **toda la plataforma**, de vida larga (TTL `SESSION_TTL_SECONDS`, 24h por defecto). No se fusionan — `voice/stream.py` sigue usando `CallSession` para lo que ya resuelve bien, y además pasa por `Switchboard.handle_inbound_turn()` igual que cualquier otro canal para decidir qué app atiende el turno.
+
+### Flujo
+
+```
+Webhook de canal (Facebook/Instagram/WhatsApp/Telegram/X/TikTok/voz)
+   │
+   ▼
+Switchboard.handle_inbound_turn(channel_type, external_id, external_conversation_key,
+                                 sender_id, message_text, raw_payload)
+   │
+   ├─ session_id = f"{project_id}:{channel_type}:{external_conversation_key}"
+   │  (mismo formato de siempre — Langflow sigue recibiendo el mismo session_id/
+   │   conversation_id, así que su memoria de conversación no se ve afectada)
+   │
+   ├─ session_repo.get(session_id)  (Redis)
+   │  si no existe: channel_connection_repo.get_by_channel_and_external_id(...) resuelve
+   │  tenant/proyecto/agente (igual que antes), crea la Session con current_app="langflow"
+   │  y session.variables["langflow_flow_id"] = <flow_id resuelto AHORA, snapshot único>
+   │
+   ├─ app_connectors[session.current_app].handle_turn(session, message_text, raw_payload)
+   │  (Strategy — hoy solo existe "langflow": LangflowAppConnector, que dispara
+   │  IngestMessageUseCase igual que siempre, con transport="kafka_voice" si
+   │  channel_type=="voice" o "kafka" para cualquier otro canal; devuelve None,
+   │  la respuesta llega después por el pipeline Kafka+Langflow de siempre)
+   │
+   ├─ registra el turno entrante en Postgres (session_messages) y en la ventana
+   │  corta de la Session (últimos 10 mensajes), guarda la Session en Redis
+   │
+   └─ si el conector devolvió una respuesta síncrona (ningún conector la devuelve
+      hoy, pero el contrato ya lo soporta) → Switchboard la entrega inmediatamente
+      reusando HandleOutboundResponseUseCase.deliver(), sin duplicar lógica de envío
+
+HandleOutboundResponseUseCase.deliver()  (llamado por /internal/outbound, sin cambio
+   de responsabilidad — solo gana un paso extra al final de una entrega exitosa)
+   │
+   └─ registra el turno saliente en Postgres (session_messages) y actualiza la
+      Session en Redis (best-effort: nunca rompe una entrega ya exitosa)
+```
+
+**Por qué el flow_id de Langflow se snapshotea una sola vez:** antes de esta feature, `RouteChannelMessageUseCase` releía `agent.langflow_flow_id` en cada turno — si un admin cambiaba el flow del agente a mitad de una conversación, el siguiente turno silenciosamente empezaba a hablar con otro flow, sin que nadie lo pidiera. Ahora ese valor se resuelve una única vez, al crear la `Session`, y queda fijo en `session.variables["langflow_flow_id"]` para toda la conversación.
+
+**Webchat no pasa por Switchboard** — sigue yendo directo por WebSocket a `IngestMessageUseCase` como siempre (no tiene `channel_connection`, no hay nada que resolver). No tiene `Session`; `HandleOutboundResponseUseCase` detecta la ausencia de `channel_connection_id` y no intenta registrar historial.
+
+### Piezas nuevas
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `Session` / `SessionMessage` | `domain/models/session.py` | Estado de la conversación: canal, `current_app`, `variables`, últimos 10 mensajes, `started_at`/`last_activity_at`. |
+| `SessionRepositoryPort` → `RedisSessionRepository` | `domain/ports/outbound/`, `adapters/outbound/session/` | Lectura/escritura rápida con TTL (`SESSION_TTL_SECONDS`), mismo patrón que `CallSessionRepositoryPort`. |
+| `SessionHistoryRepositoryPort` → `PostgresSessionHistoryRepository` | ídem | Histórico durable turno-a-turno (`session_messages`) y de eventos (`session_events`: `started`/`app_switched`/`closed`) — migración `0004_switchboard_sessions`. |
+| `AppConnectorPort` (Strategy) → `LangflowAppConnector` | `domain/ports/outbound/app_connector.py`, `adapters/outbound/apps/` | Contrato para cualquier "app" destino. Hoy solo Langflow está implementado; un ticketing system/otro bot/email futuro implementan el mismo puerto sin tocar `Switchboard`. |
+| `Switchboard` | `application/services/switchboard.py` | Resuelve/crea la `Session`, delega al conector actual, registra historial, expone `switch_app(session_id, to_app, reason=None)`. |
+
+### Variables de entorno nuevas
+
+| Variable | Para qué |
+|---|---|
+| `SESSION_TTL_SECONDS` | TTL de la `Session` en Redis (default `86400`, 24h) — mucho más largo que `CALL_SESSION_TTL_SECONDS` porque una conversación de WhatsApp/Telegram puede retomarse horas después y debe seguir contando como la misma sesión. |
+
+### Fuera de alcance (a propósito, por ahora)
+
+- Conectores reales para Zendesk/Jira/Salesforce/email/otro bot — solo existe `LangflowAppConnector`.
+- Endpoint HTTP para invocar `switch_app()` — no tiene sentido exponerlo con un solo conector registrado; llega junto con el segundo.
+- Cualquier motor de disparo automático de conmutación (por frase, por intención, por regla) — esta feature es solo la infraestructura de conmutación, no el "cuándo".
 
