@@ -8,10 +8,10 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.adapters.outbound.voice.redis_call_session_repository import (
+from app.adapters.outbound.voice.redis_call_session_repository import (
     RedisCallSessionRepository,
 )
-from api_gateway.app.domain.models.call_session import CallSession
+from app.domain.models.call_session import CallSession
 from api_gateway.tests.support.fakes import FakeRedisClient
 
 pytestmark = pytest.mark.anyio

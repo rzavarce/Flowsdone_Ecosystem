@@ -8,7 +8,7 @@ import hmac
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.channels.twitter import (
+from app.adapters.inbound.http.channels.twitter import (
     _hmac_sha256_base64,
     _verify_signature,
 )

@@ -15,8 +15,8 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from api_gateway.app.adapters.outbound.db.models import Base  # noqa: E402
-from api_gateway.app.core.config import settings  # noqa: E402
+from app.adapters.outbound.db.models import Base  # noqa: E402
+from app.core.config import settings  # noqa: E402
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_SQLALCHEMY or "")

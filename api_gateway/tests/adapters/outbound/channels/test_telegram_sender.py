@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels import telegram_sender as module
-from api_gateway.app.adapters.outbound.channels.telegram_sender import TelegramSender
+from app.adapters.outbound.channels import telegram_sender as module
+from app.adapters.outbound.channels.telegram_sender import TelegramSender
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 
 pytestmark = pytest.mark.anyio

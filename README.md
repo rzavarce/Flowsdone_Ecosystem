@@ -31,7 +31,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 
 ## 1. Qué hace este proyecto
 
-Es un **API Gateway** (`api_gateway/app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) multi-tenant que recibe mensajes desde distintos canales (webchat propio, Facebook Messenger, Instagram, X/Twitter, WhatsApp vía Evolution API, Telegram, TikTok, voz vía Twilio — sección 18) y los enruta según una regla fija:
+Es un **API Gateway** (`app/`, FastAPI, arquitectura hexagonal — ver `CLAUDE.md`) multi-tenant que recibe mensajes desde distintos canales (webchat propio, Facebook Messenger, Instagram, X/Twitter, WhatsApp vía Evolution API, Telegram, TikTok, voz vía Twilio — sección 18) y los enruta según una regla fija:
 
 - **Mensajería conversacional de cualquier canal → siempre Kafka → Langflow.** Todo webhook de canal (sección 9) resuelve a qué tenant/proyecto/agente pertenece y publica en Kafka; `kafka_inbound_worker` ejecuta el agente en Langflow y la respuesta vuelve por WebSocket/callback. El canal de voz sigue la misma regla pero con un topic y un worker propios (`VOICE_KAFKA_TOPIC` / `kafka_voice_worker`, sección 18) para no competir con los canales de texto.
 - **Disparo de automatizaciones de n8n → siempre RabbitMQ.** El endpoint genérico `/webhooks/generic` (o cualquier caller interno) publica en RabbitMQ; un workflow de n8n con un nodo **RabbitMQ Trigger** lo consume directamente (no pasa por Langflow) y puede responder publicando en la cola de salida (ver sección 13).
@@ -54,7 +54,7 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
                         │        (única red, dev y prod)            │
                         └──────────────────────────────────────────┘
 
-  Canales de entrada (webhooks nativos, sección 9)         Gateway (api_gateway/app/, hexagonal)
+  Canales de entrada (webhooks nativos, sección 9)         Gateway (app/, hexagonal)
   ┌────────────┬────────────┬─────────┬──────────┬────────┐   ┌──────────────────────────┐
   │  Webchat   │ Facebook / │ X /     │ WhatsApp │Telegram│   │   api  (FastAPI :8000)   │
   │  (WS)      │ Instagram  │ Twitter │(Evolution│/TikTok │──▶│  domain/application/     │
@@ -237,11 +237,11 @@ docker compose run --rm api alembic -c api_gateway/alembic.ini upgrade head
 # Ver la revisión actual
 docker compose run --rm api alembic -c api_gateway/alembic.ini current
 
-# Crear una migración nueva después de tocar api_gateway/app/adapters/outbound/db/models.py
+# Crear una migración nueva después de tocar app/adapters/outbound/db/models.py
 docker compose run --rm api alembic -c api_gateway/alembic.ini revision --autogenerate -m "descripción"
 ```
 
-> **Importante:** `alembic.ini` resuelve `sqlalchemy.url` en runtime desde `settings.DATABASE_URL_SQLALCHEMY` (`api_gateway/app/core/config.py`), no está hardcodeado — no hace falta tocar el `.ini` para apuntar a otro entorno, alcanza con la variable de entorno.
+> **Importante:** `alembic.ini` resuelve `sqlalchemy.url` en runtime desde `settings.DATABASE_URL_SQLALCHEMY` (`app/core/config.py`), no está hardcodeado — no hace falta tocar el `.ini` para apuntar a otro entorno, alcanza con la variable de entorno.
 
 ---
 
@@ -395,7 +395,7 @@ responde, ese mismo `envelope.meta` viaja intacto hasta
 `/internal/outbound` tanto por `kafka_outbound_worker` como por
 `rabbitmq_outbound_worker`), que resuelve el `channel_connection` y
 despacha el mensaje al `ChannelSenderPort` correspondiente
-(`api_gateway/app/adapters/outbound/channels/`):
+(`app/adapters/outbound/channels/`):
 
 | Canal | Envío | Credencial nueva requerida |
 |---|---|---|
@@ -417,7 +417,7 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 
 `IngestMessageUseCase` publica cada mensaje en `KAFKA_TOPIC` (`inbound.messages`) usando el **canal como `key`** de Kafka (`KafkaPublisher.publish(..., key=channel)`). Con eso, Kafka garantiza que todos los mensajes de un mismo canal (`whatsapp_evolution`, `facebook`, `web`, etc.) siempre caen en la **misma partición** y en orden — es la base para poder aislar canales entre sí más adelante, sin tener que definir un worker por canal.
 
-- `api_gateway/app/infrastructure/kafka_admin.py` (`ensure_topics_exist()`) crea `KAFKA_TOPIC`/`DLQ_TOPIC` con `KAFKA_TOPIC_PARTITIONS` particiones (default `6`, env-configurable) si no existen, y **sube** la cantidad de particiones si el tópico ya existía con menos (Kafka no permite bajarlas). Corre solo, al arrancar `api` y los workers de Kafka — no hace falta tocar nada a mano salvo que quieras más de 6.
+- `app/infrastructure/kafka_admin.py` (`ensure_topics_exist()`) crea `KAFKA_TOPIC`/`DLQ_TOPIC` con `KAFKA_TOPIC_PARTITIONS` particiones (default `6`, env-configurable) si no existen, y **sube** la cantidad de particiones si el tópico ya existía con menos (Kafka no permite bajarlas). Corre solo, al arrancar `api` y los workers de Kafka — no hace falta tocar nada a mano salvo que quieras más de 6.
 - **Hoy, con una sola réplica de `kafka_inbound_worker`**, esto no aísla nada todavía — un único proceso sigue consumiendo las 6 particiones. El aislamiento real se activa el día que escales réplicas del mismo worker:
   ```bash
   docker compose up -d --scale kafka_inbound_worker=3
@@ -568,7 +568,7 @@ Evolution API todavía no está conectado a n8n (`EVOLUTION_N8N_ENABLED=false`);
 Solo activa en `profile prod`. Dos fuentes distintas confluyen en el mismo índice de OpenSearch (`ss4o_logs-*`):
 
 1. **Logs de infraestructura**: el `otel-collector` lee `/var/lib/docker/containers/*/*.log` (el log driver `json-file` de Docker) de **todos** los contenedores del host — Postgres, Redis, RabbitMQ, Langflow, Langfuse, etc. — sin necesidad de instrumentarlos.
-2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `api_gateway/app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` (`fd-n8n`) y `evolution` también mandan sus propias trazas OTLP.
+2. **Logs + traces de las apps propias**: `api` y los 4 workers están instrumentados con `opentelemetry-sdk` (ver `app/core/logging.py`), exportan por OTLP con `service.name` propio (`fd-gateway`, `fd-kafka-inbound-worker`, etc.), incluyendo `correlation_id` y ubicación en código (`code.file.path`/`line.number`). `n8n` (`fd-n8n`) y `evolution` también mandan sus propias trazas OTLP.
 
 Para explorarlos: http://localhost:5601 (usuario `admin`, password `OPENSEARCH_PASSWORD`) → Discover → index pattern `ss4o_logs-*`.
 
@@ -716,7 +716,7 @@ CREATE USER fibralan_user WITH PASSWORD '15WB4FV4d0xn';
 
 ## 17. Tests
 
-Suite de tests unitarios con `pytest`, en `api_gateway/tests/`, mirroring la estructura de `api_gateway/app/`. No hay tests de integración todavía (nada pega contra Postgres/Kafka/RabbitMQ reales) — cada test mockea los puertos del dominio o la llamada HTTP saliente (`httpx.AsyncClient`), así que corren en milisegundos y no necesitan el stack levantado.
+Suite de tests unitarios con `pytest`, en `api_gateway/tests/`, mirroring la estructura de `app/`. No hay tests de integración todavía (nada pega contra Postgres/Kafka/RabbitMQ reales) — cada test mockea los puertos del dominio o la llamada HTTP saliente (`httpx.AsyncClient`), así que corren en milisegundos y no necesitan el stack levantado.
 
 **Instalar y correr:**
 
@@ -740,7 +740,7 @@ pytest
 
 ### Cobertura
 
-`pytest-cov` mide cobertura sobre `api_gateway/app` (config en `[tool.coverage.*]` de `pyproject.toml`):
+`pytest-cov` mide cobertura sobre `app` (config en `[tool.coverage.*]` de `pyproject.toml`):
 
 ```bash
 docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest --cov --cov-report=term-missing"

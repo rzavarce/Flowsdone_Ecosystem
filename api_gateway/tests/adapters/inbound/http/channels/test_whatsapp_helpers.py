@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from api_gateway.app.adapters.inbound.http.channels.whatsapp_evolution import _extract_text
+from app.adapters.inbound.http.channels.whatsapp_evolution import _extract_text
 
 
 def test_extracts_plain_conversation_text():

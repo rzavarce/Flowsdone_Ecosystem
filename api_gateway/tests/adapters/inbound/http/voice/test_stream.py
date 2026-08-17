@@ -8,11 +8,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api_gateway.app.adapters.inbound.http.voice.stream import (
+from app.adapters.inbound.http.voice.stream import (
     _matches_human_transfer_phrase,
     router,
 )
-from api_gateway.app.application.services.ws_registry import WSRegistry
+from app.application.services.ws_registry import WSRegistry
 from api_gateway.tests.support.fakes import (
     FakeCallSessionRepo,
     FakeSwitchboard,

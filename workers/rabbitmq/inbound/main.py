@@ -7,19 +7,19 @@ import logging
 
 import asyncpg
 
-from api_gateway.app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
-from api_gateway.app.adapters.outbound.db.idempotency_repository import (
+from app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
+from app.adapters.outbound.db.idempotency_repository import (
     PostgresIdempotencyRepository,
 )
-from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
-from api_gateway.app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
-from api_gateway.app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
-from api_gateway.app.application.use_cases.handle_outbound_response import (
+from app.adapters.outbound.langflow.executor import LangflowExecutor
+from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("rabbitmq.inbound.worker")

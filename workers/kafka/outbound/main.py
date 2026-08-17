@@ -9,12 +9,12 @@ import logging
 
 import httpx
 
-from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
-from api_gateway.app.application.services.hmac_signing import sign
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
-from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
+from app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
+from app.application.services.hmac_signing import sign
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.domain.models.message_envelope import MessageEnvelope
+from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("kafka.outbound.worker")

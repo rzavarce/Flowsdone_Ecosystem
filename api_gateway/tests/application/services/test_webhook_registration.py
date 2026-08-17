@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.application.services.webhook_registration import (
+from app.application.services.webhook_registration import (
     WebhookRegistrationError,
     register_or_compensate,
 )

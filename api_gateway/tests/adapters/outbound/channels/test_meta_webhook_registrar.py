@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels import meta_webhook_registrar as module
-from api_gateway.app.adapters.outbound.channels.meta_webhook_registrar import (
+from app.adapters.outbound.channels import meta_webhook_registrar as module
+from app.adapters.outbound.channels.meta_webhook_registrar import (
     MetaWebhookRegistrar,
     MetaWebhookRegistrationError,
 )

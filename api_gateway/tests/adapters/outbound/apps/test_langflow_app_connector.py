@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.apps.langflow_app_connector import LangflowAppConnector
-from api_gateway.app.application.use_cases.ingest_message import IngestMessageUseCase
+from app.adapters.outbound.apps.langflow_app_connector import LangflowAppConnector
+from app.application.use_cases.ingest_message import IngestMessageUseCase
 from api_gateway.tests.support.fakes import FakePublisherFactory, make_session
 
 pytestmark = pytest.mark.anyio

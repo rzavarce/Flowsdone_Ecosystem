@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels import whatsapp_evolution_sender as module
-from api_gateway.app.adapters.outbound.channels.whatsapp_evolution_sender import (
+from app.adapters.outbound.channels import whatsapp_evolution_sender as module
+from app.adapters.outbound.channels.whatsapp_evolution_sender import (
     WhatsAppEvolutionSender,
 )
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse

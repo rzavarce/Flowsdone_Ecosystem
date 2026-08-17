@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.session.redis_session_repository import (
+from app.adapters.outbound.session.redis_session_repository import (
     RedisSessionRepository,
 )
 from api_gateway.tests.support.fakes import FakeRedisClient, make_session

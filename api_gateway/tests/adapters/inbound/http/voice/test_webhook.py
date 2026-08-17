@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.voice.webhook import router
-from api_gateway.app.domain.models.channel_app import ChannelApp
+from app.adapters.inbound.http.voice.webhook import router
+from app.domain.models.channel_app import ChannelApp
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import (
     FakeCallSessionRepo,

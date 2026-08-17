@@ -19,18 +19,18 @@ import logging
 import asyncpg
 import httpx
 
-from api_gateway.app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
-from api_gateway.app.adapters.outbound.db.idempotency_repository import (
+from app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
+from app.adapters.outbound.db.idempotency_repository import (
     PostgresIdempotencyRepository,
 )
-from api_gateway.app.adapters.outbound.langflow.executor import LangflowExecutor
-from api_gateway.app.application.services.hmac_signing import sign
-from api_gateway.app.application.services.langflow_result import extract_text_from_langflow_result
-from api_gateway.app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
-from api_gateway.app.infrastructure.kafka_admin import ensure_topics_exist
+from app.adapters.outbound.langflow.executor import LangflowExecutor
+from app.application.services.hmac_signing import sign
+from app.application.services.langflow_result import extract_text_from_langflow_result
+from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.domain.models.message_envelope import MessageEnvelope
+from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("kafka.voice.worker")

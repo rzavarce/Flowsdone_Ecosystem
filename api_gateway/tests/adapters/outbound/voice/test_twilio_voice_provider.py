@@ -7,7 +7,7 @@ import json
 import pytest
 from twilio.request_validator import RequestValidator
 
-from api_gateway.app.adapters.outbound.voice.twilio_voice_provider import (
+from app.adapters.outbound.voice.twilio_voice_provider import (
     TwilioVoiceProviderAdapter,
 )
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from api_gateway.app.application.services.hmac_signing import sign, verify
+from app.application.services.hmac_signing import sign, verify
 
 
 def test_sign_is_deterministic_for_the_same_body_and_secret():

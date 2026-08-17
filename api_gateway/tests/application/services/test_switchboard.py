@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.application.services.switchboard import (
+from app.application.services.switchboard import (
     ChannelMessageNotRoutable,
     Switchboard,
     build_conversation_id,
 )
-from api_gateway.app.domain.ports.outbound.app_connector import AppTurnResult
+from app.domain.ports.outbound.app_connector import AppTurnResult
 from api_gateway.tests.support.fakes import (
     FakeAppConnector,
     FakeChannelConnectionRepo,

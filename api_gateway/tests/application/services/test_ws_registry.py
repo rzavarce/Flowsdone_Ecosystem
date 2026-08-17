@@ -6,7 +6,7 @@ from typing import Any, List
 
 import pytest
 
-from api_gateway.app.application.services.ws_registry import WSRegistry
+from app.application.services.ws_registry import WSRegistry
 
 pytestmark = pytest.mark.anyio
 

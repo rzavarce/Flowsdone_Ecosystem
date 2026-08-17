@@ -10,12 +10,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from api_gateway.app.domain.models.call_session import CallSession
-from api_gateway.app.domain.models.channel_app import ChannelApp
-from api_gateway.app.domain.models.channel_connection import ChannelConnection
-from api_gateway.app.domain.models.channel_resolution import ChannelResolution
-from api_gateway.app.domain.models.session import Session
-from api_gateway.app.domain.models.voice_relay_event import VoiceRelayEvent
+from app.domain.models.call_session import CallSession
+from app.domain.models.channel_app import ChannelApp
+from app.domain.models.channel_connection import ChannelConnection
+from app.domain.models.channel_resolution import ChannelResolution
+from app.domain.models.session import Session
+from app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -497,7 +497,7 @@ class FakeSwitchboard:
     async def handle_inbound_turn(self, **kwargs: Any) -> None:
         self.calls.append(kwargs)
         if self.not_routable:
-            from api_gateway.app.application.services.switchboard import (
+            from app.application.services.switchboard import (
                 ChannelMessageNotRoutable,
             )
 

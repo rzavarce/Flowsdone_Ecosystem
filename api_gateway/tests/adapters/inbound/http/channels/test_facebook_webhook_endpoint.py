@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.channels.facebook import router
+from app.adapters.inbound.http.channels.facebook import router
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import FakeChannelAppRepo, FakeSwitchboard
 

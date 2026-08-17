@@ -7,11 +7,11 @@ from uuid import uuid4
 
 import pytest
 
-from api_gateway.app.application.use_cases import handle_outbound_response as hor_module
-from api_gateway.app.application.use_cases.handle_outbound_response import (
+from app.application.use_cases import handle_outbound_response as hor_module
+from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope, MessageMeta
+from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 from api_gateway.tests.support.fakes import (
     FakeChannelConnectionRepo,

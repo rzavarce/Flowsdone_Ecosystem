@@ -536,6 +536,7 @@ services:
     ports:
       - "${API_PORT}:8000"
     volumes:
+      - ./app:/app/app
       - ./api_gateway:/app/api_gateway
     depends_on:
       postgres:

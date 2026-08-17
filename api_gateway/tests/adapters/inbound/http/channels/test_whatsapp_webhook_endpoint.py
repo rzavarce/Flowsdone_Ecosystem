@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.inbound.http.channels import whatsapp_evolution as module
-from api_gateway.app.adapters.inbound.http.channels.whatsapp_evolution import router
+from app.adapters.inbound.http.channels import whatsapp_evolution as module
+from app.adapters.inbound.http.channels.whatsapp_evolution import router
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import FakeSwitchboard
 

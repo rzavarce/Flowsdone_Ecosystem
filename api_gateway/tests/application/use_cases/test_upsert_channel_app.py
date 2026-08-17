@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from api_gateway.tests.support.fakes import FakeChannelAppRepo, FakeSecretGenerator
 
 pytestmark = pytest.mark.anyio

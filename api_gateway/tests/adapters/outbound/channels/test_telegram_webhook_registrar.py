@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.adapters.outbound.channels import telegram_webhook_registrar as module
-from api_gateway.app.adapters.outbound.channels.telegram_webhook_registrar import (
+from app.adapters.outbound.channels import telegram_webhook_registrar as module
+from app.adapters.outbound.channels.telegram_webhook_registrar import (
     TelegramWebhookRegistrar,
     TelegramWebhookRegistrationError,
 )

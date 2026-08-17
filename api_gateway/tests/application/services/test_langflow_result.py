@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from api_gateway.app.application.services.langflow_result import (
+from app.application.services.langflow_result import (
     extract_text_from_langflow_result,
 )
 

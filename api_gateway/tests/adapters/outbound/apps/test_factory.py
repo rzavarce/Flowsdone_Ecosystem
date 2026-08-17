@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from api_gateway.app.adapters.outbound.apps.factory import AppConnectorFactory
-from api_gateway.app.adapters.outbound.apps.langflow_app_connector import LangflowAppConnector
+from app.adapters.outbound.apps.factory import AppConnectorFactory
+from app.adapters.outbound.apps.langflow_app_connector import LangflowAppConnector
 
 
 def test_build_all_registers_langflow():
