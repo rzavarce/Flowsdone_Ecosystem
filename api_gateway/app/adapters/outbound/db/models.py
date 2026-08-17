@@ -177,3 +177,49 @@ class WorkflowExecutionModel(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SessionMessageModel(Base):
+    """Row for one turn of a Switchboard conversation - the durable,
+    append-only transcript (SessionRepositoryPort in Redis is the fast,
+    ephemeral counterpart, not the source of truth for history).
+    """
+
+    __tablename__ = "session_messages"
+    __table_args__ = (
+        CheckConstraint("direction IN ('inbound','outbound')", name="ck_session_messages_direction"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    direction: Mapped[str] = mapped_column(Text, nullable=False)
+    app: Mapped[str] = mapped_column(Text, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SessionEventModel(Base):
+    """Row for one Switchboard lifecycle event (session started, app
+    switched, session closed) - the audit trail of routing decisions.
+    """
+
+    __tablename__ = "session_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('started','app_switched','closed')", name="ck_session_events_event_type"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    from_app: Mapped[str | None] = mapped_column(Text, nullable=True)
+    to_app: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from .....application.services.switchboard import ChannelMessageNotRoutable
 from .....core.config import settings
 
 logger = logging.getLogger("channels.whatsapp_evolution")
@@ -74,23 +74,23 @@ async def receive_webhook(
     text = _extract_text(data.get("message") or {})
 
     if instance and remote_jid and text:
-        route_use_case = request.app.state.route_channel_message_use_case
-        await _route_event(route_use_case, instance, remote_jid, text, body)
+        switchboard = request.app.state.switchboard
+        await _route_event(switchboard, instance, remote_jid, text, body)
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     instance: str,
     remote_jid: str,
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
-    """Route a single WhatsApp message to its Langflow agent.
+    """Route a single WhatsApp message to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         instance (str): Evolution API instance name the message
             arrived on.
         remote_jid (str): WhatsApp id of the sender.
@@ -99,12 +99,13 @@ async def _route_event(
             in the payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=instance,
             external_conversation_key=remote_jid,
             sender_id=remote_jid,
-            payload={"message": text, "raw": raw_event},
+            message_text=text,
+            raw_payload=raw_event,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

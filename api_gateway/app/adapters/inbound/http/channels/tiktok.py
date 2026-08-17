@@ -10,7 +10,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from .....application.services.switchboard import ChannelMessageNotRoutable
 
 logger = logging.getLogger("channels.tiktok")
 
@@ -74,28 +74,28 @@ async def receive_webhook(request: Request) -> JSONResponse:
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 
     body = await request.json()
-    route_use_case = request.app.state.route_channel_message_use_case
+    switchboard = request.app.state.switchboard
 
     data = body.get("data") or {}
     open_id = data.get("open_id")
     text = data.get("message") or data.get("content")
 
     if open_id and text:
-        await _route_event(route_use_case, open_id, text, body)
+        await _route_event(switchboard, open_id, text, body)
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     open_id: str,
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
-    """Route a single TikTok message to its Langflow agent.
+    """Route a single TikTok message to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         open_id (str): TikTok open_id, used as both external_id and
             sender_id.
         text (str): Message text.
@@ -103,12 +103,13 @@ async def _route_event(
             payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=open_id,
             external_conversation_key=open_id,
             sender_id=open_id,
-            payload={"message": text, "raw": raw_event},
+            message_text=text,
+            raw_payload=raw_event,
         )
     except ChannelMessageNotRoutable:
         logger.warning("channels.tiktok.not_routable", extra={"open_id": open_id})

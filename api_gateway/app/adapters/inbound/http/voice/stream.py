@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from .....application.services.switchboard import ChannelMessageNotRoutable
 from .....domain.models.call_session import CallSession
 from .webhook import CHANNEL_TYPE
 
@@ -63,7 +63,7 @@ async def stream_endpoint(ws: WebSocket, call_sid: str) -> None:
     call_session_repo = ws.app.state.call_session_repo
     call_session_registry = ws.app.state.call_session_registry
     voice_provider = ws.app.state.voice_provider
-    route_use_case = ws.app.state.route_channel_message_use_case
+    switchboard = ws.app.state.switchboard
 
     session = await call_session_repo.get(call_sid)
     if session is None:
@@ -105,7 +105,7 @@ async def stream_endpoint(ws: WebSocket, call_sid: str) -> None:
                     await ws.send_json(end_frame)
                     break
 
-                await _route_turn(route_use_case, session, event.text, raw_frame)
+                await _route_turn(switchboard, session, event.text, raw_frame)
             elif event.type == "end":
                 break
 
@@ -117,28 +117,33 @@ async def stream_endpoint(ws: WebSocket, call_sid: str) -> None:
 
 
 async def _route_turn(
-    route_use_case: Any,
+    switchboard: Any,
     session: CallSession,
     text: str,
     raw_frame: Dict[str, Any],
 ) -> None:
-    """Route a single transcribed caller utterance to its Langflow agent.
+    """Route a single transcribed caller utterance to its currently
+    assigned app.
+
+    No `transport` to pick here: Switchboard's LangflowAppConnector
+    infers "kafka_voice" on its own from channel_type="voice" - voice
+    and every other channel go through the exact same call.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         session (CallSession): The call's session context.
         text (str): Transcribed caller speech.
         raw_frame (Dict[str, Any]): The raw provider frame, kept in the
             payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=session.to_number,
             external_conversation_key=session.call_sid,
             sender_id=session.from_number,
-            payload={"message": text, "raw": raw_frame},
-            transport="kafka_voice",
+            message_text=text,
+            raw_payload=raw_frame,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

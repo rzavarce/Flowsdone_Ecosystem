@@ -64,8 +64,11 @@ from .admin_repositories import (  # noqa: F401
     WorkflowConfigRepositoryPort,
 )
 
+from .app_connector import AppConnectorPort  # noqa: F401
 from .call_session_repository import CallSessionRepositoryPort  # noqa: F401
 from .channel_sender import ChannelSenderPort  # noqa: F401
 from .secret_generator import SecretGeneratorPort  # noqa: F401
+from .session_history_repository import SessionHistoryRepositoryPort  # noqa: F401
+from .session_repository import SessionRepositoryPort  # noqa: F401
 from .voice_provider import VoiceProviderPort  # noqa: F401
 from .webhook_registrar import WebhookRegistrarPort  # noqa: F401

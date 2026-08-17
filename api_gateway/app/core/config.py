@@ -44,6 +44,13 @@ class Settings(BaseModel):
     # the streaming WebSocket connects, shortly after this is written.
     CALL_SESSION_TTL_SECONDS: int = 7200
 
+    # Switchboard: how long a conversation Session survives in Redis
+    # between turns. Much longer than CALL_SESSION_TTL_SECONDS - a
+    # WhatsApp/Telegram conversation can resume hours later and should
+    # still count as "the same session" (same app, same variables),
+    # unlike a phone call.
+    SESSION_TTL_SECONDS: int = 86400
+
     # RabbitMQ
     ENABLE_RABBITMQ: bool = False
     RABBITMQ_URL: Optional[str] = None
@@ -151,6 +158,7 @@ settings = Settings(
     REDIS_PORT=int(os.getenv("REDIS_PORT", "6379")),
     REDIS_PASSWORD=os.getenv("REDIS_PASSWORD"),
     CALL_SESSION_TTL_SECONDS=int(os.getenv("CALL_SESSION_TTL_SECONDS", "7200")),
+    SESSION_TTL_SECONDS=int(os.getenv("SESSION_TTL_SECONDS", "86400")),
 
     ENABLE_RABBITMQ=_bool(os.getenv("ENABLE_RABBITMQ"), False),
     RABBITMQ_URL=os.getenv("RABBITMQ_URL"),

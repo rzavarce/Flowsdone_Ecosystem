@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from .....application.services.switchboard import ChannelMessageNotRoutable
 from .meta_common import handle_verification_challenge, verify_meta_signature
 
 logger = logging.getLogger("channels.facebook")
@@ -66,7 +66,7 @@ async def receive_webhook(request: Request) -> JSONResponse:
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 
     body = await request.json()
-    route_use_case = request.app.state.route_channel_message_use_case
+    switchboard = request.app.state.switchboard
 
     for entry in body.get("entry", []):
         page_id = entry.get("id")
@@ -78,7 +78,7 @@ async def receive_webhook(request: Request) -> JSONResponse:
             if not page_id or not sender_id or not text:
                 continue
 
-            await _route_event(route_use_case, page_id, sender_id, text, event)
+            await _route_event(switchboard, page_id, sender_id, text, event)
 
     # Meta expects 200 + this exact body whenever the signature is
     # valid, so it does not retry indefinitely over *our* routing
@@ -87,16 +87,16 @@ async def receive_webhook(request: Request) -> JSONResponse:
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     page_id: str,
     sender_id: str,
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
-    """Route a single Messenger message to its Langflow agent.
+    """Route a single Messenger message to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         page_id (str): Facebook page id the message was sent to.
         sender_id (str): Id of the sender (psid).
         text (str): Message text.
@@ -104,12 +104,13 @@ async def _route_event(
             payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=page_id,
             external_conversation_key=sender_id,
             sender_id=sender_id,
-            payload={"message": text, "raw": raw_event},
+            message_text=text,
+            raw_payload=raw_event,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

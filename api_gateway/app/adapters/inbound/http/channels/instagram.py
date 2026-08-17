@@ -8,7 +8,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse, PlainTextResponse
 
-from .....application.use_cases.route_channel_message import ChannelMessageNotRoutable
+from .....application.services.switchboard import ChannelMessageNotRoutable
 from .meta_common import handle_verification_challenge, verify_meta_signature
 
 logger = logging.getLogger("channels.instagram")
@@ -66,7 +66,7 @@ async def receive_webhook(request: Request) -> JSONResponse:
         return JSONResponse(status_code=401, content={"status": "invalid_signature"})
 
     body = await request.json()
-    route_use_case = request.app.state.route_channel_message_use_case
+    switchboard = request.app.state.switchboard
 
     for entry in body.get("entry", []):
         ig_account_id = entry.get("id")
@@ -78,22 +78,22 @@ async def receive_webhook(request: Request) -> JSONResponse:
             if not ig_account_id or not sender_id or not text:
                 continue
 
-            await _route_event(route_use_case, ig_account_id, sender_id, text, event)
+            await _route_event(switchboard, ig_account_id, sender_id, text, event)
 
     return JSONResponse(status_code=200, content={"status": "EVENT_RECEIVED"})
 
 
 async def _route_event(
-    route_use_case: Any,
+    switchboard: Any,
     ig_account_id: str,
     sender_id: str,
     text: str,
     raw_event: Dict[str, Any],
 ) -> None:
-    """Route a single Instagram DM to its Langflow agent.
+    """Route a single Instagram DM to its currently assigned app.
 
     Args:
-        route_use_case (Any): The RouteChannelMessageUseCase instance.
+        switchboard (Any): The Switchboard instance.
         ig_account_id (str): Instagram business account id the message
             was sent to.
         sender_id (str): Id of the sender.
@@ -102,12 +102,13 @@ async def _route_event(
             payload for debugging.
     """
     try:
-        await route_use_case.execute(
+        await switchboard.handle_inbound_turn(
             channel_type=CHANNEL_TYPE,
             external_id=ig_account_id,
             external_conversation_key=sender_id,
             sender_id=sender_id,
-            payload={"message": text, "raw": raw_event},
+            message_text=text,
+            raw_payload=raw_event,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

@@ -15,7 +15,7 @@ from api_gateway.app.adapters.inbound.http.voice.stream import (
 from api_gateway.app.application.services.ws_registry import WSRegistry
 from api_gateway.tests.support.fakes import (
     FakeCallSessionRepo,
-    FakeRouteChannelMessageUseCase,
+    FakeSwitchboard,
     FakeVoiceProvider,
     make_call_session,
 )
@@ -49,13 +49,13 @@ def test_prompt_frame_routes_the_transcribed_turn_to_the_voice_channel():
     call_session_repo = FakeCallSessionRepo(session=session)
     call_session_registry = WSRegistry()
     voice_provider = FakeVoiceProvider()
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
     client = _client(
         call_session_repo=call_session_repo,
         call_session_registry=call_session_registry,
         voice_provider=voice_provider,
-        route_channel_message_use_case=route_use_case,
+        switchboard=switchboard,
     )
 
     with client.websocket_connect("/voice/stream/CA123") as ws:
@@ -63,14 +63,13 @@ def test_prompt_frame_routes_the_transcribed_turn_to_the_voice_channel():
         ws.send_json({"type": "prompt", "callSid": "CA123", "voicePrompt": "hola, quiero soporte"})
         ws.send_json({"type": "end", "callSid": "CA123"})
 
-    assert len(route_use_case.calls) == 1
-    call = route_use_case.calls[0]
+    assert len(switchboard.calls) == 1
+    call = switchboard.calls[0]
     assert call["channel_type"] == "voice"
     assert call["external_id"] == "+15559998888"
     assert call["external_conversation_key"] == "CA123"
     assert call["sender_id"] == "+15550001111"
-    assert call["payload"]["message"] == "hola, quiero soporte"
-    assert call["transport"] == "kafka_voice"
+    assert call["message_text"] == "hola, quiero soporte"
     # The connection is unregistered and the session cleaned up once the
     # call ends, so a stray outbound response can no longer reach it.
     assert call_session_repo.deleted == ["CA123"]
@@ -89,13 +88,13 @@ def test_phrase_match_triggers_handoff_instead_of_routing_to_langflow():
     call_session_repo = FakeCallSessionRepo(session=session)
     call_session_registry = WSRegistry()
     voice_provider = FakeVoiceProvider()
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
     client = _client(
         call_session_repo=call_session_repo,
         call_session_registry=call_session_registry,
         voice_provider=voice_provider,
-        route_channel_message_use_case=route_use_case,
+        switchboard=switchboard,
     )
 
     with client.websocket_connect("/voice/stream/CA123") as ws:
@@ -106,7 +105,7 @@ def test_phrase_match_triggers_handoff_instead_of_routing_to_langflow():
         received = ws.receive_json()
 
     # No Langflow turn - the deterministic trigger short-circuits routing.
-    assert route_use_case.calls == []
+    assert switchboard.calls == []
     assert received["type"] == "end"
     handoff_data = json.loads(received["handoffData"])
     assert handoff_data == {
@@ -129,13 +128,13 @@ def test_non_matching_prompt_still_routes_normally_when_transfer_is_configured()
     call_session_repo = FakeCallSessionRepo(session=session)
     call_session_registry = WSRegistry()
     voice_provider = FakeVoiceProvider()
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
     client = _client(
         call_session_repo=call_session_repo,
         call_session_registry=call_session_registry,
         voice_provider=voice_provider,
-        route_channel_message_use_case=route_use_case,
+        switchboard=switchboard,
     )
 
     with client.websocket_connect("/voice/stream/CA123") as ws:
@@ -143,25 +142,25 @@ def test_non_matching_prompt_still_routes_normally_when_transfer_is_configured()
         ws.send_json({"type": "prompt", "callSid": "CA123", "voicePrompt": "cuanto cuesta el router"})
         ws.send_json({"type": "end", "callSid": "CA123"})
 
-    assert len(route_use_case.calls) == 1
-    assert route_use_case.calls[0]["payload"]["message"] == "cuanto cuesta el router"
+    assert len(switchboard.calls) == 1
+    assert switchboard.calls[0]["message_text"] == "cuanto cuesta el router"
 
 
 def test_unknown_call_sid_closes_the_connection_immediately():
     call_session_repo = FakeCallSessionRepo()
     call_session_registry = WSRegistry()
     voice_provider = FakeVoiceProvider()
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
     client = _client(
         call_session_repo=call_session_repo,
         call_session_registry=call_session_registry,
         voice_provider=voice_provider,
-        route_channel_message_use_case=route_use_case,
+        switchboard=switchboard,
     )
 
     with pytest.raises(Exception):
         with client.websocket_connect("/voice/stream/unknown-call") as ws:
             ws.receive_text()
 
-    assert route_use_case.calls == []
+    assert switchboard.calls == []

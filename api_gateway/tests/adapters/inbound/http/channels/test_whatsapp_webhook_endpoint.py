@@ -7,7 +7,7 @@ import pytest
 from api_gateway.app.adapters.inbound.http.channels import whatsapp_evolution as module
 from api_gateway.app.adapters.inbound.http.channels.whatsapp_evolution import router
 from api_gateway.tests.support.asgi import client_for_router
-from api_gateway.tests.support.fakes import FakeRouteChannelMessageUseCase
+from api_gateway.tests.support.fakes import FakeSwitchboard
 
 pytestmark = pytest.mark.anyio
 
@@ -31,9 +31,9 @@ def _upsert_event(**overrides):
 
 
 async def test_valid_apikey_routes_the_message():
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
-    async with client_for_router(router, route_channel_message_use_case=route_use_case) as client:
+    async with client_for_router(router, switchboard=switchboard) as client:
         response = await client.post(
             "/webhooks/whatsapp",
             headers={"apikey": "shared-evolution-key"},
@@ -41,29 +41,29 @@ async def test_valid_apikey_routes_the_message():
         )
 
     assert response.status_code == 200
-    assert len(route_use_case.calls) == 1
-    call = route_use_case.calls[0]
+    assert len(switchboard.calls) == 1
+    call = switchboard.calls[0]
     assert call["external_id"] == "instance-1"
     assert call["external_conversation_key"] == "5511999999999@s.whatsapp.net"
-    assert call["payload"]["message"] == "hola"
+    assert call["message_text"] == "hola"
 
 
 async def test_wrong_apikey_is_rejected():
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
-    async with client_for_router(router, route_channel_message_use_case=route_use_case) as client:
+    async with client_for_router(router, switchboard=switchboard) as client:
         response = await client.post(
             "/webhooks/whatsapp", headers={"apikey": "wrong"}, json=_upsert_event()
         )
 
     assert response.status_code == 401
-    assert route_use_case.calls == []
+    assert switchboard.calls == []
 
 
 async def test_non_upsert_event_is_ignored():
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
 
-    async with client_for_router(router, route_channel_message_use_case=route_use_case) as client:
+    async with client_for_router(router, switchboard=switchboard) as client:
         response = await client.post(
             "/webhooks/whatsapp",
             headers={"apikey": "shared-evolution-key"},
@@ -71,18 +71,18 @@ async def test_non_upsert_event_is_ignored():
         )
 
     assert response.status_code == 200
-    assert route_use_case.calls == []
+    assert switchboard.calls == []
 
 
 async def test_own_outgoing_message_is_ignored():
-    route_use_case = FakeRouteChannelMessageUseCase()
+    switchboard = FakeSwitchboard()
     event = _upsert_event()
     event["data"]["key"]["fromMe"] = True
 
-    async with client_for_router(router, route_channel_message_use_case=route_use_case) as client:
+    async with client_for_router(router, switchboard=switchboard) as client:
         response = await client.post(
             "/webhooks/whatsapp", headers={"apikey": "shared-evolution-key"}, json=event
         )
 
     assert response.status_code == 200
-    assert route_use_case.calls == []
+    assert switchboard.calls == []
