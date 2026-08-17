@@ -37,26 +37,33 @@ build-backend = "setuptools.build_meta"
 
 # Sin esto, setuptools intenta adivinar qué carpeta del repo es el
 # paquete instalable y encuentra varias candidatas en la raíz
-# (dockers/, postman/, workers/, volumes/, app/, api_gateway/) - falla
-# con "Multiple top-level packages discovered in a flat-layout". El
+# (dockers/, postman/, workers/, volumes/, api_gateway/) - falla con
+# "Multiple top-level packages discovered in a flat-layout". El
 # Dockerfile no lo sufre porque en ese build context solo existe
-# app/ + api_gateway/ + pyproject.toml (dockers/postman/workers/... no
-# se copian a la imagen), pero un checkout completo del repo (como el
+# api_gateway/ + pyproject.toml (dockers/postman/workers/... no se
+# copian a la imagen), pero un checkout completo del repo (como el
 # runner de GitHub Actions, o instalar en local desde la raíz) sí ve
 # todas las carpetas y necesita que se lo digamos explícito.
-#
-# El paquete de la aplicación es `app` (importado como `app.xxx` desde
-# cualquier lugar del repo, workers/ y tests/ incluidos); `api_gateway*`
-# solo se necesita instalado para que `api_gateway.tests` (el propio
-# paquete de tests) sea importable - ya no contiene código de la app.
 [tool.setuptools.packages.find]
-include = ["app*", "api_gateway*"]
+include = ["api_gateway*"]
 
+# El código de la app vive físicamente en api_gateway/app/, pero se
+# importa como `app.xxx` (sin el prefijo api_gateway) en TODO el repo
+# -código interno de app/, tests/ y workers/ por igual-, nunca mezclado
+# con `api_gateway.app.xxx`: el código interno de app/ no sabe por qué
+# nombre lo importaron, así que dos nombres para el mismo módulo
+# terminan cargándolo dos veces como clases distintas (roto isinstance/
+# validación Pydantic entre ambas copias). `pythonpath` agrega
+# api_gateway/ a sys.path para que pytest resuelva `app` como paquete
+# de primer nivel sin necesitar un segundo entry en packages.find;
+# Docker hace el equivalente vía PYTHONPATH en dockers/Dockerfile.api
+# y Dockerfile.worker.
 [tool.pytest.ini_options]
 testpaths = ["api_gateway/tests"]
+pythonpath = ["api_gateway"]
 
 [tool.coverage.run]
-source = ["app"]
+source = ["api_gateway/app"]
 branch = true
 
 [tool.coverage.report]

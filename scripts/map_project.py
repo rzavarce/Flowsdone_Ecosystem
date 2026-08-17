@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 App Complete Architecture Mapper
-Propósito: Listar de forma exhaustiva tanto carpetas como archivos dentro de 'app/'
+Propósito: Listar de forma exhaustiva tanto carpetas como archivos dentro de 'api_gateway/app/'
            para auditar capas, DTOs, schemas y casos de uso.
 Estilo: Clean Code, SOLID, Typed Python.
 """
@@ -11,7 +11,7 @@ from typing import Set
 
 
 class AppCompleteMapper:
-    def __init__(self, target_dir: str = "app", exclude_dirs: Set[str] = None, exclude_files: Set[str] = None):
+    def __init__(self, target_dir: str = "api_gateway/app", exclude_dirs: Set[str] = None, exclude_files: Set[str] = None):
         self.target_path = Path(target_dir).resolve()
         
         # Filtros de exclusión para mantener el mapa limpio y enfocado en código fuente
@@ -90,5 +90,5 @@ class AppCompleteMapper:
 if __name__ == "__main__":
     # Por defecto omite los __init__.py para no saturar la vista. 
     # Si deseas verlos, limpia el conjunto 'exclude_files' en la instanciación.
-    mapper = AppCompleteMapper(target_dir="./app")
+    mapper = AppCompleteMapper(target_dir="./api_gateway/app")
     mapper.analyze()
