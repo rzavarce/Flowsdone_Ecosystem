@@ -48,6 +48,23 @@ async def test_valid_apikey_routes_the_message():
     assert call["message_text"] == "hola"
 
 
+async def test_valid_apikey_in_body_routes_the_message():
+    """Some Evolution API configurations send apikey as a top-level
+    body field instead of (or in addition to) the "apikey" header -
+    seen in production with Evolution 2.3.5's global webhook.
+    """
+    switchboard = FakeSwitchboard()
+
+    async with client_for_router(router, switchboard=switchboard) as client:
+        response = await client.post(
+            "/webhooks/whatsapp",
+            json=_upsert_event(apikey="shared-evolution-key"),
+        )
+
+    assert response.status_code == 200
+    assert len(switchboard.calls) == 1
+
+
 async def test_wrong_apikey_is_rejected():
     switchboard = FakeSwitchboard()
 
