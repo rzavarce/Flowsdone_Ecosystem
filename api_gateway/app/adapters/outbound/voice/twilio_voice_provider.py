@@ -147,7 +147,9 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
         if frame_type == "dtmf":
             return VoiceRelayEvent(type="dtmf", call_sid=call_sid, text=raw.get("digit"), raw=raw)
 
-        logger.warning("channels.voice.twilio.unknown_frame_type", extra={"type": frame_type})
+        logger.warning(
+            "channels.voice.twilio.unknown_frame_type", extra={"type": frame_type, "raw": raw}
+        )
         raise ValueError(f"unsupported ConversationRelay frame type: {frame_type!r}")
 
     def build_relay_text_frame(self, *, text: str, last: bool = True) -> Dict[str, Any]:
