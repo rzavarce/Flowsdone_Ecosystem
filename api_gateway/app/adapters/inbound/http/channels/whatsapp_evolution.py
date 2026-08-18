@@ -48,17 +48,21 @@ async def receive_webhook(
 
     Args:
         request (Request): The incoming FastAPI request.
-        apikey (Optional[str]): Evolution API shared secret, validated
-            against settings.EVOLUTION_API_KEY.
+        apikey (Optional[str]): Evolution API shared secret, when sent
+            as a header. Some Evolution API configurations instead
+            embed it as a top-level "apikey" field in the JSON body -
+            both are accepted, validated against
+            settings.EVOLUTION_API_KEY.
 
     Returns:
         JSONResponse: Acknowledges the event.
     """
-    if not settings.EVOLUTION_API_KEY or apikey != settings.EVOLUTION_API_KEY:
+    body = await request.json()
+    received_key = apikey or body.get("apikey")
+
+    if not settings.EVOLUTION_API_KEY or received_key != settings.EVOLUTION_API_KEY:
         logger.warning("channels.whatsapp_evolution.invalid_api_key")
         return JSONResponse(status_code=401, content={"status": "invalid_api_key"})
-
-    body = await request.json()
 
     if body.get("event") != "messages.upsert":
         return JSONResponse(status_code=200, content={"status": "ignored"})
