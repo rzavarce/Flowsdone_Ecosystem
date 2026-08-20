@@ -271,6 +271,7 @@ async def lifespan(app: FastAPI):
         channel_senders=ChannelSenderFactory().build_all(
             call_session_registry=call_session_registry,
             voice_provider=app.state.voice_provider,
+            call_session_repo=app.state.call_session_repo,
         ),
         session_repo=session_repo,
         session_history_repo=session_history_repo,

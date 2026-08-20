@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from app.application.services.ws_registry import WSRegistry
-from app.domain.ports.outbound import ChannelSenderPort, VoiceProviderPort
+from app.domain.ports.outbound import CallSessionRepositoryPort, ChannelSenderPort, VoiceProviderPort
 from app.adapters.outbound.channels.facebook_sender import FacebookSender
 from app.adapters.outbound.channels.instagram_sender import InstagramSender
 from app.adapters.outbound.channels.telegram_sender import TelegramSender
@@ -26,6 +26,7 @@ class ChannelSenderFactory:
         *,
         call_session_registry: Optional[WSRegistry] = None,
         voice_provider: Optional[VoiceProviderPort] = None,
+        call_session_repo: Optional[CallSessionRepositoryPort] = None,
     ) -> Dict[str, ChannelSenderPort]:
         """Instantiate every supported channel sender.
 
@@ -37,6 +38,9 @@ class ChannelSenderFactory:
                 every ChannelType having a sender.
             voice_provider (Optional[VoiceProviderPort]): Voice
                 provider strategy, forwarded to TwilioVoiceSender.
+            call_session_repo (Optional[CallSessionRepositoryPort]):
+                Call session storage, forwarded to TwilioVoiceSender so
+                it can read the connection's `tts_language` config.
 
         Returns:
             Dict[str, ChannelSenderPort]: A dict mapping each supported
@@ -50,6 +54,8 @@ class ChannelSenderFactory:
             "twitter": TwitterSender(),
             "tiktok": TikTokSender(),
             "voice": TwilioVoiceSender(
-                call_session_registry=call_session_registry, voice_provider=voice_provider
+                call_session_registry=call_session_registry,
+                voice_provider=voice_provider,
+                call_session_repo=call_session_repo,
             ),
         }

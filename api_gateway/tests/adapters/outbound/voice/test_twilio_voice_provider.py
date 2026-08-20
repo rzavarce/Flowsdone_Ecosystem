@@ -101,6 +101,63 @@ def test_build_twiml_connect_omits_action_when_not_given():
     assert "action=" not in twiml
 
 
+def test_build_twiml_connect_embeds_welcome_greeting_when_given():
+    provider = TwilioVoiceProviderAdapter()
+
+    twiml = provider.build_twiml_connect(
+        stream_url="wss://platform.flowsdone.com/voice/stream/CA123",
+        welcome_greeting="Hola, gracias por llamar, ¿en qué te puedo ayudar?",
+    )
+
+    assert 'welcomeGreeting="Hola, gracias por llamar, ¿en qué te puedo ayudar?"' in twiml
+
+
+def test_build_twiml_connect_omits_welcome_greeting_when_not_given():
+    provider = TwilioVoiceProviderAdapter()
+
+    twiml = provider.build_twiml_connect(stream_url="wss://platform.flowsdone.com/voice/stream/CA123")
+
+    assert "welcomeGreeting=" not in twiml
+
+
+def test_build_twiml_connect_embeds_tts_language_independently_of_language():
+    provider = TwilioVoiceProviderAdapter()
+
+    twiml = provider.build_twiml_connect(
+        stream_url="wss://platform.flowsdone.com/voice/stream/CA123",
+        tts_language="multi",
+    )
+
+    assert 'ttsLanguage="multi"' in twiml
+    # The plain `language` attribute (combined STT+TTS, see README
+    # warning) must stay absent - only `ttsLanguage` was set above.
+    assert 'language="' not in twiml
+
+
+def test_build_twiml_connect_omits_tts_language_when_not_given():
+    provider = TwilioVoiceProviderAdapter()
+
+    twiml = provider.build_twiml_connect(stream_url="wss://platform.flowsdone.com/voice/stream/CA123")
+
+    assert "ttsLanguage=" not in twiml
+
+
+def test_build_relay_text_frame_includes_lang_when_given():
+    provider = TwilioVoiceProviderAdapter()
+
+    frame = provider.build_relay_text_frame(text="hola", lang="multi")
+
+    assert frame == {"type": "text", "token": "hola", "last": True, "lang": "multi"}
+
+
+def test_build_relay_text_frame_omits_lang_when_not_given():
+    provider = TwilioVoiceProviderAdapter()
+
+    frame = provider.build_relay_text_frame(text="hola")
+
+    assert "lang" not in frame
+
+
 def test_build_relay_end_frame_json_encodes_handoff_data():
     provider = TwilioVoiceProviderAdapter()
 

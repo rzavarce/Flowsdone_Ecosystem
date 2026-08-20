@@ -50,10 +50,12 @@ class VoiceProviderPort(Protocol):
         voice: Optional[str] = None,
         language: Optional[str] = None,
         tts_provider: Optional[str] = None,
+        tts_language: Optional[str] = None,
         transcription_language: Optional[str] = None,
         transcription_provider: Optional[str] = None,
         speech_model: Optional[str] = None,
         action_url: Optional[str] = None,
+        welcome_greeting: Optional[str] = None,
     ) -> str:
         """Build the call-control markup that connects the call to our
         real-time streaming WebSocket endpoint.
@@ -69,8 +71,16 @@ class VoiceProviderPort(Protocol):
             tts_provider (Optional[str]): Which TTS engine to use, if
                 the voice provider supports more than one. None uses
                 the provider's own default.
+            tts_language (Optional[str]): BCP-47 language for
+                text-to-speech only, independent of `language`
+                (e.g. "es-MX", or "multi" for automatic per-response
+                language detection - only supported by some TTS
+                providers, e.g. ElevenLabs; see README section 18).
+                None uses the provider's own default.
             transcription_language (Optional[str]): BCP-47 language for
-                speech-to-text only (e.g. "es-MX"). None uses the
+                speech-to-text only (e.g. "es-MX", or "multi" for
+                automatic language detection - only supported by some
+                transcription providers, e.g. Deepgram). None uses the
                 provider's own default (which may not match the
                 caller's language - see README section 18).
             transcription_provider (Optional[str]): Which STT engine to
@@ -81,6 +91,10 @@ class VoiceProviderPort(Protocol):
                 calls with fresh call-control instructions once the
                 streaming session ends (human handoff/transfer). None
                 skips this - the call just ends when the session does.
+            welcome_greeting (Optional[str]): Sentence the provider
+                speaks automatically as soon as the session connects,
+                before the caller says anything. None leaves the
+                caller to speak first (the provider's own default).
 
         Returns:
             str: The response body to return to the provider's webhook
@@ -99,7 +113,9 @@ class VoiceProviderPort(Protocol):
         """
         ...
 
-    def build_relay_text_frame(self, *, text: str, last: bool = True) -> Dict[str, Any]:
+    def build_relay_text_frame(
+        self, *, text: str, last: bool = True, lang: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Build the outbound WebSocket frame that makes the provider
         speak `text` back to the caller.
 
@@ -108,6 +124,11 @@ class VoiceProviderPort(Protocol):
             last (bool): Whether this is the final chunk of the
                 response (providers that support incremental token
                 streaming use this to know when to start speaking).
+            lang (Optional[str]): Per-message language override (e.g.
+                "multi" to have a provider that supports it, such as
+                ElevenLabs, detect this response's language from
+                `text` itself). None uses the session's configured
+                language.
 
         Returns:
             Dict[str, Any]: The frame to send on the streaming
