@@ -853,6 +853,39 @@ curl -X PATCH http://localhost:8000/internal/admin/channel-connections/<id> \
 
 ⚠️ **No mandes `language` salvo que también configures transcripción (STT).** Twilio trata `language` como un set todo-o-nada: si lo definís, exige que `transcriptionProvider`/`speechModel` también estén presentes, o rechaza la llamada entera con el error [64101](https://www.twilio.com/docs/errors/64101) ("Incomplete value set..."), que se manifiesta como una llamada que corta sola con un mensaje en inglés que Twilio inyecta. Para solo cambiar la voz/acento, alcanza con `voice` + `tts_provider`.
 
+### Multi-idioma (mismo número, cualquier idioma)
+
+Si el mismo número recibe llamadas en distintos idiomas, no hay forma de fijar `voice`/`language`/`transcription_language` de antemano — hace falta detección automática. ConversationRelay la soporta nativamente (sin lógica de detección de idioma en nuestro código), pero solo con proveedores específicos:
+
+- **STT (lo que dice el caller):** `transcription_provider: "Deepgram"` + `transcription_language: "multi"` — Twilio detecta el idioma hablado.
+- **TTS (lo que dice el bot):** `tts_provider: "ElevenLabs"` + `tts_language: "multi"` — el WS manda `lang: "multi"` en cada frame de texto (`TwilioVoiceSender`, automático si el config tiene esto puesto) y ElevenLabs detecta el idioma de la respuesta turno a turno.
+
+```bash
+curl -X PATCH http://localhost:8000/internal/admin/channel-connections/<id> \
+  -H "X-Admin-Api-Key: $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{
+        "config": {
+          "provider": "twilio",
+          "transcription_provider": "Deepgram",
+          "transcription_language": "multi",
+          "tts_provider": "ElevenLabs",
+          "tts_language": "multi"
+        }
+      }'
+```
+
+⚠️ Ata la conexión a Deepgram + ElevenLabs como proveedores — no es compatible con Amazon/Google (no entienden `"multi"`), y ElevenLabs suele costar más por minuto que Polly. `tts_language` es independiente del atributo `language` combinado (no dispara el error 64101 de la sección anterior).
+
+### Saludo inicial
+
+Por defecto el bot espera a que el caller hable primero. Para que salude apenas conecta la llamada, `ChannelConnection.config` acepta `welcome_greeting` — se pasa directo como `welcomeGreeting` del `<ConversationRelay>`, así que Twilio lo sintetiza y lo dice de una sin esperar ningún round-trip a Langflow:
+
+```bash
+curl -X PATCH http://localhost:8000/internal/admin/channel-connections/<id> \
+  -H "X-Admin-Api-Key: $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"config": {"provider": "twilio", "welcome_greeting": "Hola, gracias por llamar, ¿en qué te puedo ayudar?"}}'
+```
+
 ### Transferencia a un agente humano ("handoff")
 
 Requisito legal habitual: siempre ofrecer la opción de hablar con una persona. Se implementa con el mecanismo de **handoff** de ConversationRelay — no es la app la que controla la llamada telefónica directamente, sino que le devolvemos el control a Twilio para que haga un `<Dial>` a otro número:

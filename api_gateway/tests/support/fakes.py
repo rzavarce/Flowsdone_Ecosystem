@@ -267,10 +267,12 @@ class FakeVoiceProvider:
         voice: Optional[str] = None,
         language: Optional[str] = None,
         tts_provider: Optional[str] = None,
+        tts_language: Optional[str] = None,
         transcription_language: Optional[str] = None,
         transcription_provider: Optional[str] = None,
         speech_model: Optional[str] = None,
         action_url: Optional[str] = None,
+        welcome_greeting: Optional[str] = None,
     ) -> str:
         self.built_twiml_for.append(stream_url)
         self.built_twiml_calls.append(
@@ -279,10 +281,12 @@ class FakeVoiceProvider:
                 "voice": voice,
                 "language": language,
                 "tts_provider": tts_provider,
+                "tts_language": tts_language,
                 "transcription_language": transcription_language,
                 "transcription_provider": transcription_provider,
                 "speech_model": speech_model,
                 "action_url": action_url,
+                "welcome_greeting": welcome_greeting,
             }
         )
         return f'<Response><Connect><ConversationRelay url="{stream_url}"/></Connect></Response>'
@@ -296,8 +300,12 @@ class FakeVoiceProvider:
             )
         return VoiceRelayEvent(type=frame_type, call_sid=call_sid, raw=raw)
 
-    def build_relay_text_frame(self, *, text: str, last: bool = True) -> Dict[str, Any]:
-        frame = {"type": "text", "token": text, "last": last}
+    def build_relay_text_frame(
+        self, *, text: str, last: bool = True, lang: Optional[str] = None
+    ) -> Dict[str, Any]:
+        frame: Dict[str, Any] = {"type": "text", "token": text, "last": last}
+        if lang:
+            frame["lang"] = lang
         self.built_frames.append(frame)
         return frame
 

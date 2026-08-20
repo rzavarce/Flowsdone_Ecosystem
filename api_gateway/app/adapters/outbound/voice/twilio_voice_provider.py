@@ -61,10 +61,12 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
         voice: Optional[str] = None,
         language: Optional[str] = None,
         tts_provider: Optional[str] = None,
+        tts_language: Optional[str] = None,
         transcription_language: Optional[str] = None,
         transcription_provider: Optional[str] = None,
         speech_model: Optional[str] = None,
         action_url: Optional[str] = None,
+        welcome_greeting: Optional[str] = None,
     ) -> str:
         """Build the TwiML that connects the call to our ConversationRelay
         streaming WebSocket endpoint.
@@ -88,6 +90,13 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
             tts_provider (Optional[str]): Twilio TTS engine (e.g.
                 "Google", "ElevenLabs", "Amazon"). None uses Twilio's
                 default.
+            tts_language (Optional[str]): TTS-only language,
+                independent of `language` above - does not trigger the
+                combined STT+TTS requirement. "multi" auto-detects the
+                response's language per message (ElevenLabs only; must
+                be paired with sending `lang="multi"` on each "text"
+                frame, see TwilioVoiceSender). None uses Twilio's
+                default.
             transcription_language (Optional[str]): BCP-47 language for
                 speech-to-text only (e.g. "es-MX"). Twilio's own
                 default is en-US regardless of what language the agent
@@ -101,6 +110,10 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
                 handoffData for a human transfer). None omits the
                 `action` attribute - the call just ends with the
                 session.
+            welcome_greeting (Optional[str]): Sentence Twilio speaks
+                automatically the moment the session connects, before
+                the caller says anything. None leaves the caller to
+                speak first (Twilio's own default).
 
         Returns:
             str: The TwiML XML document to return to Twilio's webhook.
@@ -112,9 +125,11 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
             voice=voice,
             language=language,
             tts_provider=tts_provider,
+            tts_language=tts_language,
             transcription_language=transcription_language,
             transcription_provider=transcription_provider,
             speech_model=speech_model,
+            welcome_greeting=welcome_greeting,
         )
         response.append(connect)
         return str(response)
@@ -152,7 +167,9 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
         )
         raise ValueError(f"unsupported ConversationRelay frame type: {frame_type!r}")
 
-    def build_relay_text_frame(self, *, text: str, last: bool = True) -> Dict[str, Any]:
+    def build_relay_text_frame(
+        self, *, text: str, last: bool = True, lang: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Build the ConversationRelay "text" frame that makes Twilio
         speak `text` to the caller.
 
@@ -160,12 +177,19 @@ class TwilioVoiceProviderAdapter(VoiceProviderPort):
             text (str): Text for Twilio to synthesize as speech.
             last (bool): Whether this is the final chunk of the
                 response.
+            lang (Optional[str]): Per-message language override, e.g.
+                "multi" so ElevenLabs detects this response's language
+                from `text` itself. None omits the field, using the
+                session's configured TTS language.
 
         Returns:
             Dict[str, Any]: The frame to send on the ConversationRelay
             WebSocket.
         """
-        return {"type": "text", "token": text, "last": last}
+        frame: Dict[str, Any] = {"type": "text", "token": text, "last": last}
+        if lang:
+            frame["lang"] = lang
+        return frame
 
     def build_relay_end_frame(self, *, handoff_data: Dict[str, Any]) -> Dict[str, Any]:
         """Build the ConversationRelay "end" frame that hands the call

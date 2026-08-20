@@ -60,7 +60,12 @@ async def test_valid_call_returns_twiml_and_saves_a_call_session():
 
 async def test_valid_call_passes_the_connections_voice_config_through_to_the_provider():
     resolution = make_channel_resolution(
-        channel_type="voice", config={"voice": "Google.es-US-Neural2-A", "language": "es-MX"}
+        channel_type="voice",
+        config={
+            "voice": "Google.es-US-Neural2-A",
+            "language": "es-MX",
+            "tts_language": "multi",
+        },
     )
     conn_repo = FakeChannelConnectionRepo(resolution=resolution)
     app_repo = FakeChannelAppRepo(channel_app=_channel_app())
@@ -80,6 +85,34 @@ async def test_valid_call_passes_the_connections_voice_config_through_to_the_pro
 
     assert voice_provider.built_twiml_calls[0]["voice"] == "Google.es-US-Neural2-A"
     assert voice_provider.built_twiml_calls[0]["language"] == "es-MX"
+    assert voice_provider.built_twiml_calls[0]["tts_language"] == "multi"
+
+
+async def test_valid_call_passes_the_welcome_greeting_through_to_the_provider():
+    resolution = make_channel_resolution(
+        channel_type="voice",
+        config={"welcome_greeting": "Hola, gracias por llamar, ¿en qué te puedo ayudar?"},
+    )
+    conn_repo = FakeChannelConnectionRepo(resolution=resolution)
+    app_repo = FakeChannelAppRepo(channel_app=_channel_app())
+    call_session_repo = FakeCallSessionRepo()
+    voice_provider = FakeVoiceProvider(signature_valid=True)
+
+    async with client_for_router(
+        router,
+        channel_connection_repo=conn_repo,
+        channel_app_repo=app_repo,
+        call_session_repo=call_session_repo,
+        voice_provider=voice_provider,
+    ) as client:
+        await client.post(
+            "/webhooks/voice", data=CALL_PARAMS, headers={"X-Twilio-Signature": "sig"}
+        )
+
+    assert (
+        voice_provider.built_twiml_calls[0]["welcome_greeting"]
+        == "Hola, gracias por llamar, ¿en qué te puedo ayudar?"
+    )
 
 
 async def test_valid_call_requests_an_action_url_when_human_transfer_is_configured():

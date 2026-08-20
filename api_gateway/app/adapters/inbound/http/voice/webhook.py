@@ -150,9 +150,11 @@ async def receive_call(request: Request) -> Response:
         voice=voice_config.get("voice"),
         language=voice_config.get("language"),
         tts_provider=voice_config.get("tts_provider"),
+        tts_language=voice_config.get("tts_language"),
         transcription_language=voice_config.get("transcription_language"),
         transcription_provider=voice_config.get("transcription_provider"),
         speech_model=voice_config.get("speech_model"),
         action_url=action_url,
+        welcome_greeting=voice_config.get("welcome_greeting"),
     )
     return Response(content=twiml, media_type="application/xml")
