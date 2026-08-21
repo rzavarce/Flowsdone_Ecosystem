@@ -450,6 +450,14 @@ services:
       LANGFLOW_DATABASE_URL: ${LANGFLOW_DATABASE_URL}   # ← NUEVO
       LANGFLOW_COMPONENTS_PATH: /app/langflow/components
       LANGFLOW_LOG_LEVEL: ${LANGFLOW_LOG_LEVEL:-info}
+      # Para el agente de onboarding interno (tool provision_client):
+      # llama de vuelta al admin API del gateway para crear tenant/
+      # project/agent/channel_connection. Mismo patron que n8n usa para
+      # llamar a Langflow (LANGFLOW_BASE_URL/LANGFLOW_API_KEY, seccion 13
+      # del README) - la tool lee esto via os.environ, nunca hardcodeado
+      # en el flow.
+      GATEWAY_INTERNAL_URL: ${GATEWAY_INTERNAL_URL}
+      GATEWAY_ADMIN_API_KEY: ${ADMIN_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy          # ← NUEVO

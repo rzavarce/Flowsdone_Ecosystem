@@ -1058,3 +1058,22 @@ HandleOutboundResponseUseCase.deliver()  (llamado por /internal/outbound, sin ca
 - Endpoint HTTP para invocar `switch_app()` — no tiene sentido exponerlo con un solo conector registrado; llega junto con el segundo.
 - Cualquier motor de disparo automático de conmutación (por frase, por intención, por regla) — esta feature es solo la infraestructura de conmutación, no el "cuándo".
 
+---
+
+## 21. Agente de onboarding interno (Langflow → admin API)
+
+Herramienta de uso interno (equipo Flowsdone, no cliente final): un agente de Langflow que da de alta un cliente nuevo — tenant, project, agent y channel_connection — conversando, en vez de llamar al admin API (sección 8) a mano con curl/Postman. El flow en sí **no vive en este repo** (es contenido de Langflow, se administra desde su propia UI/DB); lo único que este repo aporta es la conexión de vuelta hacia el gateway que ese flow necesita para funcionar.
+
+**Cómo llama de vuelta al admin API:** el flow tiene una tool `provision_client` (componente `PythonCodeStructuredTool`) que ejecuta, en orden, `POST /tenants` → `/projects` → `/agents` → `/channel-connections` (sección 8), pasando el `id` de cada paso al siguiente. El código de la tool lee `GATEWAY_INTERNAL_URL` y `GATEWAY_ADMIN_API_KEY` vía `os.environ` en vez de tener la key hardcodeada en el flow — mismo patrón que ya usa n8n para llamar a Langflow (`LANGFLOW_BASE_URL`/`LANGFLOW_API_KEY`, sección 13). Ambas variables se inyectan al contenedor `langflow` en `docker-compose.yml`.
+
+⚠️ `GATEWAY_ADMIN_API_KEY` (= `ADMIN_API_KEY`) es una única credencial con poder total sobre cualquier tenant/proyecto/agente/canal de la plataforma — no hay hoy un mecanismo de API key con permisos acotados. Este agente asume uso estrictamente interno; si en algún momento se expone a alguien fuera del equipo, hace falta acotar el alcance de esa key antes.
+
+### Variables de entorno nuevas
+
+| Variable | Para qué |
+|---|---|
+| `GATEWAY_INTERNAL_URL` | Ya existía (la usan los workers para `/internal/outbound`) — reusada acá para que la tool del agente llegue al gateway. |
+| `GATEWAY_ADMIN_API_KEY` | Mismo valor que `ADMIN_API_KEY`, inyectado al contenedor `langflow` bajo otro nombre para que la tool distinga "credencial que uso para llamarme a mí mismo" del resto de la config de Langflow. |
+
+Tras actualizar `docker-compose.yml`, hace falta `docker compose up -d langflow` para que el contenedor tome las variables nuevas.
+
