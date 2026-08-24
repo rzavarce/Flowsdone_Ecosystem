@@ -44,7 +44,9 @@
            + location.host
            + '/ws',
 
-      workflowId: params.get("workflow_id") || selected.workflowId,
+      // Acepta workflow_id o workflowId en la URL (mismo valor, dos
+      // grafías) - si no se pasa ninguno, cae al default de CASES.
+      workflowId: params.get("workflow_id") || params.get("workflowId") || selected.workflowId,
       conversationId: conversationId,
       userId: "anonymous",
 
