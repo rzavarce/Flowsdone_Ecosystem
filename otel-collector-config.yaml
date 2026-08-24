@@ -27,7 +27,10 @@ receivers:
     start_at: beginning
     include_file_path: true
     operators:
-      # Cada línea del driver json-file de Docker es un JSON: {"log":"...","stream":"stdout|stderr","time":"..."}
+      # Cada línea del driver json-file de Docker es un JSON:
+      # {"log":"...","stream":"stdout|stderr","time":"...","attrs":{"com.docker.compose.service":"..."}}
+      # El campo "attrs" existe porque docker-compose.yml define
+      # logging.options.labels: com.docker.compose.service en el anchor &common.
       - type: json_parser
         parse_to: attributes
         on_error: send
@@ -35,12 +38,77 @@ receivers:
         from: attributes.log
         to: body
         if: attributes.log != nil
+
+      # Promovemos el nombre del servicio a resource attribute: lo usa el
+      # exporter de OpenSearch para enrutar cada log al índice de su servicio.
+      - type: move
+        from: attributes.attrs["com.docker.compose.service"]
+        to: resource["service.name"]
+        if: attributes.attrs != nil && attributes.attrs["com.docker.compose.service"] != nil
+      - type: remove
+        field: attributes.attrs
+        if: attributes.attrs != nil
+
+      # Severidad base según el stream (stdout/stderr). Es solo un fallback:
+      # si más abajo logramos parsear el nivel real del log, lo pisa.
       - type: severity_parser
         parse_from: attributes.stream
         if: attributes.stream != nil
         mapping:
           error: stderr
           info: stdout
+
+      # La mayoría de nuestros servicios loguean JSON estructurado. Si el body
+      # parsea como JSON, buscamos el nivel real ahí (Python logging usa
+      # "levelname", la mayoría del resto usa "level").
+      - type: json_parser
+        parse_from: body
+        parse_to: attributes.body_json
+        on_error: send_quiet
+      - type: severity_parser
+        parse_from: attributes.body_json.levelname
+        if: attributes.body_json != nil && attributes.body_json.levelname != nil
+        mapping:
+          debug: DEBUG
+          info: INFO
+          warn: WARNING
+          error: ERROR
+          fatal: [CRITICAL, FATAL]
+      - type: severity_parser
+        parse_from: attributes.body_json.level
+        if: attributes.body_json != nil && attributes.body_json.level != nil
+        mapping:
+          debug: [debug, DEBUG]
+          info: [info, INFO]
+          warn: [warn, warning, WARN, WARNING]
+          error: [error, ERROR]
+          fatal: [critical, CRITICAL, fatal, FATAL]
+
+      # Si el body no es JSON (nginx, uvicorn, etc.), buscamos la palabra de
+      # nivel en el texto plano.
+      - type: regex_parser
+        parse_from: body
+        parse_to: attributes.plain_level
+        if: attributes.body_json == nil
+        regex: '(?i)\b(?P<level>CRITICAL|FATAL|ERROR|WARN(?:ING)?|INFO|DEBUG)\b'
+        on_error: send_quiet
+      - type: severity_parser
+        parse_from: attributes.plain_level.level
+        if: attributes.plain_level != nil && attributes.plain_level.level != nil
+        mapping:
+          debug: DEBUG
+          info: INFO
+          warn: [WARN, WARNING]
+          error: ERROR
+          fatal: [CRITICAL, FATAL]
+
+      - type: remove
+        field: attributes.body_json
+        if: attributes.body_json != nil
+      - type: remove
+        field: attributes.plain_level
+        if: attributes.plain_level != nil
+
       - type: time_parser
         parse_from: attributes.time
         layout_type: gotime
@@ -76,6 +144,13 @@ exporters:
         insecure_skip_verify: true
       auth:
         authenticator: basicauth/opensearch
+    # Un índice por servicio del compose (resource["service.name"], ver
+    # filelog/docker). Si algún log llega sin la label (no debería, la label
+    # se setea globalmente en &common), cae en logs-unknown-service.
+    logs_index: "logs-%{service.name}"
+    logs_index_fallback: "unknown-service"
+    mapping:
+      mode: ss4o
     timeout: 10s
 
   # Trazas de cualquier servicio instrumentado con OTLP (api_gateway, workers,
