@@ -103,3 +103,42 @@ async def test_channel_without_registrar_updates_freely():
     result = await use_case.execute(connection.id, credentials={"a": 2})
 
     assert result.credentials == {"a": 2}
+
+
+async def test_config_update_merges_onto_existing_config_instead_of_replacing_it():
+    connection = make_channel_connection(
+        channel_type="voice",
+        config={"provider": "twilio", "voice": "Polly.Mia-Neural", "tts_provider": "Amazon"},
+    )
+    use_case, repo, _ = _build_use_case(connection)
+
+    result = await use_case.execute(connection.id, config={"welcome_greeting": "Hola!"})
+
+    assert result.config == {
+        "provider": "twilio",
+        "voice": "Polly.Mia-Neural",
+        "tts_provider": "Amazon",
+        "welcome_greeting": "Hola!",
+    }
+
+
+async def test_config_update_overrides_a_key_already_present():
+    connection = make_channel_connection(
+        channel_type="voice", config={"provider": "twilio", "voice": "Polly.Andres-Neural"}
+    )
+    use_case, repo, _ = _build_use_case(connection)
+
+    result = await use_case.execute(connection.id, config={"voice": "Polly.Mia-Neural"})
+
+    assert result.config == {"provider": "twilio", "voice": "Polly.Mia-Neural"}
+
+
+async def test_update_without_touching_config_leaves_it_unchanged():
+    connection = make_channel_connection(
+        channel_type="voice", config={"provider": "twilio", "voice": "Polly.Mia-Neural"}
+    )
+    use_case, repo, _ = _build_use_case(connection)
+
+    result = await use_case.execute(connection.id, display_name="new name")
+
+    assert result.config == {"provider": "twilio", "voice": "Polly.Mia-Neural"}
