@@ -806,6 +806,8 @@ curl -s -X PUT http://localhost:8000/internal/admin/channel-apps/twilio \
 # 3. Conexión del número (el número específico, como la instance de Evolution o el bot_token
 #    de Telegram). `config.provider` es quién implementa VoiceProviderPort para este número —
 #    hoy solo "twilio", pero deja la puerta abierta a otro proveedor de voz sin tocar el resto.
+#    transcription_provider/transcription_language son OBLIGATORIOS EN LA PRÁCTICA - ver el
+#    aviso justo abajo antes de omitirlos.
 curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
   -H "X-Admin-Api-Key: $KEY" -H "Content-Type: application/json" \
   -d '{
@@ -813,12 +815,18 @@ curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
         "agent_id":"<agent_id>",
         "channel_type":"voice",
         "external_id":"+1XXXXXXXXXX",
-        "config":{"provider":"twilio"}
+        "config":{
+          "provider":"twilio",
+          "transcription_provider":"Google",
+          "transcription_language":"es-MX"
+        }
       }'
 
 # 4. En la consola de Twilio (o vía API), configurar el Voice Webhook del número:
 #    https://<PUBLIC_BASE_URL>/webhooks/voice  (POST)
 ```
+
+⚠️ **`transcription_provider` (y por lo tanto `transcription_language`) no son realmente opcionales, pese a que el código los trata como tal.** Dejar ambos sin especificar, para que ConversationRelay use "su propio default" (como dice la documentación de Twilio), produce un fallo silencioso: la llamada conecta, el `<Connect>` funciona, `setup` llega bien por el WebSocket - pero Twilio **nunca manda un solo frame `prompt`**, sin importar cuánto hable el caller. Sin error, sin frame `error`, sin nada que loguear: la sesión queda completamente muda hasta que el caller corta. Confirmado en producción (2026-08-24) con una cuenta activa y con saldo - no es un tema de plan/trial. Forzar `transcription_provider: "Google"` (o `"Deepgram"` para el modo multi-idioma, sección más abajo) resolvió el problema. Hasta no entender la causa raíz del lado de Twilio, tratá esta clave como obligatoria en cualquier `channel_connection` de voz nueva.
 
 `config` acepta más claves opcionales, sin volver a tocar código: `voice`/`tts_provider` (personalizar la voz TTS, ver más abajo) y `human_transfer_number`/`human_transfer_phrases` (transferencia a un agente humano, ver más abajo).
 
@@ -928,6 +936,7 @@ Si `human_transfer_number` no está configurado, el `<Connect>` inicial no lleva
 - **DLQ de `VOICE_KAFKA_TOPIC` no implementada** — mismo estado que `DLQ_TOPIC` del resto del gateway (el topic se crea pero nada publica ahí todavía).
 - **Sin eventos de control de llamada** (call_started/ended, DTMF) como topic/analítica separada — queda para una iteración futura si hace falta.
 - **Detección de frases de transferencia sin normalización** — substring plano en minúsculas, sin manejo de acentos/tildes ni fuzzy matching. Si el STT transcribe "quiero hablar con una persona" con alguna variación no cubierta en `human_transfer_phrases`, no dispara. Complementarlo con detección por DTMF ("marcar 0") es una opción más robusta, no implementada todavía.
+- **`transcription_provider` sin configurar deja la sesión muda, sin ningún error** — ver el aviso en "Puesta en marcha" más arriba. Causa raíz del lado de Twilio no identificada (no tenemos Voice Insights pago para verla); tratalo como obligatorio hasta que se entienda mejor.
 
 ---
 
