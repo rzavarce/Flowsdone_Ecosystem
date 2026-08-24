@@ -86,6 +86,20 @@ async def stream_endpoint(ws: WebSocket, call_sid: str) -> None:
                 )
                 continue
 
+            # Every frame Twilio sends, including setup/interrupt/dtmf and
+            # prompts with no text - without this, a session that never
+            # produces a usable "prompt" (e.g. STT detects nothing) leaves
+            # zero trace in the logs, indistinguishable from the WS never
+            # receiving anything at all.
+            logger.info(
+                "channels.voice.stream.frame_received",
+                extra={
+                    "call_sid": call_sid,
+                    "frame_type": event.type,
+                    "has_text": bool(event.text),
+                },
+            )
+
             if event.type == "prompt" and event.text:
                 transfer_number = session.config.get("human_transfer_number")
                 phrases = session.config.get("human_transfer_phrases") or []
