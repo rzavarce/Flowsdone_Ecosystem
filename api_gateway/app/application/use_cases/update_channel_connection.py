@@ -21,8 +21,8 @@ class UpdateChannelConnectionUseCase:
     registrar, keeps the external platform in sync whenever
     `credentials` changes.
 
-    `ChannelConnectionRepositoryPort.update` replaces `credentials`
-    wholesale rather than merging it (see
+    `ChannelConnectionRepositoryPort.update` replaces `credentials` and
+    `config` wholesale rather than merging them (see
     SqlAlchemyChannelConnectionRepository.update), so a PATCH that
     touches credentials without re-sending a channel's webhook secret
     would otherwise silently drop it — and, worse, a PATCH that *does*
@@ -31,6 +31,13 @@ class UpdateChannelConnectionUseCase:
     This closes both gaps: the previous secret is preserved unless the
     caller explicitly overrides it, and any credentials change for a
     registrar-backed channel triggers a fresh registration.
+
+    The same wholesale-replace trap applies to `config` - a PATCH
+    meant to only set one key (e.g. `welcome_greeting`) would silently
+    wipe out every other key already there (`voice`, `tts_provider`,
+    `human_transfer_number`, ...). Unlike `credentials`, there is no
+    external system to re-sync, so this is fixed with a plain shallow
+    merge onto the existing config before persisting.
     """
 
     def __init__(
@@ -77,7 +84,10 @@ class UpdateChannelConnectionUseCase:
                 a registrar and this omits its `secret_field`, the
                 prior secret is preserved (or a new one generated if
                 there wasn't one yet) rather than silently lost.
-            config (Optional[Dict[str, Any]]): New channel configuration.
+            config (Optional[Dict[str, Any]]): Keys to set on the
+                connection's config - shallow-merged onto the existing
+                config, so keys not mentioned here are left untouched
+                (not wiped out).
             status (Optional[str]): New lifecycle status.
 
         Returns:
@@ -96,6 +106,9 @@ class UpdateChannelConnectionUseCase:
             return None
 
         registrar = self._webhook_registrars.get(existing.channel_type)
+
+        if config is not None:
+            config = {**existing.config, **config}
 
         if credentials is not None and registrar is not None:
             credentials = dict(credentials)
