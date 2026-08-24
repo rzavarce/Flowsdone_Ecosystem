@@ -8,6 +8,9 @@ x-common: &common
     options:
       max-size: "10m"
       max-file: "5"
+      # El otel-collector (filelog/docker) lee esta label para poder rutear
+      # cada log al índice de OpenSearch de su propio servicio.
+      labels: "com.docker.compose.service"
 
 networks:
   flowsdone-net:
@@ -212,10 +215,57 @@ services:
         condition: service_healthy
     ports:
       - "${OPENSEARCH_DASH_PORT}:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -u ${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD} http://localhost:5601/api/status | grep -q '\"state\":\"green\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
     networks:
       - flowsdone-net
     mem_limit: ${OPENSEARCH_DASH_MEM_LIMIT}
     cpus: ${OPENSEARCH_DASH_CPUS}
+
+  # Job de un solo uso: importa el index pattern logs-* y el dashboard
+  # "Observabilidad de logs" (scripts/opensearch/dashboards-export.ndjson).
+  # Idempotente (overwrite=true), corre en cada deploy.
+  opensearch-dashboards-init:
+    <<: *common
+    image: ${OPENSEARCH_INIT_IMAGE}
+    container_name: ${CONTAINER_PREFIX}_opensearch_dashboards_init
+    restart: "no"
+    environment:
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
+    entrypoint: ["/bin/sh", "/init-dashboards.sh"]
+    volumes:
+      - ./scripts/opensearch/init-dashboards.sh:/init-dashboards.sh:ro
+      - ./scripts/opensearch/dashboards-export.ndjson:/dashboards-export.ndjson:ro
+    depends_on:
+      opensearch-dashboards:
+        condition: service_healthy
+    networks:
+      - flowsdone-net
+
+  # Job de un solo uso: crea el index template de logs-* (mapping ss4o) y
+  # limpia el índice legacy ss4o_logs-default-namespace. Corre en cada
+  # deploy; es idempotente, así que no hay problema en repetirlo.
+  opensearch-init:
+    <<: *common
+    image: ${OPENSEARCH_INIT_IMAGE}
+    container_name: ${CONTAINER_PREFIX}_opensearch_init
+    restart: "no"
+    environment:
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
+    entrypoint: ["/bin/sh", "/init-opensearch.sh"]
+    volumes:
+      - ./scripts/opensearch/init-opensearch.sh:/init-opensearch.sh:ro
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    networks:
+      - flowsdone-net
 
   otel-collector:
     <<: *common
@@ -232,6 +282,8 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
+      opensearch-init:
+        condition: service_completed_successfully
     ports:
       - "${OTEL_PORT_GRPC}:4317"
       - "${OTEL_PORT_HTTP}:4318"
