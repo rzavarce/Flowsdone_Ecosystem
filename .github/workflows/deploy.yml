@@ -96,7 +96,12 @@ jobs:
             timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $DASH_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
             docker cp scripts/opensearch/dashboards-export.ndjson "${DASH_CONTAINER}:/tmp/dashboards-export.ndjson"
             docker exec -i "$DASH_CONTAINER" sh -s < scripts/opensearch/init-dashboards.sh
-            docker exec "$DASH_CONTAINER" rm -f /tmp/dashboards-export.ndjson
+            # Sin cleanup del ndjson en /tmp: el contenedor corre como un
+            # usuario no-root, docker cp lo crea como root, y con el sticky
+            # bit de /tmp ese usuario no puede borrarlo ("Operation not
+            # permitted") - cortaba el deploy entero por script_stop antes
+            # de llegar al `up -d` final. /tmp es la capa efímera del
+            # contenedor, se limpia solo en el próximo recreate.
 
             # Ahora sí, el resto del stack (incluye otel-collector, que ya
             # encuentra el index template listo) incluyendo el perfil 'prod'
