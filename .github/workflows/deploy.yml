@@ -81,7 +81,26 @@ jobs:
             # los workers, para que arranquen ya contra el esquema nuevo.
             docker compose --profile prod run --rm api alembic -c api_gateway/alembic.ini upgrade head
 
-            # Desplegar contenedores incluyendo el perfil 'prod' (para Traefik, etc.)
+            # OpenSearch primero, y solo, todavía SIN otel-collector: el index
+            # template de logs-* (scripts/opensearch/init-opensearch.sh) tiene
+            # que existir antes de que otel-collector escriba el primer log,
+            # o el índice queda creado con mapping dinámico y no hay forma de
+            # corregirlo después sin borrarlo.
+            docker compose --profile prod up -d --remove-orphans --no-deps opensearch opensearch-dashboards
+
+            OS_CONTAINER=$(docker compose --profile prod ps -q opensearch)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $OS_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+            docker exec -i "$OS_CONTAINER" sh -s < scripts/opensearch/init-opensearch.sh
+
+            DASH_CONTAINER=$(docker compose --profile prod ps -q opensearch-dashboards)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $DASH_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+            docker cp scripts/opensearch/dashboards-export.ndjson "${DASH_CONTAINER}:/tmp/dashboards-export.ndjson"
+            docker exec -i "$DASH_CONTAINER" sh -s < scripts/opensearch/init-dashboards.sh
+            docker exec "$DASH_CONTAINER" rm -f /tmp/dashboards-export.ndjson
+
+            # Ahora sí, el resto del stack (incluye otel-collector, que ya
+            # encuentra el index template listo) incluyendo el perfil 'prod'
+            # (Traefik, etc.)
             docker compose --profile prod up -d --remove-orphans
 
             # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco

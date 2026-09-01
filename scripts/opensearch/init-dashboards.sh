@@ -1,9 +1,13 @@
 #!/bin/sh
+# Pensado para correr DENTRO del contenedor de opensearch-dashboards,
+# vía `docker exec -i <container> sh -s < init-dashboards.sh` (ver
+# ecosistems_up.sh / deploy.yml), con dashboards-export.ndjson ya
+# copiado a /tmp con `docker cp` antes de invocarlo.
 set -eu
 
-DASHBOARDS_URL="http://opensearch-dashboards:5601"
+DASHBOARDS_URL="http://localhost:5601"
 AUTH="${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}"
-NDJSON="/dashboards-export.ndjson"
+NDJSON="/tmp/dashboards-export.ndjson"
 
 echo "Importando saved objects (index pattern logs-*, dashboard Observabilidad de logs)..."
 status=$(curl -s -o /tmp/os_import_response.json -w "%{http_code}" \
