@@ -305,7 +305,11 @@ if ! $SKIP_UI; then
       docker exec -i "$dashboards_container" sh -s < ./scripts/opensearch/init-dashboards.sh \
         && success "Dashboard de OpenSearch importado." \
         || warn "No se pudo importar el dashboard de OpenSearch; se continúa."
-      docker exec "$dashboards_container" rm -f /tmp/dashboards-export.ndjson
+      # Sin cleanup del ndjson en /tmp: el contenedor corre como un usuario
+      # no-root, docker cp lo crea como root, y con el sticky bit de /tmp
+      # ese usuario no puede borrarlo ("Operation not permitted") - con
+      # set -e eso mataba el script entero. /tmp es la capa efímera del
+      # contenedor, se limpia solo en el próximo recreate.
     fi
   fi
 fi
