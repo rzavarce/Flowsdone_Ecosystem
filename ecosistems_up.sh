@@ -10,6 +10,10 @@
 #   --skip-observability   omite OpenSearch + OTEL Collector
 #   --skip-ui              omite todos los paneles web
 #   --only-infra           arranca solo la infraestructura base
+#   --reset-postgres       borra ./volumes/postgres_data antes de arrancar
+#                           (solo perfil dev; rechaza correr con prod). Pedí
+#                           un backup fresco antes con scripts/backup-postgres.sh
+#                           si te importa lo que hay ahí.
 # =============================================================================
 
 set -euo pipefail
@@ -27,12 +31,14 @@ PROFILE="dev"
 SKIP_OBSERVABILITY=false
 SKIP_UI=false
 ONLY_INFRA=false
+RESET_POSTGRES=false
 
 for arg in "$@"; do
   case "$arg" in
     --skip-observability) SKIP_OBSERVABILITY=true ;;
     --skip-ui)            SKIP_UI=true ;;
     --only-infra)         ONLY_INFRA=true ;;
+    --reset-postgres)     RESET_POSTGRES=true ;;
     dev|prod)
       PROFILE="$arg"
       ;;
@@ -169,9 +175,18 @@ $SKIP_UI            && warn "--skip-ui: se omiten los paneles web."
 $ONLY_INFRA         && warn "--only-infra: se arranca solo la infraestructura base."
 
 phase "Fase 1a — Fundación (postgres + redis)"
-if [[ -d "./volumes/postgres_data" ]] && find "./volumes/postgres_data" -mindepth 1 -maxdepth 1 | grep -q .; then
-  warn "Se detectó estado previo en ./volumes/postgres_data; se limpiará para reiniciar Postgres limpio."
-  find "./volumes/postgres_data" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+if $RESET_POSTGRES; then
+  [[ "$PROFILE" == "prod" ]] && \
+    error "--reset-postgres no se puede usar con el perfil 'prod' (borraría datos reales). Si hace falta de verdad, hacelo a mano, con un backup fresco antes."
+  warn "--reset-postgres: borrando ./volumes/postgres_data..."
+  compose stop postgres >/dev/null 2>&1 || true
+  compose rm -f postgres >/dev/null 2>&1 || true
+  # postgres_data queda con permisos 700 del uid interno de postgres, así que
+  # un "rm -rf ./volumes/postgres_data/*" del usuario sin privilegios no
+  # borraría nada (el glob se expande vacío antes de que sudo entre en
+  # juego). Hay que apuntar al directorio en sí, no a su contenido.
+  sudo rm -rf ./volumes/postgres_data
+  success "./volumes/postgres_data vaciado."
 fi
 compose up -d --force-recreate --remove-orphans --no-deps postgres redis
 wait_healthy postgres 300
