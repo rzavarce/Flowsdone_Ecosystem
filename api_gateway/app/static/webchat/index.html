@@ -6,20 +6,274 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>ZavarceCloud AI Webchat</title>
-  <link rel="stylesheet" href="agent-chat-widget.css?v=20260716" />
+  <title>Flowsdone Webchat — demo e integración</title>
+  <link rel="stylesheet" href="demo.css?v=20260901" />
+  <link rel="stylesheet" href="agent-chat-widget.css?v=20260901" />
 </head>
 <body>
-  <main class="demo-page">
-    <section class="demo-card">
-      <h1>ZavarceCloud AI Webchat</h1>
-      <p>El WebSocket se crea al hacer click en el launcher.</p>
-      <p>Los mensajes del usuario viajan por WebSocket al gateway.</p>
-      <p>El gateway reenvía por Kafka al workflow.</p>
+
+  <header class="demo-hero">
+    <div class="demo-hero-inner">
+      <span class="demo-eyebrow">Flowsdone · Webchat widget</span>
+      <h1>Un chat con IA, embebible en cualquier página</h1>
+      <p>Un solo <code>&lt;script&gt;</code>, un objeto de configuración y listo. Este mismo widget que ves flotando abajo a la derecha es el que podés integrar en tu sitio en minutos.</p>
+      <div class="demo-hero-actions">
+        <a class="btn btn-light" href="#demo">Probar el chat en vivo</a>
+        <a class="btn btn-ghost" href="#integracion">Ver guía de integración</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="demo-shell">
+
+    <section class="demo-section" id="demo">
+      <div class="demo-section-head">
+        <span class="demo-kicker">Demo en vivo</span>
+        <h2>Probá el widget con distintos backends</h2>
+        <p>Esta página inicializa el widget que ves abajo a la derecha. Elegí a qué workflow de prueba se conecta — el cambio se aplica al recargar.</p>
+      </div>
+      <div class="demo-card">
+        <div class="case-switch" id="case-switch">
+          <button class="case-btn" data-caso="langflow">Langflow (Kafka)</button>
+          <button class="case-btn" data-caso="n8n">n8n (RabbitMQ)</button>
+        </div>
+        <p class="demo-hint">
+          Caso activo: <code id="active-case">langflow</code> · workflow_id: <code id="active-workflow">—</code> · transport: <code id="active-transport">—</code>
+        </p>
+        <p class="demo-live-note">Hacé click en el botón flotante (abajo a la derecha) para abrir el chat. El WebSocket recién se abre en ese momento.</p>
+      </div>
     </section>
-  </main>
+
+    <section class="demo-section" id="integracion">
+      <div class="demo-section-head">
+        <span class="demo-kicker">Integración</span>
+        <h2>Cómo agregarlo a tu página</h2>
+        <p>Tres pasos: cargar el CSS y el JS del widget, definir la configuración antes de que el script corra, y listo — se auto-inicializa solo.</p>
+      </div>
+      <div class="demo-card">
+
+        <div class="step">
+          <span class="step-num">1</span>
+          <div class="step-body">
+            <h3>Cargá el CSS y el script del widget</h3>
+            <p>Van en cualquier parte de tu <code>&lt;head&gt;</code> o antes de cerrar <code>&lt;/body&gt;</code>. Se sirven desde nuestro dominio, no hace falta alojarlos vos.</p>
+            <div class="code-block">
+              <button class="copy-btn" data-copy-target="snippet-1">Copiar</button>
+              <pre id="snippet-1"><code>&lt;link rel="stylesheet" href="https://chat.flowsdone.com/agent-chat-widget.css" /&gt;
+&lt;script src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-num">2</span>
+          <div class="step-body">
+            <h3>Definí <code>window.AgentChatConfig</code> antes del script</h3>
+            <p>El widget busca esta variable global apenas carga y se auto-inicializa. El único campo obligatorio es <code>workflowId</code>: sin él, no hay a dónde enviar los mensajes.</p>
+            <div class="code-block">
+              <button class="copy-btn" data-copy-target="snippet-2">Copiar</button>
+              <pre id="snippet-2"><code>&lt;script&gt;
+  window.AgentChatConfig = {
+    workflowId: "TU_WORKFLOW_ID",   // obligatorio
+    transport: "kafka",             // "kafka" (Langflow) o "rabbitmq" (n8n)
+    title: "Mi Asistente",
+    initialMessage: "¡Hola! ¿En qué te puedo ayudar?",
+    launcherColor: "#4F46E5",
+    sendButtonColor: "#10B981"
+  };
+&lt;/script&gt;
+&lt;link rel="stylesheet" href="https://chat.flowsdone.com/agent-chat-widget.css" /&gt;
+&lt;script src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <span class="step-num">3</span>
+          <div class="step-body">
+            <h3>(Opcional) Inicializá manualmente</h3>
+            <p>Si preferís no usar <code>window.AgentChatConfig</code> — por ejemplo, para crear el widget después de una acción del usuario — llamá a <code>init()</code> a mano con el script cargado con <code>defer</code>.</p>
+            <div class="code-block">
+              <button class="copy-btn" data-copy-target="snippet-3">Copiar</button>
+              <pre id="snippet-3"><code>&lt;script defer src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  window.addEventListener("load", function () {
+    window.AgentChat.init({ workflowId: "TU_WORKFLOW_ID", transport: "kafka" });
+  });
+&lt;/script&gt;</code></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="demo-section" id="configuracion">
+      <div class="demo-section-head">
+        <span class="demo-kicker">Referencia</span>
+        <h2>Variables de configuración disponibles</h2>
+        <p>Todo lo que acepta <code>AgentChatConfig</code> / <code>AgentChat.init(options)</code>, agrupado por para qué sirve. Ninguna es obligatoria salvo <code>workflowId</code>.</p>
+      </div>
+
+      <div class="demo-card">
+
+        <div class="config-group">
+          <h3>Conexión</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>workflowId</code></td><td class="col-default">—</td><td class="col-desc"><strong>Obligatorio.</strong> El workflow (Langflow o n8n) al que se enrutan los mensajes.</td></tr>
+              <tr><td class="col-name"><code>transport</code></td><td class="col-default"><code>rabbitmq</code></td><td class="col-desc"><code>kafka</code> para Langflow, <code>rabbitmq</code> para n8n. Define el camino que toma el mensaje dentro del gateway.</td></tr>
+              <tr><td class="col-name"><code>wsUrl</code></td><td class="col-default">auto</td><td class="col-desc">Endpoint del WebSocket. Por defecto se arma solo a partir del dominio actual (<code>wss://tu-dominio/ws</code>) — normalmente no hace falta tocarlo.</td></tr>
+              <tr><td class="col-name"><code>sessionId</code></td><td class="col-default">auto</td><td class="col-desc">Id de sesión del visitante. Se genera y persiste en <code>localStorage</code> si no lo pasás.</td></tr>
+              <tr><td class="col-name"><code>conversationId</code></td><td class="col-default">auto</td><td class="col-desc">Id de conversación, también persistido en <code>localStorage</code>. Pasalo vos si necesitás controlar cuándo empieza una conversación nueva.</td></tr>
+              <tr><td class="col-name"><code>userId</code></td><td class="col-default">—</td><td class="col-desc">Identificador del usuario que envía los mensajes (para trazabilidad del lado del workflow).</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Textos y contenido</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>title</code></td><td class="col-default"><code>AI Assistant</code></td><td class="col-desc">Título en el header del chat.</td></tr>
+              <tr><td class="col-name"><code>initialMessage</code></td><td class="col-default">"Hi! How can I help you today?"</td><td class="col-desc">Primer mensaje que muestra el bot al abrir.</td></tr>
+              <tr><td class="col-name"><code>inputPlaceholder</code></td><td class="col-default">"Type your message..."</td><td class="col-desc">Placeholder del campo de texto.</td></tr>
+              <tr><td class="col-name"><code>sendLabel</code></td><td class="col-default"><code>Send</code></td><td class="col-desc">Texto accesible (aria-label) del botón de enviar.</td></tr>
+              <tr><td class="col-name"><code>openLabel</code> / <code>closeLabel</code></td><td class="col-default"><code>Open chat</code> / <code>Close chat</code></td><td class="col-desc">Textos accesibles del botón flotante y del botón de cerrar.</td></tr>
+              <tr><td class="col-name"><code>messages</code></td><td class="col-default">objeto con defaults en inglés</td><td class="col-desc">Sobrescribí <code>socketConnecting</code>, <code>socketConnected</code>, <code>socketDisconnected</code>, <code>genericError</code> y/o <code>queuedError</code> para traducir los mensajes de estado.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Tamaño y posición</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>width</code></td><td class="col-default"><code>420px</code></td><td class="col-desc">Ancho de la ventana del chat abierta.</td></tr>
+              <tr><td class="col-name"><code>height</code></td><td class="col-default"><code>680px</code></td><td class="col-desc">Alto de la ventana del chat abierta.</td></tr>
+              <tr><td class="col-name"><code>maxHeight</code></td><td class="col-default"><code>80vh</code></td><td class="col-desc">Tope de alto relativo al viewport, para pantallas chicas.</td></tr>
+              <tr><td class="col-name"><code>position</code></td><td class="col-default"><code>bottom-right</code></td><td class="col-desc"><code>bottom-right</code> o <code>bottom-left</code>.</td></tr>
+              <tr><td class="col-name"><code>bottom</code></td><td class="col-default"><code>20px</code></td><td class="col-desc">Separación desde el borde inferior de la pantalla.</td></tr>
+              <tr><td class="col-name"><code>sideOffset</code></td><td class="col-default"><code>20px</code></td><td class="col-desc">Separación desde el borde lateral (derecho o izquierdo según <code>position</code>).</td></tr>
+              <tr><td class="col-name"><code>launcherSize</code></td><td class="col-default"><code>60px</code></td><td class="col-desc">Diámetro del botón flotante.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Colores y tema</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>launcherColor</code></td><td class="col-default"><code>#4F46E5</code></td><td class="col-desc">Color de fondo del botón flotante.</td></tr>
+              <tr><td class="col-name"><code>launcherIconColor</code></td><td class="col-default"><code>#ffffff</code></td><td class="col-desc">Color del ícono dentro del botón flotante.</td></tr>
+              <tr><td class="col-name"><code>launcherIconAccentColor</code></td><td class="col-default"><code>#111827</code></td><td class="col-desc">Color de acento secundario del ícono por defecto.</td></tr>
+              <tr><td class="col-name"><code>launcherIconUrl</code></td><td class="col-default">—</td><td class="col-desc">URL de una imagen propia para reemplazar el ícono SVG por defecto del botón flotante.</td></tr>
+              <tr><td class="col-name"><code>headerColor</code></td><td class="col-default"><code>#111827</code></td><td class="col-desc">Color de fondo del header del chat.</td></tr>
+              <tr><td class="col-name"><code>headerTextColor</code></td><td class="col-default"><code>#ffffff</code></td><td class="col-desc">Color del texto del header.</td></tr>
+              <tr><td class="col-name"><code>userMessageColor</code> / <code>userMessageTextColor</code></td><td class="col-default"><code>#4F46E5</code> / <code>#ffffff</code></td><td class="col-desc">Fondo y texto de las burbujas del usuario.</td></tr>
+              <tr><td class="col-name"><code>botMessageColor</code> / <code>botMessageTextColor</code></td><td class="col-default"><code>#E5E7EB</code> / <code>#111827</code></td><td class="col-desc">Fondo y texto de las burbujas del bot.</td></tr>
+              <tr><td class="col-name"><code>sendButtonColor</code></td><td class="col-default"><code>#10B981</code></td><td class="col-desc">Color del botón de enviar.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Comportamiento</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>mode</code></td><td class="col-default"><code>widget</code></td><td class="col-desc"><code>widget</code> (botón flotante + ventana popup) o <code>fullscreen</code> (el chat ocupa toda la pantalla, sin botón flotante).</td></tr>
+              <tr><td class="col-name"><code>autoOpen</code></td><td class="col-default"><code>false</code></td><td class="col-desc">Si es <code>true</code>, el chat se abre solo 100ms después de cargar la página.</td></tr>
+              <tr><td class="col-name"><code>showLauncher</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Ponelo en <code>false</code> para ocultar el botón flotante por completo (útil si vos disparás la apertura desde otro elemento).</td></tr>
+              <tr><td class="col-name"><code>closeOnEsc</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Cierra el chat con la tecla Esc (no aplica en modo <code>fullscreen</code>).</td></tr>
+              <tr><td class="col-name"><code>focusInputOnOpen</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Enfoca el campo de texto automáticamente al abrir el chat.</td></tr>
+              <tr><td class="col-name"><code>toastDuration</code></td><td class="col-default"><code>4500</code> (ms)</td><td class="col-desc">Cuánto tiempo queda visible un mensaje de error tipo toast.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Animación</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>animation</code></td><td class="col-default"><code>slide-up</code></td><td class="col-desc"><code>slide-up</code>, <code>scale</code>, <code>fade</code> o <code>none</code>. Efecto al abrir/cerrar la ventana del chat.</td></tr>
+              <tr><td class="col-name"><code>animationDuration</code></td><td class="col-default"><code>280ms</code></td><td class="col-desc">Duración de esa transición.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="config-group">
+          <h3>Reconexión del WebSocket</h3>
+          <table class="config-table">
+            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
+            <tbody>
+              <tr><td class="col-name"><code>reconnectInterval</code></td><td class="col-default"><code>1500</code> (ms)</td><td class="col-desc">Espera inicial antes de reintentar la conexión si el WebSocket se corta.</td></tr>
+              <tr><td class="col-name"><code>maxReconnectInterval</code></td><td class="col-default"><code>15000</code> (ms)</td><td class="col-desc">Tope del backoff exponencial entre reintentos.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </section>
+
+    <p class="demo-footer">
+      ¿Dudas sobre qué <code>workflow_id</code> usar o cómo levantar uno nuevo? Revisá el <a href="/">README del proyecto</a> o el equipo de Flowsdone.
+    </p>
+
+  </div>
 
   <script>
+    // Casos de uso básicos de prueba (ver ?caso=langflow o ?caso=n8n en la URL):
+    //   - langflow (default): transport=kafka -> kafka_inbound_worker -> Langflow ("Basic Prompting")
+    //   - n8n: transport=rabbitmq -> workflow de n8n "Flowsdone - Caso de uso basico (RabbitMQ)"
+    const CASES = {
+      langflow: { workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d", transport: "kafka" },
+      n8n: { workflowId: "n8n-demo-workflow", transport: "rabbitmq" },
+    };
+
+    const params = new URLSearchParams(location.search);
+    const caso = CASES[params.get("caso")] ? params.get("caso") : "langflow";
+    const selected = CASES[caso];
+
+    const workflowId = params.get("workflow_id") || params.get("workflowId") || selected.workflowId;
+    const transport = params.get("transport") || selected.transport;
+
+    document.getElementById("active-case").textContent = caso;
+    document.getElementById("active-workflow").textContent = workflowId;
+    document.getElementById("active-transport").textContent = transport;
+
+    document.querySelectorAll(".case-btn").forEach(function (btn) {
+      if (btn.dataset.caso === caso) btn.classList.add("active");
+      btn.addEventListener("click", function () {
+        const url = new URL(location.href);
+        url.searchParams.set("caso", btn.dataset.caso);
+        url.searchParams.delete("workflow_id");
+        url.searchParams.delete("workflowId");
+        url.searchParams.delete("transport");
+        location.href = url.toString();
+      });
+    });
+
+    document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const target = document.getElementById(btn.dataset.copyTarget);
+        const text = target ? target.textContent : "";
+        navigator.clipboard.writeText(text).then(function () {
+          const original = btn.textContent;
+          btn.textContent = "¡Copiado!";
+          btn.classList.add("copied");
+          setTimeout(function () {
+            btn.textContent = original;
+            btn.classList.remove("copied");
+          }, 1800);
+        });
+      });
+    });
 
     const conversationId =
         localStorage.getItem("conversation_id") ||
@@ -27,35 +281,19 @@
 
     localStorage.setItem("conversation_id", conversationId);
 
-    // Casos de uso básicos de prueba (ver ?caso=langflow o ?caso=n8n en la URL):
-    //   - langflow (default): transport=kafka -> kafka_inbound_worker -> Langflow ("Basic Prompting")
-    //   - n8n: transport=rabbitmq -> workflow de n8n "Flowsdone - Caso de uso basico (RabbitMQ)"
-    const params = new URLSearchParams(location.search);
-    const caso = params.get("caso") || "langflow";
-
-    const CASES = {
-      langflow: { workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d", transport: "kafka" },
-      n8n: { workflowId: "n8n-demo-workflow", transport: "rabbitmq" },
-    };
-    const selected = CASES[caso] || CASES.langflow;
-
     window.AgentChatConfig = {
       wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://')
            + location.host
            + '/ws',
 
-      // Acepta workflow_id o workflowId en la URL (mismo valor, dos
-      // grafías) - si no se pasa ninguno, cae al default de CASES.
-      workflowId: params.get("workflow_id") || params.get("workflowId") || selected.workflowId,
+      workflowId: workflowId,
       conversationId: conversationId,
       userId: "anonymous",
+      transport: transport,
 
-      transport: params.get("transport") || selected.transport,
-
-      title: 'ZavarceCloud AI',
+      title: 'Flowsdone AI',
       initialMessage: 'Hi! How can I help you today?',
       inputPlaceholder: 'Type your message...',
-      waitingMessage: 'Processing your request',
 
       launcherColor: '#4F46E5',
       launcherIconColor: '#ffffff',
