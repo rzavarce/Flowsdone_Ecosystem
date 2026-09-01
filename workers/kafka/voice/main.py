@@ -29,10 +29,12 @@ from app.application.services.langflow_result import extract_text_from_langflow_
 from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("kafka.voice.worker")
 
 _FALLBACK_RESPONSE = "The workflow did not return a valid response."

@@ -13,9 +13,11 @@ from app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
 from app.application.services.hmac_signing import sign
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("rabbitmq.outbound.worker")
 
 
