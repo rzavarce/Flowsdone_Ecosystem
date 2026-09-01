@@ -4,13 +4,6 @@ extensions:
       username: admin
       password: ${OPENSEARCH_PASSWORD}
 
-  # Langfuse ingiere trazas vía su endpoint OTLP público, autenticado con
-  # Basic Auth: username = public key, password = secret key del proyecto.
-  basicauth/langfuse:
-    client_auth:
-      username: ${LANGFUSE_PUBLIC_KEY}
-      password: ${LANGFUSE_SECRET_KEY}
-
 receivers:
   otlp:
     protocols:
@@ -153,21 +146,23 @@ exporters:
       mode: ss4o
     timeout: 10s
 
-  # Trazas de cualquier servicio instrumentado con OTLP (api_gateway, workers,
-  # n8n vía N8N_OTEL_TRACING_ENABLED) también se reenvían a Langfuse.
-  otlphttp/langfuse:
-    traces_endpoint: http://langfuse-web:3000/api/public/otel/v1/traces
-    auth:
-      authenticator: basicauth/langfuse
-
 service:
-  extensions: [basicauth/opensearch, basicauth/langfuse]
+  extensions: [basicauth/opensearch]
 
   pipelines:
+    # Las trazas OTLP genéricas (api_gateway, workers, n8n vía
+    # N8N_OTEL_TRACING_ENABLED) van solo a OpenSearch. Langfuse recibe sus
+    # propias trazas ricas (tokens, costos, generaciones) directo del SDK
+    # nativo de Langflow (LANGFUSE_SECRET_KEY/PUBLIC_KEY en su compose),
+    # que es un camino separado de este collector. Reenviar además estos
+    # spans genéricos por acá era redundante y, si LANGFUSE_PUBLIC_KEY/
+    # SECRET_KEY quedan desalineados con el proyecto real, generaba spam
+    # de "Invalid authorization header" en los logs de langfuse-web en
+    # cada trace fallido.
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [opensearch, otlphttp/langfuse]
+      exporters: [opensearch]
 
     logs:
       receivers: [otlp, filelog/docker]
