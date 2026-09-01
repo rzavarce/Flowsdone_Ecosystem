@@ -204,6 +204,14 @@ services:
     # profiles: [prod]
     image: ${OPENSEARCH_DASHBOARDS_IMAGE}
     container_name: ${CONTAINER_PREFIX}_opensearch_dashboards
+    # opensearch_security.multitenancy.* no está en la whitelist de keys que
+    # el entrypoint de la imagen convierte desde variables de entorno, así
+    # que se pasa como flag: el entrypoint reenvía cualquier arg extra al
+    # binario final. Sin esto, los saved objects (index patterns,
+    # dashboards) quedan en el tenant "Private" del usuario que los creó
+    # -invisible tanto en "Global" como en cualquier tenant custom-, aunque
+    # la API confirme que existen.
+    command: ["--opensearch_security.multitenancy.enabled=false"]
     environment:
       OPENSEARCH_HOSTS: ${OPENSEARCH_DASHBOARDS_HOSTS}
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
@@ -226,47 +234,6 @@ services:
     mem_limit: ${OPENSEARCH_DASH_MEM_LIMIT}
     cpus: ${OPENSEARCH_DASH_CPUS}
 
-  # Job de un solo uso: importa el index pattern logs-* y el dashboard
-  # "Observabilidad de logs" (scripts/opensearch/dashboards-export.ndjson).
-  # Idempotente (overwrite=true), corre en cada deploy.
-  opensearch-dashboards-init:
-    <<: *common
-    image: ${OPENSEARCH_INIT_IMAGE}
-    container_name: ${CONTAINER_PREFIX}_opensearch_dashboards_init
-    restart: "no"
-    environment:
-      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
-    entrypoint: ["/bin/sh", "/init-dashboards.sh"]
-    volumes:
-      - ./scripts/opensearch/init-dashboards.sh:/init-dashboards.sh:ro
-      - ./scripts/opensearch/dashboards-export.ndjson:/dashboards-export.ndjson:ro
-    depends_on:
-      opensearch-dashboards:
-        condition: service_healthy
-    networks:
-      - flowsdone-net
-
-  # Job de un solo uso: crea el index template de logs-* (mapping ss4o) y
-  # limpia el índice legacy ss4o_logs-default-namespace. Corre en cada
-  # deploy; es idempotente, así que no hay problema en repetirlo.
-  opensearch-init:
-    <<: *common
-    image: ${OPENSEARCH_INIT_IMAGE}
-    container_name: ${CONTAINER_PREFIX}_opensearch_init
-    restart: "no"
-    environment:
-      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
-      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
-    entrypoint: ["/bin/sh", "/init-opensearch.sh"]
-    volumes:
-      - ./scripts/opensearch/init-opensearch.sh:/init-opensearch.sh:ro
-    depends_on:
-      opensearch:
-        condition: service_healthy
-    networks:
-      - flowsdone-net
-
   otel-collector:
     <<: *common
     # profiles: [prod]
@@ -282,8 +249,6 @@ services:
     depends_on:
       opensearch:
         condition: service_healthy
-      opensearch-init:
-        condition: service_completed_successfully
     ports:
       - "${OTEL_PORT_GRPC}:4317"
       - "${OTEL_PORT_HTTP}:4318"

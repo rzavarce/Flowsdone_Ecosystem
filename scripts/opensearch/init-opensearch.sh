@@ -1,7 +1,12 @@
 #!/bin/sh
+# Pensado para correr DENTRO del contenedor de opensearch, vía
+# `docker exec -i <container> sh -s < init-opensearch.sh` (ver
+# ecosistems_up.sh / deploy.yml) — por eso apunta a localhost y no
+# necesita que le pasen OPENSEARCH_USERNAME/PASSWORD, ya están en el
+# entorno del propio contenedor.
 set -eu
 
-OPENSEARCH_URL="https://opensearch:9200"
+OPENSEARCH_URL="https://localhost:9200"
 AUTH="${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}"
 LEGACY_INDEX="ss4o_logs-default-namespace"
 

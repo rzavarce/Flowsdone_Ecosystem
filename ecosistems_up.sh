@@ -257,6 +257,16 @@ if ! $SKIP_OBSERVABILITY; then
     docker exec "$opensearch_container" curl -sf --max-time 5 -ku "admin:${OPENSEARCH_PASSWORD}" https://localhost:9200/_cluster/health 2>/dev/null | grep -q status \
       && success "OpenSearch responde." \
       || warn "OpenSearch aún no responde; se continúa."
+
+    # Index template de logs-* (mapping ss4o) + limpieza del índice legacy.
+    # Tiene que correr ANTES de arrancar otel-collector (más abajo): si
+    # otel-collector escribe el primer log antes de que exista el template,
+    # el índice queda creado con mapping dinámico (el problema original que
+    # este template soluciona) y ya no hay forma de corregirlo sin borrarlo.
+    log "Aplicando index template de OpenSearch…"
+    docker exec -i "$opensearch_container" sh -s < ./scripts/opensearch/init-opensearch.sh \
+      && success "Index template de OpenSearch aplicado." \
+      || warn "No se pudo aplicar el index template de OpenSearch; se continúa."
   fi
 fi
 
@@ -284,6 +294,20 @@ if ! $SKIP_UI; then
   log "Arrancando paneles web: ${UI_SERVICES[*]}"
   compose up -d --remove-orphans --no-deps "${UI_SERVICES[@]}"
   success "Paneles web arrancados."
+
+  if ! $SKIP_OBSERVABILITY; then
+    wait_healthy opensearch-dashboards 120
+    dashboards_container=$(resolve_container_id opensearch-dashboards || true)
+    if [[ -n "$dashboards_container" ]]; then
+      log "Importando index pattern + dashboard de OpenSearch…"
+      docker cp ./scripts/opensearch/dashboards-export.ndjson \
+        "${dashboards_container}:/tmp/dashboards-export.ndjson"
+      docker exec -i "$dashboards_container" sh -s < ./scripts/opensearch/init-dashboards.sh \
+        && success "Dashboard de OpenSearch importado." \
+        || warn "No se pudo importar el dashboard de OpenSearch; se continúa."
+      docker exec "$dashboards_container" rm -f /tmp/dashboards-export.ndjson
+    fi
+  fi
 fi
 
 if [[ "$PROFILE" == "prod" ]]; then
