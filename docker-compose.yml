@@ -204,6 +204,14 @@ services:
     # profiles: [prod]
     image: ${OPENSEARCH_DASHBOARDS_IMAGE}
     container_name: ${CONTAINER_PREFIX}_opensearch_dashboards
+    # opensearch_security.multitenancy.* no está en la whitelist de keys que
+    # el entrypoint de la imagen convierte desde variables de entorno, así
+    # que se pasa como flag: el entrypoint reenvía cualquier arg extra al
+    # binario final. Sin esto, los saved objects (index patterns,
+    # dashboards) quedan en el tenant "Private" del usuario que los creó
+    # -invisible tanto en "Global" como en cualquier tenant custom-, aunque
+    # la API confirme que existen.
+    command: ["--opensearch_security.multitenancy.enabled=false"]
     environment:
       OPENSEARCH_HOSTS: ${OPENSEARCH_DASHBOARDS_HOSTS}
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
