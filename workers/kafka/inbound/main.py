@@ -17,10 +17,12 @@ from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("kafka.inbound.worker")
 
 

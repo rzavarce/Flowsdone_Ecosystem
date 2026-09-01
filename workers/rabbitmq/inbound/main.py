@@ -19,9 +19,11 @@ from app.application.use_cases.handle_outbound_response import (
 )
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("rabbitmq.inbound.worker")
 
 

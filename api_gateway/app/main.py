@@ -47,10 +47,12 @@ from app.application.use_cases.update_channel_connection import UpdateChannelCon
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import instrument_fastapi_app, setup_tracing
 from app.infrastructure.database import create_engine, create_sessionmaker
 from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("bootstrap")
 
 
@@ -337,6 +339,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+instrument_fastapi_app(app)
 
 
 class NoCacheStaticFiles(StaticFiles):

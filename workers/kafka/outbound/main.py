@@ -13,10 +13,12 @@ from app.adapters.inbound.queue.kafka_consumer import KafkaConsumer
 from app.application.services.hmac_signing import sign
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("kafka.outbound.worker")
 
 
