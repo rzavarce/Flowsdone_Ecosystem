@@ -11,6 +11,15 @@ from app.domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("langflow.executor")
 
+# Langflow only builds the vertices required to produce the requested
+# output_type. "chat" prunes any branch that doesn't feed the flow's Chat
+# Output component, so a flow with a side-effect-only branch (e.g. an HTTP
+# call fired after a conditional check, never wired back into Chat Output)
+# would silently never execute that branch. "any" forces the full graph to
+# build regardless of what feeds Chat Output.
+_RUN_OUTPUT_TYPE = "any"
+_RUN_INPUT_TYPE = "chat"
+
 
 class LangflowExecutor(LangflowExecutorPort):
     """Calls the Langflow REST API to run a flow synchronously."""
@@ -75,8 +84,8 @@ class LangflowExecutor(LangflowExecutorPort):
             url,
             json={
                 "input_value": input_value,
-                "output_type": "chat",
-                "input_type": "chat",
+                "output_type": _RUN_OUTPUT_TYPE,
+                "input_type": _RUN_INPUT_TYPE,
                 "session_id": str(conversation_id),
             },
         )

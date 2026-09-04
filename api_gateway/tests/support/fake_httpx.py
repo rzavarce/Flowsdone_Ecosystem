@@ -24,6 +24,7 @@ class FakeResponse:
     status_code: int = 200
     json_body: Optional[Dict[str, Any]] = None
     text: str = ""
+    content: bytes = b"body"
     headers: Dict[str, str] = field(
         default_factory=lambda: {"content-type": "application/json"}
     )
