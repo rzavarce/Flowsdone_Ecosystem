@@ -41,6 +41,10 @@
           Caso activo: <code id="active-case">langflow</code> · workflow_id: <code id="active-workflow">—</code> · transport: <code id="active-transport">—</code>
         </p>
         <p class="demo-live-note">Hacé click en el botón flotante (abajo a la derecha) para abrir el chat. El WebSocket recién se abre en ese momento.</p>
+        <p class="demo-live-note">
+          <button class="btn btn-ghost" id="reset-conversation-btn" type="button">Nueva conversación</button>
+          — el <code>conversation_id</code> se guarda en <code>localStorage</code> y sobrevive a un simple refresh (es el comportamiento real del widget embebido). Usá este botón para arrancar una conversación limpia sin abrir una ventana de incógnito.
+        </p>
       </div>
     </section>
 
@@ -257,6 +261,17 @@
         url.searchParams.delete("transport");
         location.href = url.toString();
       });
+    });
+
+    document.getElementById("reset-conversation-btn").addEventListener("click", function () {
+      // El widget guarda su propio session_id (agent-chat-session-id /
+      // agent-chat-conversation-id) además del conversation_id que esta
+      // página fija a mano - se borran los tres para que el agente no
+      // arrastre historial de una conversación anterior.
+      ["conversation_id", "agent-chat-session-id", "agent-chat-conversation-id"].forEach(function (key) {
+        localStorage.removeItem(key);
+      });
+      location.reload();
     });
 
     document.querySelectorAll(".copy-btn").forEach(function (btn) {
