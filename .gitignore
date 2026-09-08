@@ -8,7 +8,10 @@ wheels/
 
 
 # Virtual environments
-volumes/
+volumes/*
+!volumes/langflow/
+volumes/langflow/*
+!volumes/langflow/components/
 backups/
 evolution-api/
 .env
