@@ -1,20 +1,38 @@
+"""Langflow HTTP executor: runs a flow and normalizes its response."""
+
 import json
 import logging
 from typing import Any
 
 import httpx
 
-from ....core.config import settings
-from ....domain.ports.outbound import LangflowExecutorPort
+from app.core.config import settings
+from app.domain.ports.outbound import LangflowExecutorPort
 
 logger = logging.getLogger("langflow.executor")
 
+# Langflow only builds the vertices required to produce the requested
+# output_type. "chat" prunes any branch that doesn't feed the flow's Chat
+# Output component, so a flow with a side-effect-only branch (e.g. an HTTP
+# call fired after a conditional check, never wired back into Chat Output)
+# would silently never execute that branch. "any" forces the full graph to
+# build regardless of what feeds Chat Output.
+_RUN_OUTPUT_TYPE = "any"
+_RUN_INPUT_TYPE = "chat"
+
 
 class LangflowExecutor(LangflowExecutorPort):
+    """Calls the Langflow REST API to run a flow synchronously."""
+
     def __init__(self) -> None:
+        headers = {}
+        if settings.LANGFLOW_API_KEY:
+            headers["x-api-key"] = settings.LANGFLOW_API_KEY
+
         self.client = httpx.AsyncClient(
             base_url=settings.LANGFLOW_BASE_URL,
             timeout=httpx.Timeout(60.0),
+            headers=headers,
         )
 
     async def run(
@@ -24,6 +42,21 @@ class LangflowExecutor(LangflowExecutorPort):
         payload: dict[str, Any],
         conversation_id,
     ) -> dict | None:
+        """Run a Langflow flow and return its parsed response.
+
+        Args:
+            workflow_id (str): Id of the Langflow flow to execute.
+            payload (dict[str, Any]): Input payload; if it has a
+                "message" key, that value is sent as-is, otherwise the
+                whole payload is JSON-encoded as the input text.
+            conversation_id: Id of the conversation, sent as the
+                Langflow session_id for session continuity.
+
+        Returns:
+            dict | None: The parsed JSON response on success, an error
+            dict (`{"error": True, ...}`) on an HTTP error status, or
+            None if Langflow returned an empty body.
+        """
         url = f"/api/v1/run/{workflow_id}"
 
         logger.info(
@@ -35,7 +68,8 @@ class LangflowExecutor(LangflowExecutorPort):
             },
         )
 
-        # ✅ Normalizar payload (UUID → str)
+        # Normalize the payload so UUIDs and other non-JSON-native
+        # values become plain strings before being sent.
         safe_payload = json.loads(
             json.dumps(payload, default=str)
         )
@@ -50,8 +84,8 @@ class LangflowExecutor(LangflowExecutorPort):
             url,
             json={
                 "input_value": input_value,
-                "output_type": "chat",
-                "input_type": "chat",
+                "output_type": _RUN_OUTPUT_TYPE,
+                "input_type": _RUN_INPUT_TYPE,
                 "session_id": str(conversation_id),
             },
         )

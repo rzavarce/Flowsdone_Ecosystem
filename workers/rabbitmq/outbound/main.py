@@ -1,30 +1,32 @@
+"""RabbitMQ outbound worker: forwards outbound envelopes to the gateway's
+/internal/outbound endpoint, HMAC-signed, so the process holding the
+live WebSocket/channel state can deliver them.
+"""
+
 import asyncio
 import json
-import hmac
-import hashlib
 import logging
 
 import httpx
 
-from api_gateway.app.core.config import settings
-from api_gateway.app.core.logging import setup_logging
-
-from api_gateway.app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
-from api_gateway.app.domain.models.message_envelope import MessageEnvelope
+from app.adapters.inbound.queue.rabbitmq_consumer import RabbitMQConsumer
+from app.application.services.hmac_signing import sign
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
+from app.domain.models.message_envelope import MessageEnvelope
 
 setup_logging(settings.LOG_LEVEL)
+setup_tracing()
 logger = logging.getLogger("rabbitmq.outbound.worker")
 
 
-def sign(body: bytes) -> str:
-    return hmac.new(
-        settings.CALLBACK_HMAC_SECRET.encode("utf-8"),
-        body,
-        hashlib.sha256,
-    ).hexdigest()
-
-
 async def main() -> None:
+    """Wire up dependencies and consume the outbound queue until stopped.
+
+    For each outbound message, forwards it to the gateway's
+    /internal/outbound endpoint over HTTP, signed with an HMAC header.
+    """
     logger.info(
         "rabbitmq.outbound.worker.starting",
         extra={
@@ -40,6 +42,11 @@ async def main() -> None:
     client = httpx.AsyncClient(timeout=10)
 
     async def handler(body: bytes) -> None:
+        """Forward one outbound message to /internal/outbound.
+
+        Args:
+            body (bytes): The raw message body.
+        """
         try:
             envelope = MessageEnvelope.parse(body)
         except Exception:
@@ -59,7 +66,7 @@ async def main() -> None:
 
         raw = json.loads(body.decode("utf-8"))
         signed_body = json.dumps(raw, separators=(",", ":"), sort_keys=True, default=str).encode("utf-8")
-        sig = sign(signed_body)
+        sig = sign(signed_body, settings.CALLBACK_HMAC_SECRET)
 
         resp = await client.post(
             endpoint,

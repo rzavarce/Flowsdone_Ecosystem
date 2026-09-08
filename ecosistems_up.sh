@@ -10,6 +10,10 @@
 #   --skip-observability   omite OpenSearch + OTEL Collector
 #   --skip-ui              omite todos los paneles web
 #   --only-infra           arranca solo la infraestructura base
+#   --reset-postgres       borra ./volumes/postgres_data antes de arrancar
+#                           (solo perfil dev; rechaza correr con prod). Pedí
+#                           un backup fresco antes con scripts/backup-postgres.sh
+#                           si te importa lo que hay ahí.
 # =============================================================================
 
 set -euo pipefail
@@ -27,12 +31,14 @@ PROFILE="dev"
 SKIP_OBSERVABILITY=false
 SKIP_UI=false
 ONLY_INFRA=false
+RESET_POSTGRES=false
 
 for arg in "$@"; do
   case "$arg" in
     --skip-observability) SKIP_OBSERVABILITY=true ;;
     --skip-ui)            SKIP_UI=true ;;
     --only-infra)         ONLY_INFRA=true ;;
+    --reset-postgres)     RESET_POSTGRES=true ;;
     dev|prod)
       PROFILE="$arg"
       ;;
@@ -169,9 +175,18 @@ $SKIP_UI            && warn "--skip-ui: se omiten los paneles web."
 $ONLY_INFRA         && warn "--only-infra: se arranca solo la infraestructura base."
 
 phase "Fase 1a — Fundación (postgres + redis)"
-if [[ -d "./volumes/postgres_data" ]] && find "./volumes/postgres_data" -mindepth 1 -maxdepth 1 | grep -q .; then
-  warn "Se detectó estado previo en ./volumes/postgres_data; se limpiará para reiniciar Postgres limpio."
-  find "./volumes/postgres_data" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+if $RESET_POSTGRES; then
+  [[ "$PROFILE" == "prod" ]] && \
+    error "--reset-postgres no se puede usar con el perfil 'prod' (borraría datos reales). Si hace falta de verdad, hacelo a mano, con un backup fresco antes."
+  warn "--reset-postgres: borrando ./volumes/postgres_data..."
+  compose stop postgres >/dev/null 2>&1 || true
+  compose rm -f postgres >/dev/null 2>&1 || true
+  # postgres_data queda con permisos 700 del uid interno de postgres, así que
+  # un "rm -rf ./volumes/postgres_data/*" del usuario sin privilegios no
+  # borraría nada (el glob se expande vacío antes de que sudo entre en
+  # juego). Hay que apuntar al directorio en sí, no a su contenido.
+  sudo rm -rf ./volumes/postgres_data
+  success "./volumes/postgres_data vaciado."
 fi
 compose up -d --force-recreate --remove-orphans --no-deps postgres redis
 wait_healthy postgres 300
@@ -242,6 +257,16 @@ if ! $SKIP_OBSERVABILITY; then
     docker exec "$opensearch_container" curl -sf --max-time 5 -ku "admin:${OPENSEARCH_PASSWORD}" https://localhost:9200/_cluster/health 2>/dev/null | grep -q status \
       && success "OpenSearch responde." \
       || warn "OpenSearch aún no responde; se continúa."
+
+    # Index template de logs-* (mapping ss4o) + limpieza del índice legacy.
+    # Tiene que correr ANTES de arrancar otel-collector (más abajo): si
+    # otel-collector escribe el primer log antes de que exista el template,
+    # el índice queda creado con mapping dinámico (el problema original que
+    # este template soluciona) y ya no hay forma de corregirlo sin borrarlo.
+    log "Aplicando index template de OpenSearch…"
+    docker exec -i "$opensearch_container" sh -s < ./scripts/opensearch/init-opensearch.sh \
+      && success "Index template de OpenSearch aplicado." \
+      || warn "No se pudo aplicar el index template de OpenSearch; se continúa."
   fi
 fi
 
@@ -269,6 +294,24 @@ if ! $SKIP_UI; then
   log "Arrancando paneles web: ${UI_SERVICES[*]}"
   compose up -d --remove-orphans --no-deps "${UI_SERVICES[@]}"
   success "Paneles web arrancados."
+
+  if ! $SKIP_OBSERVABILITY; then
+    wait_healthy opensearch-dashboards 120
+    dashboards_container=$(resolve_container_id opensearch-dashboards || true)
+    if [[ -n "$dashboards_container" ]]; then
+      log "Importando index pattern + dashboard de OpenSearch…"
+      docker cp ./scripts/opensearch/dashboards-export.ndjson \
+        "${dashboards_container}:/tmp/dashboards-export.ndjson"
+      docker exec -i "$dashboards_container" sh -s < ./scripts/opensearch/init-dashboards.sh \
+        && success "Dashboard de OpenSearch importado." \
+        || warn "No se pudo importar el dashboard de OpenSearch; se continúa."
+      # Sin cleanup del ndjson en /tmp: el contenedor corre como un usuario
+      # no-root, docker cp lo crea como root, y con el sticky bit de /tmp
+      # ese usuario no puede borrarlo ("Operation not permitted") - con
+      # set -e eso mataba el script entero. /tmp es la capa efímera del
+      # contenedor, se limpia solo en el próximo recreate.
+    fi
+  fi
 fi
 
 if [[ "$PROFILE" == "prod" ]]; then

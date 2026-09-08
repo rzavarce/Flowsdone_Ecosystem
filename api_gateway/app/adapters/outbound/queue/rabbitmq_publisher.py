@@ -1,18 +1,18 @@
+"""RabbitMQ implementation of MessagePublisherPort."""
+
 import json
 import logging
 from typing import Any
 
 import aio_pika
 
-from ....domain.ports.outbound import MessagePublisherPort
+from app.domain.ports.outbound import MessagePublisherPort
 
 logger = logging.getLogger("rabbitmq.publisher")
 
 
 class RabbitMQPublisher(MessagePublisherPort):
-    """
-    Outbound adapter for publishing messages to RabbitMQ.
-    """
+    """Outbound adapter for publishing messages to RabbitMQ."""
 
     def __init__(
         self,
@@ -21,6 +21,13 @@ class RabbitMQPublisher(MessagePublisherPort):
         exchange_name: str,
         routing_key: str,
     ) -> None:
+        """Build the publisher.
+
+        Args:
+            url (str): RabbitMQ connection URL.
+            exchange_name (str): Topic exchange to declare and publish to.
+            routing_key (str): Routing key used for every published message.
+        """
         self._url = url
         self._exchange_name = exchange_name
         self._routing_key = routing_key
@@ -30,6 +37,7 @@ class RabbitMQPublisher(MessagePublisherPort):
         self._exchange: aio_pika.Exchange | None = None
 
     async def start(self) -> None:
+        """Connect and declare the topic exchange."""
         logger.info(
             "rabbitmq.publisher.starting",
             extra={
@@ -53,6 +61,7 @@ class RabbitMQPublisher(MessagePublisherPort):
         )
 
     async def stop(self) -> None:
+        """Close the channel and connection, if open."""
         if self._channel:
             await self._channel.close()
         if self._connection:
@@ -60,7 +69,18 @@ class RabbitMQPublisher(MessagePublisherPort):
 
         logger.info("rabbitmq.publisher.stopped")
 
-    async def publish(self, event: Any) -> None:
+    async def publish(self, event: Any, *, key: str | None = None) -> None:
+        """Publish a JSON-serializable event using the configured routing key.
+
+        Args:
+            event (Any): The event to publish; serialized to JSON.
+            key (str | None): Unused. Kafka partition key kept only for
+                interface compatibility with MessagePublisherPort;
+                RabbitMQ already routes by routing_key.
+
+        Raises:
+            RuntimeError: If the publisher has not been started.
+        """
         if not self._exchange:
             raise RuntimeError("RabbitMQPublisher not started")
 

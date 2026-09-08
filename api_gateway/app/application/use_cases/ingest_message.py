@@ -1,3 +1,5 @@
+"""Use case for building and publishing the canonical inbound envelope."""
+
 from __future__ import annotations
 
 import logging
@@ -5,22 +7,29 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from ...domain.models.message_envelope import MessageEnvelope, MessageMeta
+from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
 
 logger = logging.getLogger("usecase.ingest_message")
 
 
 class IngestMessageUseCase:
-    """
-    Recibe un mensaje desde un canal de entrada (HTTP webhook, WS, etc.),
-    lo normaliza al contrato canónico MessageEnvelope y lo publica en el broker.
+    """Receives a message from an inbound channel (HTTP webhook, WS,
+    etc.), normalizes it into the canonical MessageEnvelope contract,
+    and publishes it to the broker.
 
-    Este use case debe ser el punto único de construcción del envelope para
-    entradas nuevas. Los consumers pueden ser tolerantes, pero los productores
-    deben crear el formato completo y correcto.
+    This use case must be the single construction point for the
+    envelope on new inbound messages. Consumers may be tolerant of
+    older/partial shapes, but producers must always build the full,
+    correct format.
     """
 
     def __init__(self, publisher_factory: Any):
+        """Build the use case.
+
+        Args:
+            publisher_factory (Any): Factory used to select the
+                publisher for a given transport.
+        """
         self.publisher_factory = publisher_factory
 
     async def execute(
@@ -32,22 +41,30 @@ class IngestMessageUseCase:
         transport: str,
         payload: Dict[str, Any],
         channel: Optional[str] = None,
+        channel_connection_id: Optional[str] = None,
+        external_conversation_key: Optional[str] = None,
     ) -> None:
-        """
-        Construye y publica un MessageEnvelope en dirección 'inbound'.
+        """Build and publish a MessageEnvelope with direction "inbound".
 
         Args:
-            workflow_id: ID del flujo de Langflow que se debe ejecutar.
-            conversation_id: ID de la conversación.
-            sender_id: ID del emisor si aplica (cliente, usuario, bot, etc.).
-            transport: transporte origen (rabbitmq, kafka, websocket, http, ...).
-            payload: payload útil del mensaje (ej. {"message": "...", "callback_url": "..."}).
-            channel: canal lógico si aplica (webchat, whatsapp, api, etc.).
+            workflow_id (str): Id of the Langflow flow that should run.
+            conversation_id (str): Id of the conversation.
+            sender_id (Optional[str]): Id of the sender, if applicable
+                (client, user, bot).
+            transport (str): Origin transport (rabbitmq, kafka,
+                websocket, http, ...).
+            payload (Dict[str, Any]): Message payload (e.g. {"message":
+                "...", "callback_url": "..."}).
+            channel (Optional[str]): Logical channel, if applicable
+                (webchat, whatsapp, api, ...).
+            channel_connection_id (Optional[str]): Id of the channel
+                connection that originated the message, if it came from
+                a native channel (not webchat). Required on the
+                outbound side to know which credentials to answer with.
+            external_conversation_key (Optional[str]): Id of the
+                recipient on the external platform (remoteJid, psid,
+                chat_id, ...), if applicable.
         """
-
-        # -----------------------------------------------------------------
-        # 1. Construcción del contrato canónico
-        # -----------------------------------------------------------------
         envelope = MessageEnvelope(
             meta=MessageMeta(
                 message_id=str(uuid4()),
@@ -55,6 +72,8 @@ class IngestMessageUseCase:
                 direction="inbound",
                 conversation_id=conversation_id,
                 workflow_id=workflow_id,
+                channel_connection_id=channel_connection_id,
+                external_conversation_key=external_conversation_key,
             ),
             transport=transport,
             channel=channel or sender_id,
@@ -74,15 +93,13 @@ class IngestMessageUseCase:
             },
         )
 
-        # -----------------------------------------------------------------
-        # 2. Resolución del publisher por transport
-        # -----------------------------------------------------------------
         publisher = self.publisher_factory.create(transport)
 
-        # -----------------------------------------------------------------
-        # 3. Publicación en broker
-        # -----------------------------------------------------------------
-        await publisher.publish(envelope.model_dump())
+        # key=channel: in Kafka this partitions messages by channel, so
+        # a slow/bursty channel does not block the others once
+        # kafka_inbound_worker replicas are scaled up (RabbitMQ ignores
+        # this key).
+        await publisher.publish(envelope.model_dump(), key=envelope.channel)
 
         logger.info(
             "ingest.message.published",

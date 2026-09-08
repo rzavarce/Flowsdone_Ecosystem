@@ -8,6 +8,9 @@ x-common: &common
     options:
       max-size: "10m"
       max-file: "5"
+      # El otel-collector (filelog/docker) lee esta label para poder rutear
+      # cada log al índice de OpenSearch de su propio servicio.
+      labels: "com.docker.compose.service"
 
 networks:
   flowsdone-net:
@@ -201,6 +204,14 @@ services:
     # profiles: [prod]
     image: ${OPENSEARCH_DASHBOARDS_IMAGE}
     container_name: ${CONTAINER_PREFIX}_opensearch_dashboards
+    # opensearch_security.multitenancy.* no está en la whitelist de keys que
+    # el entrypoint de la imagen convierte desde variables de entorno, así
+    # que se pasa como flag: el entrypoint reenvía cualquier arg extra al
+    # binario final. Sin esto, los saved objects (index patterns,
+    # dashboards) quedan en el tenant "Private" del usuario que los creó
+    # -invisible tanto en "Global" como en cualquier tenant custom-, aunque
+    # la API confirme que existen.
+    command: ["--opensearch_security.multitenancy.enabled=false"]
     environment:
       OPENSEARCH_HOSTS: ${OPENSEARCH_DASHBOARDS_HOSTS}
       OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME}
@@ -212,6 +223,12 @@ services:
         condition: service_healthy
     ports:
       - "${OPENSEARCH_DASH_PORT}:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -u ${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD} http://localhost:5601/api/status | grep -q '\"state\":\"green\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
     networks:
       - flowsdone-net
     mem_limit: ${OPENSEARCH_DASH_MEM_LIMIT}
@@ -450,6 +467,14 @@ services:
       LANGFLOW_DATABASE_URL: ${LANGFLOW_DATABASE_URL}   # ← NUEVO
       LANGFLOW_COMPONENTS_PATH: /app/langflow/components
       LANGFLOW_LOG_LEVEL: ${LANGFLOW_LOG_LEVEL:-info}
+      # Para el agente de onboarding interno (tool provision_client):
+      # llama de vuelta al admin API del gateway para crear tenant/
+      # project/agent/channel_connection. Mismo patron que n8n usa para
+      # llamar a Langflow (LANGFLOW_BASE_URL/LANGFLOW_API_KEY, seccion 13
+      # del README) - la tool lee esto via os.environ, nunca hardcodeado
+      # en el flow.
+      GATEWAY_INTERNAL_URL: ${GATEWAY_INTERNAL_URL}
+      GATEWAY_ADMIN_API_KEY: ${ADMIN_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy          # ← NUEVO
@@ -490,7 +515,7 @@ services:
       N8N_ENABLE_EXECUTE_COMMAND: ${N8N_ENABLE_EXECUTE_COMMAND}
       N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL}
       EXECUTIONS_DATA_PRUNE: ${N8N_EXECUTIONS_DATA_PRUNE}
-      WEBHOOK_URL: ${N8N_WEBHOOK_URL}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL}
       N8N_LOG_LEVEL: ${N8N_LOG_LEVEL}
       # Permite usar $env.X en expresiones de nodos (Code, HTTP Request, etc.)
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
@@ -500,9 +525,12 @@ services:
       LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
-      N8N_OTEL_TRACING_ENABLED: ${N8N_OTEL_TRACING_ENABLED}
-      N8N_OTEL_TRACING_ENDPOINT: ${N8N_OTEL_TRACING_ENDPOINT}
-      N8N_OTEL_TRACING_PROTOCOL: ${N8N_OTEL_TRACING_PROTOCOL}
+      # OJO: esta versión de n8n (2.33.3) lee N8N_OTEL_ENABLED /
+      # N8N_OTEL_EXPORTER_OTLP_ENDPOINT — NO existen N8N_OTEL_TRACING_*
+      # (quedaban de una versión/doc vieja de n8n y no hacían nada).
+      N8N_OTEL_ENABLED: ${N8N_OTEL_TRACING_ENABLED}
+      N8N_OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      N8N_OTEL_EXPORTER_SERVICE_NAME: fd-n8n
     depends_on:
       postgres:
         condition: service_healthy
@@ -540,6 +568,8 @@ services:
       kafka:
         condition: service_started
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - flowsdone-net
@@ -593,6 +623,34 @@ services:
       - flowsdone-net
     mem_limit: ${KAFKA_OUTBOUND_WORKER_MEM_LIMIT}
     cpus: ${KAFKA_OUTBOUND_WORKER_CPUS}
+
+  # Voice channel: dedicated worker/topic, kept isolated from the text
+  # channels' kafka_inbound_worker/kafka_outbound_worker pair so a
+  # burst of calls never competes with them for capacity.
+  kafka_voice_worker:
+    <<: *common
+    build:
+      context: .
+      dockerfile: dockers/Dockerfile.worker
+    command: python -m workers.kafka.voice.main
+    env_file: .env
+    environment:
+      GATEWAY_INTERNAL_URL: ${GATEWAY_INTERNAL_URL}
+      CALLBACK_HMAC_SECRET: ${CALLBACK_HMAC_SECRET}
+      OTEL_ENABLED: ${OTEL_ENABLED}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: fd-kafka-voice-worker
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      langflow:
+        condition: service_started
+    networks:
+      - flowsdone-net
+    mem_limit: ${KAFKA_VOICE_WORKER_MEM_LIMIT}
+    cpus: ${KAFKA_VOICE_WORKER_CPUS}
 
   # ------------------------------------------------------------------
   # WORKERS — RABBITMQ
