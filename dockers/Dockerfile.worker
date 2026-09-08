@@ -12,7 +12,10 @@ RUN uv pip install --system --no-cache-dir .
 COPY api_gateway ./api_gateway
 COPY workers ./workers
 
-ENV PYTHONPATH=/app
+# /app da workers.xxx; /app/api_gateway da app.xxx (el código de la
+# app vive físicamente en api_gateway/app/ pero se importa sin ese
+# prefijo, igual que en app/ mismo y en los tests - ver pyproject.toml).
+ENV PYTHONPATH=/app:/app/api_gateway
 ENV PYTHONUNBUFFERED=1
 
 # El CMD se sobreescribe en docker-compose

@@ -1,0 +1,112 @@
+name: Deploy Flowsdone Ecosystem
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias (incluye pytest/pytest-cov)
+        run: pip install -e ".[test]"
+
+      # Suite unitaria (api_gateway/tests/): mockea los puertos del
+      # dominio y httpx.AsyncClient, no pega contra Postgres/Kafka/
+      # RabbitMQ reales - corre sola en el runner, sin levantar el
+      # stack de docker-compose. El piso de cobertura vive en
+      # pyproject.toml ([tool.coverage.report].fail_under) para que
+      # local y CI usen el mismo número.
+      - name: Correr tests con cobertura
+        run: python -m pytest api_gateway/tests --cov --cov-report=term-missing
+
+  deploy:
+    needs: test
+    # Solo en push a main (post-merge) - en un evento pull_request este
+    # job no debe correr, o cada PR abierta terminaría deployando al VPS.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Si dos merges a main caen seguidos, dos runs de este job podrían
+    # pisarse en el mismo VPS a mitad de `docker compose build`/`up` o
+    # del `alembic upgrade head`. Encola los deploys en vez de dejarlos
+    # correr en paralelo; no cancela el que ya está en curso porque
+    # cortarlo a la mitad puede dejar el VPS en un estado inconsistente.
+    concurrency:
+      group: deploy-vps
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Desplegar en VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script_stop: true
+          # Default de appleboy/ssh-action (10m) no alcanza para buildear las
+          # 8 imágenes del stack en frío, en particular evolution (build de
+          # TypeScript con tsup) — sin esto el deploy corta a la mitad del
+          # `docker compose build` con "Run Command Timeout".
+          command_timeout: 40m
+          script: |
+            # Entrar al directorio del proyecto
+            cd /srv/Flowsdone_Ecosystem
+
+            # Descargar los cambios más recientes desde main
+            git pull origin main
+
+            # Buildear las imágenes actualizadas antes de tocar nada más
+            docker compose --profile prod build
+
+            # Migrar el esquema de gatewaydb (tenants/projects/agents/workflows/
+            # channel_connections/workflow_executions) ANTES de levantar api y
+            # los workers, para que arranquen ya contra el esquema nuevo.
+            docker compose --profile prod run --rm api alembic -c api_gateway/alembic.ini upgrade head
+
+            # OpenSearch primero, y solo, todavía SIN otel-collector: el index
+            # template de logs-* (scripts/opensearch/init-opensearch.sh) tiene
+            # que existir antes de que otel-collector escriba el primer log,
+            # o el índice queda creado con mapping dinámico y no hay forma de
+            # corregirlo después sin borrarlo.
+            docker compose --profile prod up -d --remove-orphans --no-deps opensearch opensearch-dashboards
+
+            OS_CONTAINER=$(docker compose --profile prod ps -q opensearch)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $OS_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+            docker exec -i "$OS_CONTAINER" sh -s < scripts/opensearch/init-opensearch.sh
+
+            DASH_CONTAINER=$(docker compose --profile prod ps -q opensearch-dashboards)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $DASH_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+            docker cp scripts/opensearch/dashboards-export.ndjson "${DASH_CONTAINER}:/tmp/dashboards-export.ndjson"
+            docker exec -i "$DASH_CONTAINER" sh -s < scripts/opensearch/init-dashboards.sh
+            # Sin cleanup del ndjson en /tmp: el contenedor corre como un
+            # usuario no-root, docker cp lo crea como root, y con el sticky
+            # bit de /tmp ese usuario no puede borrarlo ("Operation not
+            # permitted") - cortaba el deploy entero por script_stop antes
+            # de llegar al `up -d` final. /tmp es la capa efímera del
+            # contenedor, se limpia solo en el próximo recreate.
+
+            # Ahora sí, el resto del stack (incluye otel-collector, que ya
+            # encuentra el index template listo) incluyendo el perfil 'prod'
+            # (Traefik, etc.)
+            docker compose --profile prod up -d --remove-orphans
+
+            # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco
+            docker image prune -f
