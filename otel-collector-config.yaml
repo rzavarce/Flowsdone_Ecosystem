@@ -77,12 +77,34 @@ receivers:
           error: [error, ERROR]
           fatal: [critical, CRITICAL, fatal, FATAL]
 
-      # Si el body no es JSON (nginx, uvicorn, etc.), buscamos la palabra de
+      # Traefik loguea texto plano (access log tipo CLF), no JSON - el
+      # regex_parser genérico de más abajo (busca CRITICAL/ERROR/WARN como
+      # palabra suelta) le pegaba a esas palabras dentro del PATH de la URL
+      # (ej. ".../errors-critical-timeline" o ".../error.js"), marcando
+      # peticiones 200 OK como "critical"/"error". Para traefik usamos el
+      # código HTTP real, que sí refleja si la petición fue un problema.
+      - type: regex_parser
+        parse_from: body
+        parse_to: attributes.traefik_status
+        if: resource["service.name"] == "traefik" && attributes.body_json == nil
+        regex: '"\s+(?P<status>\d{3})\s+\d+\s'
+        on_error: send_quiet
+      - type: severity_parser
+        parse_from: attributes.traefik_status.status
+        if: attributes.traefik_status != nil && attributes.traefik_status.status != nil
+        mapping:
+          info: 2xx
+          info2: 3xx
+          warn: 4xx
+          error: 5xx
+
+      # Si el body no es JSON y no es un access log de traefik ya
+      # clasificado arriba (nginx, uvicorn, etc.), buscamos la palabra de
       # nivel en el texto plano.
       - type: regex_parser
         parse_from: body
         parse_to: attributes.plain_level
-        if: attributes.body_json == nil
+        if: attributes.body_json == nil && resource["service.name"] != "traefik"
         regex: '(?i)\b(?P<level>CRITICAL|FATAL|ERROR|WARN(?:ING)?|INFO|DEBUG)\b'
         on_error: send_quiet
       - type: severity_parser
@@ -101,6 +123,9 @@ receivers:
       - type: remove
         field: attributes.plain_level
         if: attributes.plain_level != nil
+      - type: remove
+        field: attributes.traefik_status
+        if: attributes.traefik_status != nil
 
       - type: time_parser
         parse_from: attributes.time
