@@ -242,8 +242,6 @@ services:
     user: "0"
     environment:
       OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
