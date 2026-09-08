@@ -12,6 +12,7 @@ volumes/*
 !volumes/langflow/
 volumes/langflow/*
 !volumes/langflow/components/
+!volumes/langflow/components_tests/
 backups/
 evolution-api/
 .env

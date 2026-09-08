@@ -9,15 +9,26 @@ wrapping the result as a Message. `toon.encode` itself is stubbed with a
 deterministic fake - verifying its actual encoding behavior is
 python-toon's own test suite's job, not this component's.
 
-This file lives outside the api_gateway package (it's a Langflow custom
-component, loaded by Langflow's own runtime, not by the api_gateway
-app), so it isn't picked up by api_gateway's pytest config and doesn't
-import the real `langflow`/`toon` packages (not installed in that venv).
-Minimal stand-ins are injected into sys.modules before loading the
-module under test.
+This file deliberately lives in a sibling directory
+(components_tests/), NOT inside components/ alongside the component
+files themselves: Langflow scans components/ at startup and tries to
+load every .py file there as a component. This file's own
+_install_stubs() overwrites sys.modules["langflow.custom"],
+sys.modules["toon"], etc. with fakes - harmless when pytest imports it
+in an isolated process, but if Langflow's component scanner ever loaded
+this file directly, it would corrupt those modules for the rest of that
+process, breaking real component registration (confirmed: this is
+exactly what happened when this file previously lived in components/).
+
+This file also lives outside the api_gateway package (it's a test for a
+Langflow custom component, not for the api_gateway app), so it isn't
+picked up by api_gateway's pytest config and doesn't import the real
+`langflow`/`toon` packages (not installed in that venv). Minimal
+stand-ins are injected into sys.modules before loading the module under
+test.
 
 Run directly with:
-    pytest volumes/langflow/components/test_data_to_toon.py
+    pytest volumes/langflow/components_tests/test_data_to_toon.py
 """
 
 from __future__ import annotations
@@ -78,7 +89,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent / "data_to_toon.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "data_to_toon.py"
 _spec = importlib.util.spec_from_file_location("data_to_toon", _MODULE_PATH)
 data_to_toon = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(data_to_toon)
