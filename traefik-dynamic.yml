@@ -14,11 +14,6 @@ http:
         regex: "^/(.*)"
         replacement: "/static/flowsdone/$1"
 
-    fibralan-static:
-      replacePathRegex:
-        regex: "^/(.*)"
-        replacement: "/static/fibralan/$1"
-
   routers:
     n8n:
       rule: "Host(`auto.flowsdone.com`)"
@@ -132,22 +127,6 @@ http:
       tls:
         certresolver: myresolver
       service: logs-svc
-
-    fibralan-ws:
-      rule: "(Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)) && Path(`/ws`)"
-      entrypoints: [websecure]
-      tls:
-        certresolver: myresolver
-      service: webchat-svc
-
-    fibralan:
-      rule: "(Host(`fibralansecurity.com`) || Host(`www.fibralansecurity.com`)) && !Path(`/ws`)"
-      entrypoints: [websecure]
-      tls:
-        certresolver: myresolver
-      service: webchat-svc
-      middlewares:
-        - fibralan-static
 
   services:
     n8n-svc:
