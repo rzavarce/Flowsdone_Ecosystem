@@ -16,6 +16,9 @@ volumes/langflow/*
 backups/
 evolution-api/
 .env
+.env.loadtest
+.env.local
+.env.vps
 .venv
 .claude
 .Blackboard.txt
@@ -26,3 +29,7 @@ htmlcov/
 # Downloaded dev tooling binary, not source - scripts/dev/voice_demo_tunnel.sh
 # fetches it on demand.
 scripts/dev/cloudflared
+
+# Load test local state (created tenant ids, not secrets, but not shared state either)
+loadtest/.tenant.json
+loadtest/results/
