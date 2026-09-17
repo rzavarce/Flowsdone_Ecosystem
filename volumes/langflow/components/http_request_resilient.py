@@ -71,10 +71,28 @@ class ResilientHTTPRequestComponent(Component):
             info="Objeto JSON para POST/PUT/PATCH. Vacío = sin body.",
         ),
         SecretStrInput(
-            name="bearer_token",
-            display_name="Bearer Token",
+            name="api_key",
+            display_name="API Key",
             required=False,
-            info="Si se completa, agrega 'Authorization: Bearer <token>' a los headers.",
+            info=(
+                "Si se completa, se agrega a los headers en 'Header de autenticación' con el "
+                "prefijo de 'Esquema'. Guardala como Global Variable (Credential) en vez de "
+                "tipearla directo - así no queda en texto plano en el flow."
+            ),
+        ),
+        StrInput(
+            name="api_key_header",
+            display_name="Header de autenticación",
+            value="Authorization",
+            advanced=True,
+            info="Nombre del header HTTP que lleva la API key (ej. 'Authorization' o 'x-api-key').",
+        ),
+        StrInput(
+            name="api_key_scheme",
+            display_name="Esquema (prefijo)",
+            value="Bearer",
+            advanced=True,
+            info="Prefijo antes de la key en el header (ej. 'Bearer'). Vacío para headers tipo x-api-key, que llevan la key sin prefijo.",
         ),
         FloatInput(name="timeout", display_name="Timeout (segundos)", value=10, advanced=True),
         IntInput(name="max_retries", display_name="Reintentos máximos", value=3, advanced=True),
@@ -237,8 +255,9 @@ class ResilientHTTPRequestComponent(Component):
         """
         retryable_codes = self._parse_retryable_codes()
         headers = self._parse_json_object_field(self.headers_json, "Headers (JSON)")
-        if self.bearer_token:
-            headers = {**headers, "Authorization": f"Bearer {self.bearer_token}"}
+        if self.api_key:
+            value = f"{self.api_key_scheme} {self.api_key}".strip() if self.api_key_scheme else self.api_key
+            headers = {**headers, self.api_key_header: value}
         params = self._parse_json_object_field(self.query_params_json, "Query params (JSON)")
         json_body = self._parse_json_object_field(self.body_json, "Body (JSON)") if self.body_json else None
 

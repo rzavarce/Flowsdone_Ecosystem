@@ -153,7 +153,9 @@ def _make_component(**overrides):
     component.headers_json = ""
     component.query_params_json = ""
     component.body_json = ""
-    component.bearer_token = ""
+    component.api_key = ""
+    component.api_key_header = "Authorization"
+    component.api_key_scheme = "Bearer"
     component.timeout = 10
     component.max_retries = 3
     component.retry_backoff_base = 0.5
@@ -301,14 +303,24 @@ def test_custom_retryable_status_codes_are_honored():
     assert result.data["attempts"] == 2
 
 
-def test_bearer_token_is_added_to_headers():
+def test_api_key_is_added_with_bearer_scheme_by_default():
     _reset()
     _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
-    component = _make_component(bearer_token="secreta")
+    component = _make_component(api_key="secreta")
 
     asyncio.run(component.make_request())
 
     assert _FakeAsyncClient.calls[0]["headers"]["Authorization"] == "Bearer secreta"
+
+
+def test_api_key_supports_x_api_key_style_headers_without_scheme():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component(api_key="secreta", api_key_header="x-api-key", api_key_scheme="")
+
+    asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["headers"] == {"x-api-key": "secreta"}
 
 
 def test_invalid_headers_json_raises_value_error():
