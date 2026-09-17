@@ -44,5 +44,13 @@ class LangflowExecutorPort(Protocol):
 
         Returns:
             dict: The raw response returned by Langflow.
+
+        Raises:
+            Exception: If the workflow could not be run — an HTTP
+                error from Langflow, or any other response that isn't
+                a usable result. Implementations must raise rather
+                than return an error-shaped dict, since callers (see
+                `ExecuteWorkflowUseCase`) rely on an exception to mark
+                the run failed.
         """
         ...

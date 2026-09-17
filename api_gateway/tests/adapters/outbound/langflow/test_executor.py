@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from app.adapters.outbound.langflow import executor as module
-from app.adapters.outbound.langflow.executor import LangflowExecutor
+from app.adapters.outbound.langflow.executor import LangflowExecutionError, LangflowExecutor
 from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 
 pytestmark = pytest.mark.anyio
@@ -73,19 +73,50 @@ async def test_run_returns_parsed_json_on_success(monkeypatch):
     assert result == {"result": "ok"}
 
 
-async def test_run_returns_error_payload_on_http_error_status(monkeypatch):
-    _patch_client(
-        monkeypatch,
-        FakeResponse(500, json_body={"detail": "boom"}, text='{"detail": "boom"}'),
-    )
+async def test_run_returns_none_on_empty_success_body(monkeypatch):
+    _patch_client(monkeypatch, FakeResponse(200, content=b"", text=""))
 
     result = await LangflowExecutor().run(
         workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1"
     )
 
-    assert result == {
-        "error": True,
-        "status_code": 500,
-        "message": "boom",
-        "raw_response": '{"detail": "boom"}',
-    }
+    assert result is None
+
+
+async def test_run_raises_on_http_error_status(monkeypatch):
+    _patch_client(
+        monkeypatch,
+        FakeResponse(500, json_body={"detail": "boom"}, text='{"detail": "boom"}'),
+    )
+
+    with pytest.raises(LangflowExecutionError) as exc_info:
+        await LangflowExecutor().run(
+            workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1"
+        )
+
+    assert exc_info.value.status_code == 500
+    assert "boom" in str(exc_info.value)
+
+
+async def test_run_raises_on_non_json_2xx_response(monkeypatch):
+    """Regression guard for the bug this fix addresses: an unknown or
+    non-PUBLIC workflow_id makes Langflow's API fall through to its own
+    frontend SPA, which answers 200 with index.html instead of a 404 —
+    that must not be treated as a successful run.
+    """
+    _patch_client(
+        monkeypatch,
+        FakeResponse(
+            200,
+            text="<!doctype html><html>...</html>",
+            content=b"<!doctype html><html>...</html>",
+            headers={"content-type": "text/html; charset=utf-8"},
+        ),
+    )
+
+    with pytest.raises(LangflowExecutionError) as exc_info:
+        await LangflowExecutor().run(
+            workflow_id="nonexistent-flow", payload={"message": "hola"}, conversation_id="conv-1"
+        )
+
+    assert exc_info.value.status_code == 200
