@@ -32,3 +32,4 @@ scripts/dev/cloudflared
 
 # Load test local state (created tenant ids, not secrets, but not shared state either)
 loadtest/.tenant.json
+loadtest/results/

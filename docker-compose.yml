@@ -467,6 +467,10 @@ services:
       LANGFLOW_DATABASE_URL: ${LANGFLOW_DATABASE_URL}   # ← NUEVO
       LANGFLOW_COMPONENTS_PATH: /app/langflow/components
       LANGFLOW_LOG_LEVEL: ${LANGFLOW_LOG_LEVEL:-info}
+      # Default de la URL de Weaviate para components/weaviate_multitenant.py
+      # (os.environ, nunca hardcodeado en el componente) - mismo patron que
+      # GATEWAY_INTERNAL_URL mas abajo.
+      WEAVIATE_URL: ${WEAVIATE_URL}
       # Para el agente de onboarding interno (tool provision_client):
       # llama de vuelta al admin API del gateway para crear tenant/
       # project/agent/channel_connection. Mismo patron que n8n usa para
