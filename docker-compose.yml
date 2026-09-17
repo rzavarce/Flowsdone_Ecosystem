@@ -467,6 +467,12 @@ services:
       LANGFLOW_DATABASE_URL: ${LANGFLOW_DATABASE_URL}   # ← NUEVO
       LANGFLOW_COMPONENTS_PATH: /app/langflow/components
       LANGFLOW_LOG_LEVEL: ${LANGFLOW_LOG_LEVEL:-info}
+      # Sin esto, Langflow genera una clave Fernet al azar dentro del
+      # contenedor (~/.cache/langflow/secret_key, no montado a un volumen del
+      # host) y la pierde en cada recreación - invalidando todos los Global
+      # Variables tipo Credential guardados con la clave anterior
+      # (cryptography.fernet.InvalidToken). Fija y estable entre deploys.
+      LANGFLOW_SECRET_KEY: ${LANGFLOW_SECRET_KEY}
       # Default de la URL de Weaviate para components/weaviate_multitenant.py
       # (os.environ, nunca hardcodeado en el componente) - mismo patron que
       # GATEWAY_INTERNAL_URL mas abajo.
