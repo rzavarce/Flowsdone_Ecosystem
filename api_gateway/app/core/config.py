@@ -83,6 +83,14 @@ class Settings(BaseModel):
     # 9). EVOLUTION_API_KEY remains the shared secret of our own
     # Evolution API instance.
     EVOLUTION_API_KEY: Optional[str] = None
+    # Evolution does NOT echo EVOLUTION_API_KEY (its own admin/auth key)
+    # back in the webhook body's "apikey" field - it sends the
+    # per-instance token Evolution auto-generates when the instance is
+    # created instead (visible via GET /instance/fetchInstances, or by
+    # inspecting a real webhook call). That's a different value than our
+    # admin key, so the WhatsApp webhook accepts either one here rather
+    # than only EVOLUTION_API_KEY.
+    EVOLUTION_WEBHOOK_API_KEY: Optional[str] = None
 
     # Channels (outbound message sending)
     EVOLUTION_API_BASE_URL: str = "http://evolution:8080"
@@ -180,6 +188,7 @@ settings = Settings(
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 
     EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),
+    EVOLUTION_WEBHOOK_API_KEY=os.getenv("EVOLUTION_WEBHOOK_API_KEY"),
 
     EVOLUTION_API_BASE_URL=os.getenv("EVOLUTION_API_BASE_URL", "http://evolution:8080"),
     META_GRAPH_API_BASE_URL=os.getenv("META_GRAPH_API_BASE_URL", "https://graph.facebook.com"),

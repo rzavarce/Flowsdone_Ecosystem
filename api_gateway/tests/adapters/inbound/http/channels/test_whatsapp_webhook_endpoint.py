@@ -65,6 +65,25 @@ async def test_valid_apikey_in_body_routes_the_message():
     assert len(switchboard.calls) == 1
 
 
+async def test_evolution_instance_apikey_is_also_accepted(monkeypatch):
+    """Evolution doesn't echo EVOLUTION_API_KEY back in real webhook
+    calls - it sends the per-instance token it auto-generated when the
+    instance was created, which is a different value. Confirmed against
+    a real webhook capture in production.
+    """
+    monkeypatch.setattr(module.settings, "EVOLUTION_WEBHOOK_API_KEY", "per-instance-token")
+    switchboard = FakeSwitchboard()
+
+    async with client_for_router(router, switchboard=switchboard) as client:
+        response = await client.post(
+            "/webhooks/whatsapp",
+            json=_upsert_event(apikey="per-instance-token"),
+        )
+
+    assert response.status_code == 200
+    assert len(switchboard.calls) == 1
+
+
 async def test_wrong_apikey_is_rejected():
     switchboard = FakeSwitchboard()
 
