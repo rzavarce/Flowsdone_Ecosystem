@@ -332,3 +332,19 @@ def test_invalid_headers_json_raises_value_error():
         assert "JSON" in str(exc)
     else:
         raise AssertionError("Expected ValueError")
+
+
+def test_whitespace_only_json_fields_are_treated_as_empty():
+    """Regresión: un campo avanzado con solo espacios/salto de línea (no '' exacto)
+    no debe intentar parsearse como JSON - json.loads(' ') falla con
+    'Expecting value: line 1 column 1 (char 0)', visto en Langflow real."""
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component(headers_json="  \n", query_params_json="\t", body_json=" ")
+
+    asyncio.run(component.make_request())
+
+    call = _FakeAsyncClient.calls[0]
+    assert call["headers"] is None
+    assert call["params"] is None
+    assert call["json"] is None
