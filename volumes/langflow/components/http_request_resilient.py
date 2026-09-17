@@ -142,12 +142,12 @@ class ResilientHTTPRequestComponent(Component):
             field_label (str): Display name, used in error messages.
 
         Returns:
-            dict: The parsed object, or `{}` if `value` is empty.
+            dict: The parsed object, or `{}` if `value` is empty or whitespace-only.
 
         Raises:
             ValueError: If `value` is set but isn't valid JSON, or isn't a JSON object.
         """
-        if not value:
+        if not value or not value.strip():
             return {}
         try:
             parsed = json.loads(value)
@@ -259,7 +259,7 @@ class ResilientHTTPRequestComponent(Component):
             value = f"{self.api_key_scheme} {self.api_key}".strip() if self.api_key_scheme else self.api_key
             headers = {**headers, self.api_key_header: value}
         params = self._parse_json_object_field(self.query_params_json, "Query params (JSON)")
-        json_body = self._parse_json_object_field(self.body_json, "Body (JSON)") if self.body_json else None
+        json_body = self._parse_json_object_field(self.body_json, "Body (JSON)")
 
         last_error = "unknown error"
         attempts = 0
@@ -273,7 +273,7 @@ class ResilientHTTPRequestComponent(Component):
                         url=self.url,
                         headers=headers or None,
                         params=params or None,
-                        json=json_body,
+                        json=json_body or None,
                     )
                 except httpx.RequestError as exc:
                     last_error = f"{type(exc).__name__}: {exc}"
