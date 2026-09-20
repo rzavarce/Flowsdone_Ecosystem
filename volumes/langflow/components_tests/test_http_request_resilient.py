@@ -17,6 +17,7 @@ import importlib.util
 import sys
 import types
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 class _FakeRequestError(Exception):
@@ -149,6 +150,7 @@ def _reset():
 def _make_component(**overrides):
     component = ResilientHTTPRequestComponent()
     component.url = "http://erp.fibralan.com/api/productos"
+    component.path = ""
     component.method = "GET"
     component.headers_json = ""
     component.query_params_json = ""
@@ -348,3 +350,127 @@ def test_whitespace_only_json_fields_are_treated_as_empty():
     assert call["headers"] is None
     assert call["params"] is None
     assert call["json"] is None
+
+
+def test_empty_path_requests_the_base_url_untouched():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component()
+
+    asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos"
+
+
+def test_path_is_appended_to_the_base_url():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={"codigo": "CP-1045"})]
+    component = _make_component(path="CP-1045")
+
+    result = asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos/CP-1045"
+    assert result.data["success"] is True
+
+
+def test_path_is_appended_correctly_with_slashes_and_multiple_segments():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component(url="http://erp.fibralan.com/api/productos/", path="/stock//CP-1045/")
+
+    asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos/stock/CP-1045"
+
+
+def test_path_keeps_the_query_string_of_the_base_url():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component(url="http://erp.fibralan.com/api/productos?empresa=1", path="CP-1045")
+
+    asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos/CP-1045?empresa=1"
+
+
+def test_path_special_characters_are_encoded_not_interpreted():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component(path="a b?x=1#frag")
+
+    asyncio.run(component.make_request())
+
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos/a%20b%3Fx%3D1%23frag"
+
+
+def test_path_cannot_redirect_the_request_to_another_host():
+    _reset()
+    payloads = ["http://evil.com/steal", "//evil.com/steal", "@evil.com", "\\evil.com\\x"]
+    for payload in payloads:
+        _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+        component = _make_component(path=payload)
+
+        asyncio.run(component.make_request())
+
+        sent = _FakeAsyncClient.calls[-1]["url"]
+        assert urlsplit(sent).netloc == "erp.fibralan.com", payload
+        assert urlsplit(sent).path.startswith("/api/productos/"), payload
+
+
+def test_path_with_dot_segments_is_rejected_without_calling_the_api():
+    _reset()
+    component = _make_component(path="../admin/users")
+
+    result = asyncio.run(component.make_request())
+
+    assert result.data["success"] is False
+    assert result.data["attempts"] == 0
+    assert "'..'" in result.data["error"]
+    assert _FakeAsyncClient.calls == []
+
+
+def test_path_with_dot_segments_raises_when_raise_on_failure_is_true():
+    _reset()
+    component = _make_component(path="a/./b", raise_on_failure=True)
+
+    try:
+        asyncio.run(component.make_request())
+    except ValueError as exc:
+        assert "Path" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+    assert _FakeAsyncClient.calls == []
+
+
+def test_component_without_path_field_still_works_for_flows_saved_before_it_existed():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data={})]
+    component = _make_component()
+    del component.path
+
+    result = asyncio.run(component.make_request())
+
+    assert result.data["success"] is True
+    assert _FakeAsyncClient.calls[0]["url"] == "http://erp.fibralan.com/api/productos"
+
+
+def test_failure_envelope_reports_the_full_requested_url():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(404, text="not found")]
+    component = _make_component(path="CP-9999")
+
+    result = asyncio.run(component.make_request())
+
+    assert result.data["success"] is False
+    assert result.data["url"] == "http://erp.fibralan.com/api/productos/CP-9999"
+
+
+def test_only_path_query_params_and_body_are_exposed_to_the_model_as_tool_params():
+    tool_inputs = {
+        item.kwargs["name"]
+        for item in ResilientHTTPRequestComponent.inputs
+        if item.kwargs.get("tool_mode")
+    }
+
+    assert tool_inputs == {"path", "query_params_json", "body_json"}
+

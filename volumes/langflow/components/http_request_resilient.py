@@ -20,6 +20,14 @@ This component adds that policy layer on top of httpx.AsyncClient:
   whole turn), less so for a batch flow, where downstream nodes still need
   an explicit `success` check before acting on `data` - this component
   only guarantees a clean signal, not that callers use it.
+
+Safe to use as an Agent tool (Tool Mode): only `path`, `query_params_json`
+and `body_json` are exposed to the model. `url` is the fixed base URL that
+whoever builds the flow chooses, and the API key / auth header never leave
+the component, so the model can't redirect the request (and the key with
+it) to another host. `path` is appended to `url` one segment at a time,
+percent-encoded, with "." / ".." segments rejected, so it can't change the
+host nor climb out of the base URL's own path prefix either.
 """
 
 from __future__ import annotations
@@ -27,6 +35,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import httpx
 from langflow.custom import Component
@@ -49,7 +58,26 @@ class ResilientHTTPRequestComponent(Component):
     icon = "Globe"
 
     inputs = [
-        StrInput(name="url", display_name="URL", required=True, tool_mode=True),
+        StrInput(
+            name="url",
+            display_name="URL",
+            required=True,
+            info=(
+                "URL base fija. Nunca la decide el modelo cuando el nodo se usa como tool: "
+                "es lo que impide que la API key viaje a otro host."
+            ),
+        ),
+        StrInput(
+            name="path",
+            display_name="Path",
+            advanced=True,
+            tool_mode=True,
+            info=(
+                "Segmento(s) que se agregan al final de la URL base, ej. 'CP-1045' o 'productos/CP-1045'. "
+                "Se codifican por segmento (no pongas '?', '#' ni una URL completa); '.' y '..' se rechazan. "
+                "Vacío = se usa la URL base tal cual."
+            ),
+        ),
         DropdownInput(name="method", display_name="Método", options=_HTTP_METHODS, value="GET"),
         StrInput(
             name="headers_json",
@@ -61,7 +89,8 @@ class ResilientHTTPRequestComponent(Component):
             name="query_params_json",
             display_name="Query params (JSON)",
             advanced=True,
-            info='Objeto JSON, ej. \'{"page": 1}\'.',
+            tool_mode=True,
+            info='Objeto JSON, ej. \'{"codigo": "CP-1045"}\'. Vacío = sin query params.',
         ),
         StrInput(
             name="body_json",
@@ -159,6 +188,36 @@ class ResilientHTTPRequestComponent(Component):
             raise ValueError(msg)
         return parsed
 
+    def _build_url(self) -> str:
+        """Appends `path` to the fixed base `url` without letting it change the destination.
+
+        Each `/`-separated segment of `path` is percent-encoded on its own, so
+        characters like `?`, `#`, `@`, `:` or `\\` end up as literal path data
+        instead of altering the URL's structure. Empty segments are dropped and
+        `.` / `..` segments are rejected, so the result always stays under the
+        base URL's host and path prefix. `path` is treated as literal text, not
+        as an already-encoded one: a `%` in it is itself encoded.
+
+        Returns:
+            str: `url` unchanged if `path` is empty, otherwise `url` with the
+            encoded segments appended to its path (any query string on `url` is kept).
+
+        Raises:
+            ValueError: If `path` contains a `.` or `..` segment.
+        """
+        base = (self.url or "").strip()
+        # getattr: flows saved before `path` existed have no such field until the node is updated.
+        path = (getattr(self, "path", "") or "").strip()
+        segments = [segment for segment in path.split("/") if segment]
+        if not segments:
+            return base
+        if any(segment in {".", ".."} for segment in segments):
+            msg = f"'Path' no puede contener segmentos '.' ni '..': {path!r}"
+            raise ValueError(msg)
+        parts = urlsplit(base)
+        encoded = "/".join(quote(segment, safe="") for segment in segments)
+        return urlunsplit(parts._replace(path=f"{parts.path.rstrip('/')}/{encoded}"))
+
     def _parse_retryable_codes(self) -> set[int]:
         """Parses `retryable_status_codes` into a set of ints.
 
@@ -217,7 +276,14 @@ class ResilientHTTPRequestComponent(Component):
         self.status = result
         return Data(data=result)
 
-    def _fail(self, error: str, status_code: int | None, attempts: int, body: str | None = None) -> Data:
+    def _fail(
+        self,
+        error: str,
+        status_code: int | None,
+        attempts: int,
+        body: str | None = None,
+        url: str | None = None,
+    ) -> Data:
         """Builds the failure envelope, or raises if `raise_on_failure` is set.
 
         Args:
@@ -225,6 +291,7 @@ class ResilientHTTPRequestComponent(Component):
             status_code (int | None): HTTP status code, or None for network-level failures.
             attempts (int): Total attempts made.
             body (str | None): Raw response body, if any was received.
+            url (str | None): URL that was requested (base `url` + `path`); defaults to the base `url`.
 
         Returns:
             Data: `{success: false, status_code, data: null, error, attempts, url}`.
@@ -232,18 +299,19 @@ class ResilientHTTPRequestComponent(Component):
         Raises:
             ValueError: If `raise_on_failure` is True.
         """
+        url = url or self.url
         result = {
             "success": False,
             "status_code": status_code,
             "data": None,
             "error": error,
             "attempts": attempts,
-            "url": self.url,
+            "url": url,
             "raw_body": body,
         }
         self.status = result
         if self.raise_on_failure:
-            msg = f"HTTP request a '{self.url}' falló tras {attempts} intento(s): {error}"
+            msg = f"HTTP request a '{url}' falló tras {attempts} intento(s): {error}"
             raise ValueError(msg)
         return Data(data=result)
 
@@ -253,6 +321,11 @@ class ResilientHTTPRequestComponent(Component):
         Returns:
             Data: The success or failure envelope (see `_succeed`/`_fail`).
         """
+        try:
+            url = self._build_url()
+        except ValueError as exc:
+            return self._fail(str(exc), status_code=None, attempts=0)
+
         retryable_codes = self._parse_retryable_codes()
         headers = self._parse_json_object_field(self.headers_json, "Headers (JSON)")
         if self.api_key:
@@ -270,7 +343,7 @@ class ResilientHTTPRequestComponent(Component):
                 try:
                     response = await client.request(
                         method=self.method,
-                        url=self.url,
+                        url=url,
                         headers=headers or None,
                         params=params or None,
                         json=json_body or None,
@@ -280,7 +353,7 @@ class ResilientHTTPRequestComponent(Component):
                     if self.retry_on_network_error and attempt <= self.max_retries:
                         await asyncio.sleep(self._compute_backoff(attempt))
                         continue
-                    return self._fail(last_error, status_code=None, attempts=attempts)
+                    return self._fail(last_error, status_code=None, attempts=attempts, url=url)
 
                 if response.status_code < 400:
                     return self._succeed(response, attempts)
@@ -298,6 +371,8 @@ class ResilientHTTPRequestComponent(Component):
                     await asyncio.sleep(delay)
                     continue
 
-                return self._fail(last_error, status_code=response.status_code, attempts=attempts, body=response.text)
+                return self._fail(
+                    last_error, status_code=response.status_code, attempts=attempts, body=response.text, url=url
+                )
 
-        return self._fail(last_error, status_code=None, attempts=attempts)
+        return self._fail(last_error, status_code=None, attempts=attempts, url=url)
