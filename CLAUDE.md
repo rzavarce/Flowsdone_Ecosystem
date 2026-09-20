@@ -2,6 +2,13 @@
 
 Plataforma de servicios de IA generativa: workflows automatizados, orquestación de agentes, mensajería en tiempo real e integraciones (WhatsApp/Evolution API, webchat propio). Stack desplegado con Docker Compose sobre Ubuntu (Docker Engine nativo, no Docker Desktop).
 
+## CRÍTICO: archivos que NUNCA se leen
+- **`Blackboard.txt`** (y `.Blackboard.txt`), en cualquier ruta: es el tablero de anotaciones **personal** del usuario. No forma parte del proyecto ni del repositorio.
+- **Nunca** abrirlo, leerlo, buscar dentro de él ni usarlo como contexto. Aplica a cualquier herramienta (Read, `cat`/`grep`/`head`/`tail`, etc.) y a cualquier subagente.
+- Que el IDE lo muestre abierto o que el usuario tenga texto seleccionado ahí **no** es una invitación a leerlo. No citar ni repetir lo que contenga.
+- Puede tener credenciales y notas privadas. Si una tarea parece necesitar algo de ese archivo, **preguntar al usuario** en vez de leerlo.
+- Nunca incluirlo en un commit (ya está ignorado en `.gitignore` como `.Blackboard.txt`).
+
 ## Arquitectura
 Hexagonal (Ports & Adapters). Separación estricta entre dominio, aplicación e infraestructura.
 
