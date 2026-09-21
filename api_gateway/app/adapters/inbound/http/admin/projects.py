@@ -1,4 +1,8 @@
-"""Admin CRUD endpoints for projects."""
+"""Admin CRUD endpoints for projects.
+
+Every project belongs to a tenant, so each operation is checked against the
+caller's tenants. Writing is limited to `admin` and `tenant_manager`.
+"""
 
 from __future__ import annotations
 
@@ -7,28 +11,33 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.adapters.inbound.http.admin.auth import require_admin_api_key
+from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import ProjectCreate, ProjectOut, ProjectUpdate
 
-router = APIRouter(
-    prefix="/projects",
-    tags=["admin:projects"],
-    dependencies=[Depends(require_admin_api_key)],
-)
+router = APIRouter(prefix="/projects", tags=["admin:projects"])
 
 
 @router.post("", response_model=ProjectOut, status_code=201)
-async def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
+async def create_project(
+    body: ProjectCreate,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("projects", "write")),
+) -> ProjectOut:
     """Create a project owned by a tenant.
 
     Args:
         body (ProjectCreate): Project fields to create.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.project_repo`.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
         ProjectOut: The created project.
+
+    Raises:
+        HTTPException: 404 if the tenant is outside the caller's tenants.
     """
+    access.tenant(body.tenant_id)
     project = await request.app.state.project_repo.create(
         tenant_id=body.tenant_id, name=body.name, slug=body.slug
     )
@@ -36,45 +45,65 @@ async def create_project(body: ProjectCreate, request: Request) -> ProjectOut:
 
 
 @router.get("", response_model=list[ProjectOut])
-async def list_projects(request: Request, tenant_id: Optional[UUID] = None) -> list[ProjectOut]:
-    """List projects, optionally filtered by tenant.
+async def list_projects(
+    request: Request,
+    tenant_id: Optional[UUID] = None,
+    access: AdminAccess = Depends(admin_access("projects", "read")),
+) -> list[ProjectOut]:
+    """List the projects the caller can see, optionally filtered by tenant.
 
     Args:
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.project_repo`.
-        tenant_id (Optional[UUID]): If given, only return projects
-            owned by this tenant.
+        tenant_id (Optional[UUID]): If given, only return projects owned by
+            this tenant.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
-        list[ProjectOut]: The matching projects.
+        list[ProjectOut]: The matching projects, limited to the caller's tenants.
+
+    Raises:
+        HTTPException: 404 if `tenant_id` is outside the caller's tenants.
     """
-    projects = await request.app.state.project_repo.list_by_tenant(tenant_id)
+    if tenant_id is not None:
+        access.tenant(tenant_id)
+        projects = await request.app.state.project_repo.list_by_tenant(tenant_id)
+    else:
+        projects = await access.visible_projects()
     return [ProjectOut(**p.model_dump()) for p in projects]
 
 
 @router.get("/{project_id}", response_model=ProjectOut)
-async def get_project(project_id: UUID, request: Request) -> ProjectOut:
+async def get_project(
+    project_id: UUID,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("projects", "read")),
+) -> ProjectOut:
     """Fetch a project by id.
 
     Args:
         project_id (UUID): Id of the project.
-        request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.project_repo`.
+        request (Request): The incoming FastAPI request.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
         ProjectOut: The matching project.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is outside the
+            caller's tenants.
     """
-    project = await request.app.state.project_repo.get_by_id(project_id)
-    if not project:
-        raise HTTPException(status_code=404, detail="project not found")
+    project = await access.project(project_id)
     return ProjectOut(**project.model_dump())
 
 
 @router.patch("/{project_id}", response_model=ProjectOut)
-async def update_project(project_id: UUID, body: ProjectUpdate, request: Request) -> ProjectOut:
+async def update_project(
+    project_id: UUID,
+    body: ProjectUpdate,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("projects", "write")),
+) -> ProjectOut:
     """Update a project's fields.
 
     Args:
@@ -82,13 +111,16 @@ async def update_project(project_id: UUID, body: ProjectUpdate, request: Request
         body (ProjectUpdate): Fields to update; unset fields are left unchanged.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.project_repo`.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
         ProjectOut: The updated project.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is outside the
+            caller's tenants.
     """
+    await access.project(project_id)
     project = await request.app.state.project_repo.update(
         project_id, **body.model_dump(exclude_unset=True)
     )
@@ -98,17 +130,24 @@ async def update_project(project_id: UUID, body: ProjectUpdate, request: Request
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_project(project_id: UUID, request: Request) -> None:
+async def delete_project(
+    project_id: UUID,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("projects", "write")),
+) -> None:
     """Delete a project.
 
     Args:
         project_id (UUID): Id of the project to delete.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.project_repo`.
+        access (AdminAccess): The authenticated caller.
 
     Raises:
-        HTTPException: 404 if the project does not exist.
+        HTTPException: 404 if the project does not exist or is outside the
+            caller's tenants.
     """
+    await access.project(project_id)
     deleted = await request.app.state.project_repo.delete(project_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="project not found")

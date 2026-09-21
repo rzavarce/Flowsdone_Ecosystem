@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -373,3 +373,71 @@ class ChannelAppCredentialsOut(BaseModel):
 
     provider: ChannelAppProvider
     credentials: Dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Users (console accounts) — admin only
+# ---------------------------------------------------------------------------
+
+
+class UserCreate(BaseModel):
+    """Request body for creating a console user.
+
+    Attributes:
+        email (str): Login email (stored lowercase).
+        name (str): Display name.
+        role (str): `admin`, `tenant_manager`, `botmaster` or `client`.
+        password (str): Initial password (min 10 characters, checked by the
+            use case so the rule lives in one place).
+        tenant_ids (List[UUID]): Tenants to assign; required unless `admin`.
+    """
+
+    email: str = Field(min_length=3, max_length=254)
+    name: str = Field(min_length=1, max_length=200)
+    role: str
+    password: str = Field(min_length=1, max_length=1024)
+    tenant_ids: List[UUID] = Field(default_factory=list)
+
+
+class UserUpdate(BaseModel):
+    """Request body for updating a user; every field is optional.
+
+    Attributes:
+        name (Optional[str]): New display name.
+        role (Optional[str]): New role.
+        status (Optional[str]): `active` or `disabled`.
+        tenant_ids (Optional[List[UUID]]): New tenants (REPLACES the list).
+        password (Optional[str]): New password; also closes the user's sessions.
+    """
+
+    name: Optional[str] = Field(default=None, max_length=200)
+    role: Optional[str] = None
+    status: Optional[str] = None
+    tenant_ids: Optional[List[UUID]] = None
+    password: Optional[str] = Field(default=None, max_length=1024)
+
+
+class UserOut(BaseModel):
+    """Response schema for a user. Never includes the password hash.
+
+    Attributes:
+        id (UUID): Unique identifier.
+        email (str): Login email.
+        name (str): Display name.
+        role (str): Access profile.
+        status (str): `active` or `disabled`.
+        tenant_ids (List[UUID]): Tenants the user belongs to (empty for admins).
+        last_login_at (Optional[datetime]): Last successful sign-in.
+        created_at (datetime): Creation timestamp.
+        updated_at (datetime): Last update timestamp.
+    """
+
+    id: UUID
+    email: str
+    name: str
+    role: str
+    status: str
+    tenant_ids: List[UUID]
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime

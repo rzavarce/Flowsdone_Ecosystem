@@ -15,6 +15,9 @@ from app.domain.models.channel_app import ChannelApp
 from app.domain.models.channel_connection import ChannelConnection
 from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.models.session import Session
+from app.domain.models.tenant import Tenant
+from app.domain.models.user import User, UserCredentials
+from app.domain.ports.outbound import UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
@@ -366,12 +369,13 @@ class FakeChannelSender:
 
 class FakeRedisClient:
     """Minimal in-memory stand-in for redis.asyncio.Redis, only the
-    get/set/delete subset the Redis-backed repositories use.
+    get/set/delete/expire/incr/sets subset the Redis-backed repositories use.
     """
 
     def __init__(self) -> None:
         self.store: Dict[str, str] = {}
         self.ttls: Dict[str, int] = {}
+        self.sets: Dict[str, set] = {}
 
     async def set(self, key: str, value: str, *, ex: Optional[int] = None) -> None:
         self.store[key] = value
@@ -384,6 +388,25 @@ class FakeRedisClient:
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
         self.ttls.pop(key, None)
+        self.sets.pop(key, None)
+
+    async def expire(self, key: str, seconds: int) -> None:
+        if key in self.store or key in self.sets:
+            self.ttls[key] = seconds
+
+    async def incr(self, key: str) -> int:
+        value = int(self.store.get(key, "0")) + 1
+        self.store[key] = str(value)
+        return value
+
+    async def sadd(self, key: str, member: str) -> None:
+        self.sets.setdefault(key, set()).add(member)
+
+    async def srem(self, key: str, member: str) -> None:
+        self.sets.get(key, set()).discard(member)
+
+    async def smembers(self, key: str) -> set:
+        return set(self.sets.get(key, set()))
 
 
 def make_session(**overrides: Any) -> Session:
@@ -524,3 +547,165 @@ class FakeOutboundHandler:
 
     async def deliver(self, envelope: Any) -> None:
         self.delivered.append(envelope)
+
+
+# --------------------------------------------------------------------------
+# Console authentication
+# --------------------------------------------------------------------------
+
+
+def make_tenant(**overrides: Any) -> Tenant:
+    """Build a Tenant with sane defaults, overridable per test."""
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(), name="Clínica Vital", slug="clinica-vital", created_at=now, updated_at=now
+    )
+    defaults.update(overrides)
+    return Tenant(**defaults)
+
+
+def make_user(**overrides: Any) -> User:
+    """Build a User (role `client`, active, no tenants) with sane defaults."""
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        email="carla@cliente.com",
+        name="Carla Cliente",
+        role="client",
+        status="active",
+        tenant_ids=[],
+        created_at=now,
+        updated_at=now,
+    )
+    defaults.update(overrides)
+    return User(**defaults)
+
+
+class FakeTenantRepo:
+    """In-memory TenantRepositoryPort: only list/list_by_ids/get_by_id."""
+
+    def __init__(self, tenants: Optional[List[Tenant]] = None) -> None:
+        self.tenants = list(tenants or [])
+
+    async def list(self) -> List[Tenant]:
+        return list(self.tenants)
+
+    async def list_by_ids(self, tenant_ids: List[UUID]) -> List[Tenant]:
+        return [t for t in self.tenants if t.id in tenant_ids]
+
+    async def get_by_id(self, tenant_id: UUID) -> Optional[Tenant]:
+        return next((t for t in self.tenants if t.id == tenant_id), None)
+
+
+class FakePasswordHasher:
+    """Instant, reversible stand-in for the real (slow) scrypt hasher."""
+
+    def __init__(self) -> None:
+        self.verify_calls: List[str] = []
+
+    def hash(self, password: str) -> str:
+        return f"fake${password}"
+
+    def verify(self, password: str, password_hash: str) -> bool:
+        self.verify_calls.append(password_hash)
+        return password_hash == f"fake${password}"
+
+
+class FakeUserRepo:
+    """In-memory UserRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.users: Dict[UUID, User] = {}
+        self.hashes: Dict[UUID, str] = {}
+        self.logins: List[UUID] = []
+
+    def add(self, user: User, password: str = "correct-horse-battery") -> User:
+        """Test helper: register a user with a fake-hashed password."""
+        self.users[user.id] = user
+        self.hashes[user.id] = f"fake${password}"
+        return user
+
+    async def create(self, *, email, name, role, password_hash, tenant_ids) -> User:
+        if any(u.email == email for u in self.users.values()):
+            raise UserAlreadyExistsError(email)
+        user = make_user(email=email, name=name, role=role, tenant_ids=list(tenant_ids))
+        self.users[user.id] = user
+        self.hashes[user.id] = password_hash
+        return user
+
+    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+        return self.users.get(user_id)
+
+    async def get_credentials_by_email(self, email: str) -> Optional[UserCredentials]:
+        for user in self.users.values():
+            if user.email == email.lower():
+                return UserCredentials(user=user, password_hash=self.hashes[user.id])
+        return None
+
+    async def mark_login(self, user_id: UUID) -> None:
+        self.logins.append(user_id)
+
+    async def list(self) -> List[User]:
+        return list(self.users.values())
+
+    async def update(self, user_id, *, name=None, role=None, status=None, tenant_ids=None, password_hash=None):
+        user = self.users.get(user_id)
+        if user is None:
+            return None
+        changes = {k: v for k, v in dict(name=name, role=role, status=status, tenant_ids=tenant_ids).items() if v is not None}
+        self.users[user_id] = user.model_copy(update=changes)
+        if password_hash is not None:
+            self.hashes[user_id] = password_hash
+        return self.users[user_id]
+
+    async def delete(self, user_id: UUID) -> bool:
+        self.hashes.pop(user_id, None)
+        return self.users.pop(user_id, None) is not None
+
+
+class FakeAuthSessionRepo:
+    """In-memory AuthSessionRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.sessions: Dict[str, UUID] = {}
+        self.ttls: Dict[str, int] = {}
+        self._n = 0
+
+    async def create(self, user_id: UUID, *, ttl_seconds: int) -> str:
+        self._n += 1
+        token = f"token-{self._n}"
+        self.sessions[token] = user_id
+        self.ttls[token] = ttl_seconds
+        return token
+
+    async def get_user_id(self, token: str, *, ttl_seconds: int) -> Optional[UUID]:
+        user_id = self.sessions.get(token)
+        if user_id is not None:
+            self.ttls[token] = ttl_seconds
+        return user_id
+
+    async def delete(self, token: str) -> None:
+        self.sessions.pop(token, None)
+
+    async def delete_all_for_user(self, user_id: UUID) -> None:
+        for token in [t for t, u in self.sessions.items() if u == user_id]:
+            del self.sessions[token]
+
+
+class FakeLoginThrottle:
+    """In-memory LoginThrottlePort (no real expiry: windows are recorded)."""
+
+    def __init__(self) -> None:
+        self.counts: Dict[str, int] = {}
+        self.windows: Dict[str, int] = {}
+
+    async def failures(self, key: str) -> int:
+        return self.counts.get(key, 0)
+
+    async def record_failure(self, key: str, *, window_seconds: int) -> int:
+        self.counts[key] = self.counts.get(key, 0) + 1
+        self.windows[key] = window_seconds
+        return self.counts[key]
+
+    async def reset(self, key: str) -> None:
+        self.counts.pop(key, None)

@@ -65,6 +65,13 @@ from app.domain.ports.outbound.admin_repositories import (  # noqa: F401
 )
 
 from app.domain.ports.outbound.app_connector import AppConnectorPort  # noqa: F401
+from app.domain.ports.outbound.auth import (  # noqa: F401
+    AuthSessionRepositoryPort,
+    LoginThrottlePort,
+    PasswordHasherPort,
+    UserAlreadyExistsError,
+    UserRepositoryPort,
+)
 from app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.channel_sender import ChannelSenderPort  # noqa: F401
 from app.domain.ports.outbound.secret_generator import SecretGeneratorPort  # noqa: F401

@@ -1,4 +1,8 @@
-"""Admin CRUD endpoints for tenants."""
+"""Admin CRUD endpoints for tenants.
+
+Reading is open to any staff role but scoped to the caller's own tenants;
+creating, editing and deleting tenants is `admin` only (see `POLICY`).
+"""
 
 from __future__ import annotations
 
@@ -6,24 +10,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.adapters.inbound.http.admin.auth import require_admin_api_key
+from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import TenantCreate, TenantOut, TenantUpdate
 
-router = APIRouter(
-    prefix="/tenants",
-    tags=["admin:tenants"],
-    dependencies=[Depends(require_admin_api_key)],
-)
+router = APIRouter(prefix="/tenants", tags=["admin:tenants"])
 
 
 @router.post("", response_model=TenantOut, status_code=201)
-async def create_tenant(body: TenantCreate, request: Request) -> TenantOut:
+async def create_tenant(
+    body: TenantCreate, request: Request, access: AdminAccess = Depends(admin_access("tenants", "write"))
+) -> TenantOut:
     """Create a tenant.
 
     Args:
         body (TenantCreate): Tenant fields to create.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.tenant_repo`.
+        access (AdminAccess): The authenticated caller (admin only).
 
     Returns:
         TenantOut: The created tenant.
@@ -33,35 +36,48 @@ async def create_tenant(body: TenantCreate, request: Request) -> TenantOut:
 
 
 @router.get("", response_model=list[TenantOut])
-async def list_tenants(request: Request) -> list[TenantOut]:
-    """List all tenants.
+async def list_tenants(
+    request: Request, access: AdminAccess = Depends(admin_access("tenants", "read"))
+) -> list[TenantOut]:
+    """List the tenants the caller can see.
 
     Args:
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.tenant_repo`.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
-        list[TenantOut]: All existing tenants.
+        list[TenantOut]: Every tenant for admins and the API key; otherwise
+        only the caller's own.
     """
-    tenants = await request.app.state.tenant_repo.list()
+    repo = request.app.state.tenant_repo
+    if access.unrestricted:
+        tenants = await repo.list()
+    else:
+        tenants = await repo.list_by_ids(list(access.principal.tenant_ids))
     return [TenantOut(**t.model_dump()) for t in tenants]
 
 
 @router.get("/{tenant_id}", response_model=TenantOut)
-async def get_tenant(tenant_id: UUID, request: Request) -> TenantOut:
+async def get_tenant(
+    tenant_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("tenants", "read"))
+) -> TenantOut:
     """Fetch a tenant by id.
 
     Args:
         tenant_id (UUID): Id of the tenant.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.tenant_repo`.
+        access (AdminAccess): The authenticated caller.
 
     Returns:
         TenantOut: The matching tenant.
 
     Raises:
-        HTTPException: 404 if the tenant does not exist.
+        HTTPException: 404 if the tenant does not exist or is outside the
+            caller's tenants (indistinguishable on purpose).
     """
+    access.tenant(tenant_id)
     tenant = await request.app.state.tenant_repo.get_by_id(tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="tenant not found")
@@ -69,7 +85,12 @@ async def get_tenant(tenant_id: UUID, request: Request) -> TenantOut:
 
 
 @router.patch("/{tenant_id}", response_model=TenantOut)
-async def update_tenant(tenant_id: UUID, body: TenantUpdate, request: Request) -> TenantOut:
+async def update_tenant(
+    tenant_id: UUID,
+    body: TenantUpdate,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("tenants", "write")),
+) -> TenantOut:
     """Update a tenant's fields.
 
     Args:
@@ -77,6 +98,7 @@ async def update_tenant(tenant_id: UUID, body: TenantUpdate, request: Request) -
         body (TenantUpdate): Fields to update; unset fields are left unchanged.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.tenant_repo`.
+        access (AdminAccess): The authenticated caller (admin only).
 
     Returns:
         TenantOut: The updated tenant.
@@ -93,13 +115,16 @@ async def update_tenant(tenant_id: UUID, body: TenantUpdate, request: Request) -
 
 
 @router.delete("/{tenant_id}", status_code=204)
-async def delete_tenant(tenant_id: UUID, request: Request) -> None:
+async def delete_tenant(
+    tenant_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("tenants", "write"))
+) -> None:
     """Delete a tenant.
 
     Args:
         tenant_id (UUID): Id of the tenant to delete.
         request (Request): The incoming FastAPI request; used to reach
             `request.app.state.tenant_repo`.
+        access (AdminAccess): The authenticated caller (admin only).
 
     Raises:
         HTTPException: 404 if the tenant does not exist.

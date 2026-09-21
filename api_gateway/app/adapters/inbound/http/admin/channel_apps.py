@@ -1,18 +1,19 @@
-"""Admin CRUD endpoints for shared provider app credentials."""
+"""Admin CRUD endpoints for shared provider app credentials.
+
+These are global (one per provider, shared by the whole SaaS), not owned by a
+tenant, and include an endpoint that reveals the raw secrets. Both reading and
+writing are `admin` only.
+"""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.domain.models.channel_app import ChannelApp, ChannelAppProvider
-from app.adapters.inbound.http.admin.auth import require_admin_api_key
+from app.adapters.inbound.http.admin.access import admin_access
 from app.adapters.inbound.http.admin.schemas import ChannelAppCredentialsOut, ChannelAppOut, ChannelAppUpsert
 
-router = APIRouter(
-    prefix="/channel-apps",
-    tags=["admin:channel-apps"],
-    dependencies=[Depends(require_admin_api_key)],
-)
+router = APIRouter(prefix="/channel-apps", tags=["admin:channel-apps"])
 
 
 def _to_out(channel_app: ChannelApp) -> ChannelAppOut:
@@ -29,7 +30,7 @@ def _to_out(channel_app: ChannelApp) -> ChannelAppOut:
     return ChannelAppOut(**data, has_credentials=bool(channel_app.credentials))
 
 
-@router.get("", response_model=list[ChannelAppOut])
+@router.get("", response_model=list[ChannelAppOut], dependencies=[Depends(admin_access("channel_apps", "read"))])
 async def list_channel_apps(request: Request) -> list[ChannelAppOut]:
     """List all provider app credential records.
 
@@ -44,7 +45,7 @@ async def list_channel_apps(request: Request) -> list[ChannelAppOut]:
     return [_to_out(a) for a in channel_apps]
 
 
-@router.get("/{provider}", response_model=ChannelAppOut)
+@router.get("/{provider}", response_model=ChannelAppOut, dependencies=[Depends(admin_access("channel_apps", "read"))])
 async def get_channel_app(provider: ChannelAppProvider, request: Request) -> ChannelAppOut:
     """Fetch a provider's app credentials.
 
@@ -65,7 +66,11 @@ async def get_channel_app(provider: ChannelAppProvider, request: Request) -> Cha
     return _to_out(channel_app)
 
 
-@router.get("/{provider}/credentials", response_model=ChannelAppCredentialsOut)
+@router.get(
+    "/{provider}/credentials",
+    response_model=ChannelAppCredentialsOut,
+    dependencies=[Depends(admin_access("channel_apps", "read"))],
+)
 async def reveal_channel_app_credentials(
     provider: ChannelAppProvider, request: Request
 ) -> ChannelAppCredentialsOut:
@@ -93,7 +98,7 @@ async def reveal_channel_app_credentials(
     return ChannelAppCredentialsOut(provider=channel_app.provider, credentials=channel_app.credentials)
 
 
-@router.put("/{provider}", response_model=ChannelAppOut)
+@router.put("/{provider}", response_model=ChannelAppOut, dependencies=[Depends(admin_access("channel_apps", "write"))])
 async def upsert_channel_app(
     provider: ChannelAppProvider, body: ChannelAppUpsert, request: Request
 ) -> ChannelAppOut:
@@ -114,7 +119,7 @@ async def upsert_channel_app(
     return _to_out(channel_app)
 
 
-@router.delete("/{provider}", status_code=204)
+@router.delete("/{provider}", status_code=204, dependencies=[Depends(admin_access("channel_apps", "write"))])
 async def delete_channel_app(provider: ChannelAppProvider, request: Request) -> None:
     """Delete a provider's app credentials.
 
