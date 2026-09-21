@@ -59,7 +59,7 @@ export function ThemePicker() {
                 data-theme={preset.id}
                 onClick={() => setTheme(preset.id)}
                 className={cn(
-                  'cursor-pointer rounded-card border bg-surface p-3 text-left transition',
+                  'cursor-pointer rounded-card border bg-surface p-3 text-left text-foreground transition',
                   active ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50',
                 )}
               >
@@ -70,7 +70,7 @@ export function ThemePicker() {
                 >
                   <span className="absolute inset-x-3 bottom-3 flex gap-1.5">
                     <span className="h-2 flex-1 rounded-full bg-white/70" />
-                    <span className="h-2 w-8 rounded-full bg-white/40" />
+                    <span className="h-2 w-8 rounded-full bg-cta" />
                   </span>
                 </span>
                 <span className="mt-3 flex items-center justify-between gap-2">

@@ -1,16 +1,19 @@
-import { LayoutDashboard, MessageSquare, Plug, Settings, Workflow, type LucideIcon } from 'lucide-react'
+import { Bot, LayoutDashboard, MessageSquare, Plug, Settings, type LucideIcon } from 'lucide-react'
+import type { Permission } from '@/core/auth/types'
 
 /** Entrada del menú principal (sidebar y barra inferior comparten esta lista). */
 export interface NavItem {
   to: string
   label: string
   icon: LucideIcon
+  /** El ítem se muestra si el perfil tiene al menos uno de estos permisos. */
+  anyOf: Permission[]
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/conversaciones', label: 'Conversaciones', icon: MessageSquare },
-  { to: '/canales', label: 'Canales', icon: Plug },
-  { to: '/workflows', label: 'Workflows', icon: Workflow },
-  { to: '/ajustes', label: 'Ajustes', icon: Settings },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, anyOf: ['dashboard:view', 'reports:view'] },
+  { to: '/conversaciones', label: 'Conversaciones', icon: MessageSquare, anyOf: ['conversations:manage'] },
+  { to: '/canales', label: 'Canales', icon: Plug, anyOf: ['channels:manage'] },
+  { to: '/agentes', label: 'Agentes', icon: Bot, anyOf: ['agents:edit'] },
+  { to: '/ajustes', label: 'Ajustes', icon: Settings, anyOf: ['settings:view'] },
 ]

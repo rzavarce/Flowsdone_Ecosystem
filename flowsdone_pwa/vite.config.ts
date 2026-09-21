@@ -13,7 +13,7 @@ export default defineConfig({
       // Al haber una versión nueva, el service worker se actualiza solo en
       // la próxima carga; más adelante se puede pasar a 'prompt' para avisar.
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'icons/favicon-32.png', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Flowsdone',
         short_name: 'Flowsdone',
@@ -22,8 +22,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#0b0d14',
-        theme_color: '#6366f1',
+        background_color: '#04141f',
+        theme_color: '#04141f',
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -49,6 +49,14 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // En desarrollo, /api -> gateway (igual que hace nginx en el contenedor), para
+    // que la cookie de sesión sea del mismo origen. Con VITE_AUTH_MODE=mock no se usa.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_API_TARGET ?? 'http://localhost:8000',
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
   },
   test: {
     environment: 'jsdom',

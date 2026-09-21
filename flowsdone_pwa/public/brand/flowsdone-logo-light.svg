@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 110" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente para el trazo fluido -->
+    <linearGradient id="flow-line-grad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0A9CC8"/>
+      <stop offset="55%" stop-color="#0A9CC8"/>
+      <stop offset="85%" stop-color="#10A27A"/>
+      <stop offset="100%" stop-color="#0A8F48"/>
+    </linearGradient>
+
+    <!-- Resplandor Neón Suave -->
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Fondo Dark Space -->
+  
+
+  <!-- ISOTIPO VECTORIAL (Más pegado al texto) -->
+  <g transform="translate(30, 32)">
+    <!-- Trazo continuo de flujo a ejecución -->
+    <path d="M 8 32 C 16 16, 32 16, 44 28 C 54 38, 64 36, 72 26 L 84 38 L 108 4" 
+          fill="none" 
+          stroke="url(#flow-line-grad)" 
+          stroke-width="7" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+         />
+
+    <!-- Nodo Inicial Cyan -->
+    <circle cx="8" cy="32" r="4.5" fill="#0A9CC8"/>
+
+    <!-- Nodo Final Neon Green -->
+    <circle cx="108" cy="4" r="4.5" fill="#0A8F48"/>
+  </g>
+
+  <!-- BLOQUE DE TEXTO (Junto al Isotipo y con slogan más pegado) -->
+  <g transform="translate(150, 60)">
+    <!-- "Flows" -->
+    <text font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#04141F" letter-spacing="-0.5">
+      Flows
+    </text>
+    
+    <!-- "done" -->
+    <text x="110" y="0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="300" fill="#0A8F48" letter-spacing="-0.5">
+      done
+    </text>
+
+    <!-- Slogan pegado verticalmente y con 'ne' de done alineada con 'ON' de MOTION -->
+    <text x="1" y="16" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10.2" font-weight="700" fill="#0A6F94" letter-spacing="3.1" opacity="0.95">
+      INTELLIGENCE IN MOTION
+    </text>
+  </g>
+</svg>

@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { Logo } from './Logo'
-import { NAV_ITEMS } from './navigation'
+import { useNavItems } from './useNavItems'
 
 /** Props de {@link Sidebar}. */
 export interface SidebarProps {
@@ -13,6 +13,7 @@ export interface SidebarProps {
 
 /** Navegación lateral de escritorio (>= lg); colapsable a solo iconos. */
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const items = useNavItems()
   return (
     <aside
       className={cn(
@@ -21,21 +22,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       )}
     >
       <div className={cn('flex h-16 items-center px-4', collapsed && 'justify-center')}>
-        <Logo showName={!collapsed} />
+        <Logo variant={collapsed ? 'icon' : 'wordmark'} className={collapsed ? 'size-9' : 'h-8 w-auto'} />
       </div>
 
       <nav aria-label="Principal" className="flex-1 space-y-1 px-3 py-2">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
             title={collapsed ? label : undefined}
             className={({ isActive }) =>
               cn(
                 'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
                 collapsed && 'justify-center px-0',
-                isActive ? 'bg-accent text-primary' : 'text-muted hover:bg-surface-muted hover:text-foreground',
+                isActive ? 'bg-accent text-primary-ink' : 'text-muted hover:bg-surface-muted hover:text-foreground',
               )
             }
           >

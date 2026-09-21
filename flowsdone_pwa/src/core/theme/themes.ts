@@ -3,8 +3,8 @@
  * temas. Sin React: se puede testear y reutilizar en el script anti-flash.
  */
 
-/** Identificadores de los presets disponibles. */
-export type ThemeId = 'aurora' | 'ocean' | 'sunset' | 'emerald'
+/** Identificadores de los templates disponibles. */
+export type ThemeId = 'flowsdone' | 'agentic' | 'corporate'
 
 /** Preferencia de modo elegida por la persona usuaria. */
 export type ColorMode = 'light' | 'dark' | 'system'
@@ -12,22 +12,21 @@ export type ColorMode = 'light' | 'dark' | 'system'
 /** Modo efectivo una vez resuelto `system`. */
 export type ResolvedMode = 'light' | 'dark'
 
-/** Metadatos de un preset para mostrarlo en el selector. */
+/** Metadatos de un template para mostrarlo en el selector. */
 export interface ThemePreset {
   id: ThemeId
   name: string
   description: string
 }
 
-/** Presets en el orden en que se muestran. Los colores viven en index.css. */
+/** Templates en el orden en que se muestran. Los colores viven en index.css. */
 export const THEMES: readonly ThemePreset[] = [
-  { id: 'aurora', name: 'Aurora', description: 'Índigo y violeta, el look por defecto.' },
-  { id: 'ocean', name: 'Ocean', description: 'Azul y turquesa, sobrio y técnico.' },
-  { id: 'sunset', name: 'Sunset', description: 'Naranja y rosa, cálido y llamativo.' },
-  { id: 'emerald', name: 'Emerald', description: 'Verde esmeralda, fresco y limpio.' },
+  { id: 'flowsdone', name: 'Flowsdone', description: 'Identidad de marca: Deep Space, cian eléctrico y verde "done".' },
+  { id: 'agentic', name: 'Agentic', description: 'Violeta y menta, la estética de las herramientas de agentes.' },
+  { id: 'corporate', name: 'Corporate', description: 'Azul cobalto y coral, sobrio para entornos B2B.' },
 ]
 
-export const DEFAULT_THEME: ThemeId = 'aurora'
+export const DEFAULT_THEME: ThemeId = 'flowsdone'
 export const DEFAULT_MODE: ColorMode = 'system'
 
 /** Clave de localStorage. Debe coincidir con el script anti-flash de index.html. */

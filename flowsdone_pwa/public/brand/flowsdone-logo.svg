@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 490 110" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente para el trazo fluido -->
+    <linearGradient id="flow-line-grad" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#19B4E6"/>
+      <stop offset="55%" stop-color="#19B4E6"/>
+      <stop offset="85%" stop-color="#24E5A3"/>
+      <stop offset="100%" stop-color="#3EFF8B"/>
+    </linearGradient>
+
+    <!-- Resplandor Neón Suave -->
+    <filter id="neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Fondo Dark Space -->
+  <rect width="100%" height="100%" rx="12" fill="#04141F"/>
+
+  <!-- ISOTIPO VECTORIAL (Más pegado al texto) -->
+  <g transform="translate(30, 32)">
+    <!-- Trazo continuo de flujo a ejecución -->
+    <path d="M 8 32 C 16 16, 32 16, 44 28 C 54 38, 64 36, 72 26 L 84 38 L 108 4" 
+          fill="none" 
+          stroke="url(#flow-line-grad)" 
+          stroke-width="7" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          filter="url(#neon-glow)"/>
+
+    <!-- Nodo Inicial Cyan -->
+    <circle cx="8" cy="32" r="4.5" fill="#19B4E6" filter="url(#neon-glow)"/>
+
+    <!-- Nodo Final Neon Green -->
+    <circle cx="108" cy="4" r="4.5" fill="#3EFF8B" filter="url(#neon-glow)"/>
+  </g>
+
+  <!-- BLOQUE DE TEXTO (Junto al Isotipo y con slogan más pegado) -->
+  <g transform="translate(150, 60)">
+    <!-- "Flows" -->
+    <text font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#F2FBF7" letter-spacing="-0.5">
+      Flows
+    </text>
+    
+    <!-- "done" -->
+    <text x="110" y="0" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="300" fill="#3EFF8B" letter-spacing="-0.5" filter="url(#neon-glow)">
+      done
+    </text>
+
+    <!-- Slogan pegado verticalmente y con 'ne' de done alineada con 'ON' de MOTION -->
+    <text x="1" y="16" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="10.2" font-weight="700" fill="#19B4E6" letter-spacing="3.1" opacity="0.95">
+      INTELLIGENCE IN MOTION
+    </text>
+  </g>
+</svg>

@@ -25,8 +25,8 @@ describe('readStoredTheme', () => {
   })
 
   it('lee un tema válido', () => {
-    const raw = JSON.stringify({ theme: 'ocean', mode: 'dark' })
-    expect(readStoredTheme(storageWith(raw))).toEqual({ theme: 'ocean', mode: 'dark' })
+    const raw = JSON.stringify({ theme: 'agentic', mode: 'dark' })
+    expect(readStoredTheme(storageWith(raw))).toEqual({ theme: 'agentic', mode: 'dark' })
   })
 
   it('reemplaza por default un preset que ya no existe, conservando el modo', () => {

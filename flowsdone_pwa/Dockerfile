@@ -10,6 +10,16 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+# Vite incrusta estas variables en el bundle en tiempo de build (no son secretos:
+# quedan visibles en el JS). VITE_AUTH_MODE=mock habilita las cuentas de
+# demostración: usarlo SOLO en maquetas locales, nunca en producción.
+ARG VITE_AUTH_MODE=http
+ARG VITE_API_BASE_URL=/api
+ARG VITE_LANGFLOW_URL=
+ENV VITE_AUTH_MODE=$VITE_AUTH_MODE \
+    VITE_API_BASE_URL=$VITE_API_BASE_URL \
+    VITE_LANGFLOW_URL=$VITE_LANGFLOW_URL
 RUN npm run build
 
 # ---- runtime: nginx sirve el estático --------------------------------

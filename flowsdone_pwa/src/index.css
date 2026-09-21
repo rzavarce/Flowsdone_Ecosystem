@@ -12,9 +12,15 @@
   --color-surface-muted: var(--surface-muted);
   --color-border: var(--border);
   --color-muted: var(--muted);
+  /* Marca: rellenos, gráficos, bordes activos. */
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
   --color-primary-2: var(--primary-2);
+  --color-primary-foreground: var(--primary-foreground);
+  /* Marca usada como TEXTO: puede ser más oscura que --primary para dar contraste en claro. */
+  --color-primary-ink: var(--primary-ink);
+  /* Acción/"hecho": CTA y confirmaciones (regla 60-30-10: el 10%). */
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
   --color-accent: var(--accent);
   --color-ring: var(--primary);
   --color-success: var(--success);
@@ -26,88 +32,122 @@
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
 }
 
-/* Neutros (modo claro). */
+/* Estados semánticos comunes a todos los templates (contraste AA verificado). */
 :root {
-  --background: oklch(0.982 0.004 265);
-  --foreground: oklch(0.21 0.02 265);
-  --surface: oklch(1 0 0);
-  --surface-muted: oklch(0.965 0.006 265);
-  --border: oklch(0.91 0.008 265);
-  --muted: oklch(0.5 0.02 265);
-  --success: oklch(0.62 0.16 155);
-  --warning: oklch(0.75 0.16 75);
-  --danger: oklch(0.6 0.22 25);
-  --primary-foreground: oklch(0.99 0 0);
+  --warning: #8a5a00;
+  --danger: #c2262e;
   color-scheme: light;
 }
-
-/* Neutros (modo oscuro). */
 .dark {
-  --background: oklch(0.16 0.015 265);
-  --foreground: oklch(0.96 0.005 265);
-  --surface: oklch(0.205 0.018 265);
-  --surface-muted: oklch(0.245 0.02 265);
-  --border: oklch(0.3 0.022 265);
-  --muted: oklch(0.72 0.02 265);
+  --warning: #fbbf24;
+  --danger: #ff7a7a;
   color-scheme: dark;
 }
 
 /* ------------------------------------------------------------------
-   Presets de template. Cada uno solo define los dos colores de marca;
-   el resto (acentos suaves, gradientes) se deriva con color-mix, así
-   funciona igual en claro y oscuro. Para sumar un preset: agregar un
-   bloque acá y una entrada en src/core/theme/themes.ts.
+   Templates. Cada uno define, para claro y oscuro, sus neutros (fondo,
+   superficies, texto) y sus colores de marca. Para sumar uno: bloque
+   claro + bloque oscuro acá, una entrada en src/core/theme/themes.ts y
+   el id en el script anti-flash de index.html.
+
+   El selector oscuro doble cubre <html> y las vistas previas del
+   selector de template (data-theme en un descendiente).
+
+   Reglas de contraste (WCAG AA, calculadas): el texto sobre --primary /
+   --cta usa su *-foreground; --primary-ink es la marca apta como texto.
    ------------------------------------------------------------------ */
-[data-theme='aurora'] {
-  --primary: oklch(0.56 0.23 278);
-  --primary-2: oklch(0.62 0.24 315);
+
+/* 1) Flowsdone — "Intelligent Execution" (identidad de marca, por defecto).
+   Deep Space #04141F · Electric Cyan #19B4E6 · Neon Flow Green #3EFF8B ·
+   Soft Ice White #F2FBF7 · estructura #11506C. */
+[data-theme='flowsdone'] {
+  --background: #f2fbf7;
+  --foreground: #04141f;
+  --surface: #ffffff;
+  --surface-muted: #e5f3ec;
+  --border: #cfe4da;
+  --muted: #4b6373;
+  --primary: #19b4e6;
+  --primary-2: #11506c;
+  --primary-ink: #0a6f94;
+  --primary-foreground: #04141f;
+  --cta: #3eff8b;
+  --cta-foreground: #04141f;
+  --success: #0b7a3e;
 }
-[data-theme='ocean'] {
-  --primary: oklch(0.57 0.16 240);
-  --primary-2: oklch(0.68 0.13 200);
-}
-[data-theme='sunset'] {
-  --primary: oklch(0.6 0.21 35);
-  --primary-2: oklch(0.63 0.23 5);
-}
-[data-theme='emerald'] {
-  --primary: oklch(0.55 0.14 160);
-  --primary-2: oklch(0.66 0.15 130);
+.dark[data-theme='flowsdone'],
+.dark [data-theme='flowsdone'] {
+  --background: #04141f;
+  --foreground: #f2fbf7;
+  --surface: #082334;
+  --surface-muted: #0d2f44;
+  --border: #14425a;
+  --muted: #93b0bf;
+  --primary-ink: #19b4e6;
+  --success: #3eff8b;
 }
 
-/* En oscuro el color de marca sube de luminosidad para conservar contraste
-   como texto/borde sobre fondos oscuros; por eso el texto sobre él pasa a
-   oscuro. El selector doble cubre <html> y también las vistas previas del
-   selector de template (data-theme en un descendiente). */
-.dark {
-  --primary-foreground: oklch(0.16 0.02 265);
+/* 2) Agentic — Violeta & Neón (opción A). */
+[data-theme='agentic'] {
+  --background: #f5f3ff;
+  --foreground: #1e1b4b;
+  --surface: #ffffff;
+  --surface-muted: #eae6fb;
+  --border: #d9d3f3;
+  --muted: #56527e;
+  --primary: #8b5cf6;
+  --primary-2: #1e1b4b;
+  --primary-ink: #6234d4;
+  --primary-foreground: #ffffff;
+  --cta: #10b981;
+  --cta-foreground: #04130e;
+  --success: #047857;
 }
-.dark[data-theme='aurora'],
-.dark [data-theme='aurora'] {
-  --primary: oklch(0.7 0.18 278);
-  --primary-2: oklch(0.72 0.19 315);
-}
-.dark[data-theme='ocean'],
-.dark [data-theme='ocean'] {
-  --primary: oklch(0.72 0.14 235);
-  --primary-2: oklch(0.8 0.12 200);
-}
-.dark[data-theme='sunset'],
-.dark [data-theme='sunset'] {
-  --primary: oklch(0.74 0.17 40);
-  --primary-2: oklch(0.72 0.19 8);
-}
-.dark[data-theme='emerald'],
-.dark [data-theme='emerald'] {
-  --primary: oklch(0.74 0.15 160);
-  --primary-2: oklch(0.8 0.15 130);
+.dark[data-theme='agentic'],
+.dark [data-theme='agentic'] {
+  --background: #1e1b4b;
+  --foreground: #f5f3ff;
+  --surface: #26235c;
+  --surface-muted: #34306f;
+  --border: #3f3b80;
+  --muted: #a9a5d6;
+  --primary-ink: #a78bfa;
+  --success: #10b981;
 }
 
-/* Derivados del preset activo. */
+/* 3) Corporate — Azul corporativo & Coral (opción B). */
+[data-theme='corporate'] {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #eef2f7;
+  --border: #dce3ec;
+  --muted: #475569;
+  --primary: #2563eb;
+  --primary-2: #0f172a;
+  --primary-ink: #2563eb;
+  --primary-foreground: #ffffff;
+  --cta: #ff6b6b;
+  --cta-foreground: #0f172a;
+  --success: #15803d;
+}
+.dark[data-theme='corporate'],
+.dark [data-theme='corporate'] {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --surface: #17223a;
+  --surface-muted: #243149;
+  --border: #2e3b55;
+  --muted: #94a3b8;
+  --primary-ink: #5b8def;
+  --success: #4ade80;
+}
+
+/* Derivados del template activo. */
 :root,
 [data-theme] {
   --accent: color-mix(in oklab, var(--primary) 12%, var(--surface));
-  --gradient-brand: linear-gradient(135deg, var(--primary), var(--primary-2));
+  --gradient-brand: linear-gradient(135deg, var(--primary-2), var(--primary));
 }
 
 @layer base {

@@ -1,8 +1,8 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ACTIVITY, RECENT_CONVERSATIONS, STATS } from '@/mocks/data'
-import { ActivityChart } from './ActivityChart'
+import { ActivityChart } from '@/components/charts/ActivityChart'
 import { RecentConversations } from './RecentConversations'
-import { StatCard } from './StatCard'
+import { StatCard } from '@/components/charts/StatCard'
 
 /** Vista de resumen: KPIs, actividad semanal y conversaciones recientes. */
 export function DashboardPage() {

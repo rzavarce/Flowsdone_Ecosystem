@@ -1,22 +1,49 @@
+import type { ReactNode } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
+import { PublicOnly } from '@/components/auth/PublicOnly'
+import { RequireAuth } from '@/components/auth/RequireAuth'
+import { RequirePermission } from '@/components/auth/RequirePermission'
 import { AppShell } from '@/components/layout/AppShell'
+import type { Permission } from '@/core/auth/types'
+import { AgentsPage } from '@/features/agents/AgentsPage'
+import { LoginPage } from '@/features/auth/LoginPage'
 import { ChannelsPage } from '@/features/channels/ChannelsPage'
 import { ConversationsPage } from '@/features/conversations/ConversationsPage'
-import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { NotFoundPage } from '@/features/NotFoundPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
-import { WorkflowsPage } from '@/features/workflows/WorkflowsPage'
+import { DashboardRoute } from './DashboardRoute'
+import { RootRedirect } from './RootRedirect'
 
-/** Rutas de la aplicación; todas cuelgan del {@link AppShell}. */
+const guarded = (permission: Permission, element: ReactNode) => (
+  <RequirePermission anyOf={[permission]}>{element}</RequirePermission>
+)
+
+/**
+ * Rutas: `/` redirige (login o inicio del perfil), `/login` es pública; el
+ * resto exige sesión y, según la sección, un permiso.
+ */
 export const routes = [
+  { path: '/', element: <RootRedirect /> },
   {
-    element: <AppShell />,
+    path: '/login',
+    element: (
+      <PublicOnly>
+        <LoginPage />
+      </PublicOnly>
+    ),
+  },
+  {
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
-      { path: '/', element: <DashboardPage /> },
-      { path: '/conversaciones', element: <ConversationsPage /> },
-      { path: '/canales', element: <ChannelsPage /> },
-      { path: '/workflows', element: <WorkflowsPage /> },
-      { path: '/ajustes', element: <SettingsPage /> },
+      { path: '/dashboard', element: <DashboardRoute /> },
+      { path: '/conversaciones', element: guarded('conversations:manage', <ConversationsPage />) },
+      { path: '/canales', element: guarded('channels:manage', <ChannelsPage />) },
+      { path: '/agentes', element: guarded('agents:edit', <AgentsPage />) },
+      { path: '/ajustes', element: guarded('settings:view', <SettingsPage />) },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

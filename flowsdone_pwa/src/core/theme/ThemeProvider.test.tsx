@@ -9,7 +9,7 @@ function Probe() {
   return (
     <div>
       <span data-testid="state">{`${theme}|${mode}|${resolvedMode}`}</span>
-      <button onClick={() => setTheme('sunset')}>sunset</button>
+      <button onClick={() => setTheme('agentic')}>agentic</button>
       <button onClick={() => setMode('dark')}>dark</button>
       <button onClick={() => setMode('system')}>system</button>
     </div>
@@ -33,8 +33,8 @@ describe('ThemeProvider', () => {
   it('arranca con aurora + system y refleja el SO claro', () => {
     mockSystemDark(false)
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(screen.getByTestId('state')).toHaveTextContent('aurora|system|light')
-    expect(document.documentElement.dataset.theme).toBe('aurora')
+    expect(screen.getByTestId('state')).toHaveTextContent('flowsdone|system|light')
+    expect(document.documentElement.dataset.theme).toBe('flowsdone')
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
@@ -42,19 +42,19 @@ describe('ThemeProvider', () => {
     mockSystemDark(false)
     render(<ThemeProvider><Probe /></ThemeProvider>)
 
-    act(() => screen.getByText('sunset').click())
+    act(() => screen.getByText('agentic').click())
     act(() => screen.getByText('dark').click())
 
-    expect(document.documentElement.dataset.theme).toBe('sunset')
+    expect(document.documentElement.dataset.theme).toBe('agentic')
     expect(document.documentElement).toHaveClass('dark')
-    expect(JSON.parse(localStorage.getItem(THEME_STORAGE_KEY)!)).toEqual({ theme: 'sunset', mode: 'dark' })
+    expect(JSON.parse(localStorage.getItem(THEME_STORAGE_KEY)!)).toEqual({ theme: 'agentic', mode: 'dark' })
   })
 
   it('restaura la elección guardada', () => {
     mockSystemDark(false)
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ theme: 'emerald', mode: 'dark' }))
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ theme: 'corporate', mode: 'dark' }))
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(screen.getByTestId('state')).toHaveTextContent('emerald|dark|dark')
+    expect(screen.getByTestId('state')).toHaveTextContent('corporate|dark|dark')
   })
 
   it('en system sigue los cambios del SO en vivo', () => {
@@ -62,7 +62,7 @@ describe('ThemeProvider', () => {
     render(<ThemeProvider><Probe /></ThemeProvider>)
 
     act(() => emit(true))
-    expect(screen.getByTestId('state')).toHaveTextContent('aurora|system|dark')
+    expect(screen.getByTestId('state')).toHaveTextContent('flowsdone|system|dark')
     expect(document.documentElement).toHaveClass('dark')
   })
 })

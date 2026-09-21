@@ -1,4 +1,5 @@
 import { Card, CardHeader } from '@/components/ui/Card'
+import { cn } from '@/lib/cn'
 import type { ActivityPoint } from '@/mocks/data'
 import { H, W, linePath, toPoints } from './chartGeometry'
 
@@ -10,15 +11,15 @@ export function ActivityChart({ data, className }: { data: readonly ActivityPoin
   const peak = data.reduce((a, b) => (b.value > a.value ? b : a))
 
   return (
-    <Card className={className}>
+    <Card className={cn('flex flex-col', className)}>
       <CardHeader title="Actividad semanal" description="Conversaciones por día" />
-      <div className="p-5">
+      <div className="flex flex-1 flex-col p-5">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
           role="img"
           aria-label={`Conversaciones por día; el máximo fue ${peak.value} el ${peak.label}.`}
-          className="h-48 w-full"
+          className="min-h-48 w-full flex-1"
         >
           <defs>
             <linearGradient id="activity-fill" x1="0" y1="0" x2="0" y2="1">

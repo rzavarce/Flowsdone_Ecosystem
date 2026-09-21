@@ -13,7 +13,7 @@ export function Avatar({ name, className }: AvatarProps) {
     <span
       aria-hidden="true"
       className={cn(
-        'inline-flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground',
+        'inline-flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white',
         className,
       )}
       style={{ backgroundImage: 'var(--gradient-brand)' }}

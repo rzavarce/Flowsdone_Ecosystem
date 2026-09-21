@@ -14,7 +14,7 @@ export function NotFoundPage() {
         description="La dirección no existe o fue movida."
       />
       <p className="mt-4 text-center">
-        <Link to="/" className="font-medium text-primary hover:underline">
+        <Link to="/dashboard" className="font-medium text-primary-ink hover:underline">
           Volver al dashboard
         </Link>
       </p>
