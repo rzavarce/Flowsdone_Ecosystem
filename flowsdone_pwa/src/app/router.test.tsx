@@ -93,6 +93,14 @@ describe('AppShell', () => {
     expect(await h1('Canales')).toBeInTheDocument()
   })
 
+  it('el contenido ocupa todo el ancho disponible (sin tope ni márgenes laterales automáticos)', async () => {
+    renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
+    await h1('Dashboard')
+    const main = screen.getByRole('main')
+    expect(main).toHaveClass('w-full')
+    expect(main.className).not.toMatch(/max-w-|mx-auto/)
+  })
+
   it('contrae y expande la sidebar', async () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
     await userEvent.click(await screen.findByRole('button', { name: 'Contraer menú' }))

@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './fonts.css';
 
 /* El modo oscuro se controla con la clase `.dark` en <html> (ThemeProvider),
    no con prefers-color-scheme directo, para permitir el override manual. */
@@ -27,7 +28,9 @@
   --color-warning: var(--warning);
   --color-danger: var(--danger);
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Títulos, cifras grandes y marca (utilidad `font-display`). */
+  --font-display: 'Sora Variable', 'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, sans-serif;
   --radius-card: 1rem;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
 }
@@ -158,6 +161,13 @@
     @apply bg-background font-sans text-foreground antialiased;
     /* Evita el "rebote" que rompe la sensación de app en la PWA instalada. */
     overscroll-behavior-y: none;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;

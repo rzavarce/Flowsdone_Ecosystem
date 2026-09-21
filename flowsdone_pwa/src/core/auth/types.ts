@@ -15,6 +15,7 @@ export type Permission =
   | 'channels:manage'
   | 'agents:edit' // editor de agentes (Langflow embebido)
   | 'settings:view'
+  | 'platform:manage' // credenciales compartidas de proveedores (Meta, X, TikTok, Twilio)
 
 /** Organización cliente de la plataforma; unidad de aislamiento de datos. */
 export interface Tenant {

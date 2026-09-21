@@ -10,7 +10,7 @@ export const ROLE_META: Record<Role, { label: string; description: string }> = {
 
 /** Matriz rol -> permisos. Única fuente de verdad del control de acceso en la UI. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  admin: ['dashboard:view', 'reports:view', 'conversations:manage', 'channels:manage', 'agents:edit', 'settings:view'],
+  admin: ['dashboard:view', 'reports:view', 'conversations:manage', 'channels:manage', 'agents:edit', 'settings:view', 'platform:manage'],
   tenant_manager: ['dashboard:view', 'reports:view', 'conversations:manage', 'channels:manage', 'agents:edit', 'settings:view'],
   botmaster: ['agents:edit', 'settings:view'],
   client: ['reports:view', 'settings:view'],

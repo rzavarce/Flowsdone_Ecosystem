@@ -1,6 +1,9 @@
 import { render } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { routes } from '@/app/router'
+import { AdminApiProvider } from '@/core/admin/AdminApiProvider'
+import type { AdminApi } from '@/core/admin/AdminApi'
+import { createMockAdminApi } from '@/core/admin/mockAdminApi'
 import type { AuthApi } from '@/core/auth/AuthApi'
 import { AuthProvider } from '@/core/auth/AuthProvider'
 import type { Role, Tenant, User } from '@/core/auth/types'
@@ -31,13 +34,21 @@ export function fakeAuthApi(user: User | null): AuthApi {
   }
 }
 
-/** Renderiza la app completa (providers + rutas reales) en `path`. */
-export function renderApp(path: string, api: AuthApi) {
+/**
+ * Renderiza la app completa (providers + rutas reales) en `path`.
+ *
+ * @param path - Ruta inicial.
+ * @param api - Adaptador de autenticación (usa `fakeAuthApi`).
+ * @param adminApi - Adaptador de la API admin; por defecto el mock sin latencia.
+ */
+export function renderApp(path: string, api: AuthApi, adminApi: AdminApi = createMockAdminApi({ latencyMs: 0 })) {
   return render(
     <ThemeProvider>
       <AuthProvider api={api}>
         <TenantProvider>
-          <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
+          <AdminApiProvider api={adminApi}>
+            <RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />
+          </AdminApiProvider>
         </TenantProvider>
       </AuthProvider>
     </ThemeProvider>,
