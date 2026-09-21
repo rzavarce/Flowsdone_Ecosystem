@@ -587,6 +587,40 @@ services:
     cpus: ${API_CPUS}
 
   # ------------------------------------------------------------------
+  # PWA — consola web (React + Vite, servida por nginx)
+  # ------------------------------------------------------------------
+  # Los ${VAR:-default} evitan que el deploy falle en un VPS cuyo .env
+  # todavía no tenga estas variables (mem_limit vacío rompe `compose up`).
+
+  pwa:
+    <<: *common
+    build:
+      context: ./flowsdone_pwa
+      dockerfile: Dockerfile
+      args:
+        # http = backend real (default seguro). mock = cuentas de demo, solo maquetas locales.
+        VITE_AUTH_MODE: ${PWA_AUTH_MODE:-http}
+        VITE_API_BASE_URL: ${PWA_API_BASE_URL:-/api}
+        VITE_LANGFLOW_URL: ${PWA_LANGFLOW_URL:-}
+    container_name: ${CONTAINER_PREFIX}_pwa
+    # Solo loopback por defecto: en producción el acceso público es por Traefik
+    # (https://app.flowsdone.com); publicar el 80 del contenedor en todas las
+    # interfaces expondría el login por http plano saltándose TLS. Para probar
+    # desde otra máquina de la red local: PWA_BIND=0.0.0.0 en el .env.
+    ports:
+      - "${PWA_BIND:-127.0.0.1}:${PWA_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - flowsdone-net
+    mem_limit: ${PWA_MEM_LIMIT:-128m}
+    cpus: ${PWA_CPUS:-0.25}
+
+  # ------------------------------------------------------------------
   # WORKERS — KAFKA
   # ------------------------------------------------------------------
 

@@ -75,6 +75,23 @@ class Settings(BaseModel):
     ADMIN_API_KEY: str = "dev-admin-key-change-me"
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY: Optional[str] = None
 
+    # Console (PWA) authentication: opaque server-side sessions in Redis,
+    # carried by an httpOnly cookie (see adapters/inbound/http/auth.py).
+    AUTH_COOKIE_NAME: str = "fd_session"
+    # Idle lifetime of a session; it slides forward on every authenticated request.
+    AUTH_SESSION_TTL_SECONDS: int = 43200
+    # None = derive from PUBLIC_BASE_URL (Secure only when it is https://).
+    AUTH_COOKIE_SECURE: Optional[bool] = None
+    # Brute-force throttling: failed logins per account (any IP) and per
+    # client IP inside the window. Hitting either answers 429.
+    AUTH_LOGIN_WINDOW_SECONDS: int = 900
+    AUTH_LOGIN_MAX_FAILURES_PER_EMAIL: int = 10
+    AUTH_LOGIN_MAX_FAILURES_PER_IP: int = 30
+    # Take the client IP from the first X-Forwarded-For hop. The gateway
+    # sits behind nginx/Traefik, so without this every user would share
+    # the proxy's IP. Only affects the per-IP bucket.
+    AUTH_TRUST_FORWARDED_FOR: bool = True
+
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
     # per-bot Telegram secret_token no longer live here - they are
@@ -185,6 +202,16 @@ settings = Settings(
     LANGFLOW_API_KEY=os.getenv("LANGFLOW_API_KEY"),
 
     ADMIN_API_KEY=os.getenv("ADMIN_API_KEY", "dev-admin-key-change-me"),
+
+    AUTH_COOKIE_NAME=os.getenv("AUTH_COOKIE_NAME", "fd_session"),
+    AUTH_SESSION_TTL_SECONDS=int(os.getenv("AUTH_SESSION_TTL_SECONDS", "43200")),
+    AUTH_COOKIE_SECURE=(
+        _bool(os.getenv("AUTH_COOKIE_SECURE"), False) if os.getenv("AUTH_COOKIE_SECURE") else None
+    ),
+    AUTH_LOGIN_WINDOW_SECONDS=int(os.getenv("AUTH_LOGIN_WINDOW_SECONDS", "900")),
+    AUTH_LOGIN_MAX_FAILURES_PER_EMAIL=int(os.getenv("AUTH_LOGIN_MAX_FAILURES_PER_EMAIL", "10")),
+    AUTH_LOGIN_MAX_FAILURES_PER_IP=int(os.getenv("AUTH_LOGIN_MAX_FAILURES_PER_IP", "30")),
+    AUTH_TRUST_FORWARDED_FOR=_bool(os.getenv("AUTH_TRUST_FORWARDED_FOR"), True),
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 
     EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),

@@ -12,6 +12,7 @@ from starlette.responses import Response
 from starlette.staticfiles import StaticFiles
 
 from app.adapters.inbound.http.admin import router as admin_router
+from app.adapters.inbound.http.auth import router as auth_router
 from app.adapters.inbound.http.channels import router as channels_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
@@ -26,10 +27,14 @@ from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelApp
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
 from app.adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
 from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
+from app.adapters.outbound.db.user_repository import SqlAlchemyUserRepository
+from app.adapters.outbound.session.redis_auth_session_repository import RedisAuthSessionRepository
+from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
 from app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
 from app.adapters.outbound.queue.factory import PublisherFactory
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from app.adapters.outbound.security.scrypt_password_hasher import ScryptPasswordHasher
 from app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
 from app.adapters.outbound.session.postgres_session_history_repository import (
     PostgresSessionHistoryRepository,
@@ -39,10 +44,16 @@ from app.adapters.outbound.voice.redis_call_session_repository import RedisCallS
 from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
 from app.application.services.switchboard import Switchboard
 from app.application.services.ws_registry import WSRegistry
+from app.application.services.access_control import AccessControl
+from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
+from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
 from app.application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
+from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.application.use_cases.ingest_message import IngestMessageUseCase
+from app.application.use_cases.logout_user import LogoutUserUseCase
+from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
@@ -231,6 +242,48 @@ async def lifespan(app: FastAPI):
 
     logger.info("database.repositories.ready")
 
+    # Console (PWA) authentication: users in Postgres, opaque sessions and
+    # login throttling in Redis (same client as voice/switchboard; own key
+    # prefixes), scrypt for passwords.
+    user_repo = SqlAlchemyUserRepository(db_sessionmaker)
+    auth_sessions = RedisAuthSessionRepository(redis_client)
+    password_hasher = ScryptPasswordHasher()
+    app.state.user_repo = user_repo
+    app.state.authenticate_user_use_case = AuthenticateUserUseCase(
+        user_repo=user_repo,
+        tenant_repo=app.state.tenant_repo,
+        hasher=password_hasher,
+        sessions=auth_sessions,
+        throttle=RedisLoginThrottle(redis_client),
+        session_ttl_seconds=settings.AUTH_SESSION_TTL_SECONDS,
+        window_seconds=settings.AUTH_LOGIN_WINDOW_SECONDS,
+        max_failures_per_email=settings.AUTH_LOGIN_MAX_FAILURES_PER_EMAIL,
+        max_failures_per_ip=settings.AUTH_LOGIN_MAX_FAILURES_PER_IP,
+    )
+    app.state.get_current_user_use_case = GetCurrentUserUseCase(
+        sessions=auth_sessions,
+        user_repo=user_repo,
+        tenant_repo=app.state.tenant_repo,
+        session_ttl_seconds=settings.AUTH_SESSION_TTL_SECONDS,
+    )
+    app.state.logout_user_use_case = LogoutUserUseCase(sessions=auth_sessions)
+
+    # Admin API authorization (role matrix + tenant scoping) and user management.
+    app.state.access_control = AccessControl(
+        project_repo=app.state.project_repo, agent_repo=app.state.agent_repo
+    )
+    app.state.create_user_use_case = CreateUserUseCase(
+        user_repo=user_repo, tenant_repo=app.state.tenant_repo, hasher=password_hasher
+    )
+    app.state.update_user_use_case = UpdateUserUseCase(
+        user_repo=user_repo,
+        tenant_repo=app.state.tenant_repo,
+        hasher=password_hasher,
+        sessions=auth_sessions,
+    )
+    app.state.delete_user_use_case = DeleteUserUseCase(user_repo=user_repo, sessions=auth_sessions)
+    logger.info("auth.dependencies.initialized")
+
     # Channel connection create/update (auto-generate webhook secrets
     # and keep external platform registration in sync for channels
     # that support it, e.g. Telegram). Secret generator and registrars
@@ -398,3 +451,4 @@ app.include_router(channels_router)
 app.include_router(voice_router)
 app.include_router(voice_demo_router)
 app.include_router(admin_router)
+app.include_router(auth_router)

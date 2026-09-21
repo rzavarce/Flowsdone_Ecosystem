@@ -50,6 +50,17 @@ class TenantRepositoryPort(Protocol):
         """
         ...
 
+    async def list_by_ids(self, tenant_ids: List[UUID]) -> List[Tenant]:
+        """Fetch several tenants at once.
+
+        Args:
+            tenant_ids (List[UUID]): Ids to look up; unknown ids are skipped.
+
+        Returns:
+            List[Tenant]: The matching tenants, ordered by creation date.
+        """
+        ...
+
     async def update(self, tenant_id: UUID, **fields: Any) -> Optional[Tenant]:
         """Update a tenant's fields.
 

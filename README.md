@@ -243,6 +243,62 @@ docker compose run --rm api alembic -c api_gateway/alembic.ini revision --autoge
 
 > **Importante:** `alembic.ini` resuelve `sqlalchemy.url` en runtime desde `settings.DATABASE_URL_SQLALCHEMY` (`api_gateway/app/core/config.py`), no está hardcodeado — no hace falta tocar el `.ini` para apuntar a otro entorno, alcanza con la variable de entorno.
 
+### Autenticación de la consola (PWA)
+
+La consola (`flowsdone_pwa`) inicia sesión contra el gateway (`/auth/*`); es independiente de `X-Admin-Api-Key`, que sigue protegiendo `/internal/admin/*` para acceso máquina a máquina.
+
+| Endpoint | Descripción |
+|---|---|
+| `POST /auth/login` | `{email, password}` → 200 con `{id, email, name, role, tenants[]}` y cookie de sesión. 401 credenciales inválidas (o cuenta deshabilitada, indistinguible a propósito); 429 demasiados intentos. |
+| `GET /auth/me` | Usuario actual y renueva la cookie. 401 sin sesión. |
+| `POST /auth/logout` | 204; cierra la sesión en el servidor y borra la cookie (idempotente). |
+
+Diseño (decisiones que conviene conocer):
+
+- **Sesión opaca en Redis, no JWT.** Un token aleatorio de 256 bits en cookie `httpOnly` + `SameSite=Lax` (+ `Secure` si `PUBLIC_BASE_URL` es https). En Redis solo se guarda su SHA-256. Se puede revocar al instante (logout, cuenta deshabilitada) y los cambios de rol/tenants aplican en la siguiente request, porque el usuario se relee de Postgres en cada una. Expira por inactividad (`AUTH_SESSION_TTL_SECONDS`).
+- **Contraseñas con scrypt** (N=2¹⁵, r=8, p=3, sal aleatoria; solo librería estándar) en `users.password_hash`, con los parámetros dentro del hash para poder subirlos sin invalidar contraseñas. Corre en un hilo aparte para no frenar el event loop.
+- **Fuerza bruta:** `AUTH_LOGIN_MAX_FAILURES_PER_EMAIL` (10) por cuenta —sin importar la IP, así rotar `X-Forwarded-For` no lo evita— y `..._PER_IP` (30) por ventana de 15 min. Un email desconocido cuesta el mismo tiempo que uno real (hash señuelo). Compromiso conocido: alguien puede bloquear temporalmente una cuenta ajena fallando a propósito.
+- **Mismo origen, sin CORS:** la PWA y la API comparten dominio; nginx (contenedor `pwa`) reenvía `/api/auth/*` a `api:8000` quitando el prefijo. Es una lista blanca: `/api/*` restante devuelve 404.
+- **Roles:** `admin` (todos los tenants), `tenant_manager`, `botmaster`, `client` (los tres últimos acotados a sus tenants en `user_tenants`).
+
+**Crear usuarios** (no hay registro público; el primer admin sale de aquí):
+
+```bash
+docker compose exec api python -m app.cli.create_user --email ana@empresa.com --name "Ana Pérez" --role admin
+docker compose exec api python -m app.cli.create_user --email carla@cliente.com --name "Carla" --role client --tenant acme
+```
+
+La contraseña se pide por prompt oculto (o `--password-stdin`); mínimo 10 caracteres. Todos los roles salvo `admin` requieren al menos un `--tenant` (slug).
+
+**Proteger un endpoint con la sesión** (bloques listos en `adapters/inbound/http/auth_deps.py`): `Depends(get_current_user)`, `Depends(require_roles("admin", "tenant_manager"))` y `ensure_tenant_access(user, tenant_id)`. Migrar `/internal/admin/*` de la API key a estas dependencias es el paso siguiente para que la consola gestione tenants y canales.
+
+#### Autorización de la API admin (`/internal/admin/*`)
+
+La API admin acepta **dos tipos de llamante**: una máquina con `X-Admin-Api-Key` (scripts, CI, Postman; se comporta como antes: admin sin restricciones) o una persona con su cookie de sesión. Para las personas se aplican dos capas (`application/services/access_control.py`):
+
+1. **Rol × recurso × acción** (`POLICY`, única fuente de verdad):
+
+| Recurso | admin | tenant_manager | botmaster | client |
+|---|---|---|---|---|
+| tenants | leer + escribir | leer (los suyos) | leer (los suyos) | — |
+| projects | leer + escribir | leer + escribir | leer | — |
+| agents | leer + escribir | leer + escribir | leer + escribir | — |
+| workflows | leer + escribir | leer + escribir | leer | — |
+| channel-connections | leer + escribir | leer + escribir | — | — |
+| channel-apps (secretos globales) | leer + escribir | — | — | — |
+| users | leer + escribir | — | — | — |
+
+2. **Alcance por tenant:** todo cuelga de un proyecto y este de un tenant; un no-admin solo ve y toca lo de sus tenants. Lo que queda fuera de alcance responde **404** (no 403), igual que un id inexistente, para no revelar qué ids existen en otros tenants. Los listados sin filtro devuelven solo lo visible.
+
+Otras defensas:
+
+- **Referencias cruzadas:** al crear o editar una `channel-connection`, el `agent_id` debe pertenecer al mismo proyecto (400 si no). Sin esto, un gestor podría enlazar su canal al agente de otro tenant y desviar mensajes. Aplica también a la API key.
+- **CSRF:** una petición que cambia datos (`POST/PATCH/PUT/DELETE`) autenticada por **cookie** debe llevar `X-Requested-With: fd-console` (403 si falta). `SameSite=Lax` no basta porque `chat.`, `platform.` y la PWA son el mismo *site*; un origen ajeno no puede enviar esa cabecera sin CORS, y el gateway no concede CORS. La API key no lo necesita.
+- **Sesiones al día:** editar el rol, los tenants, el estado o la contraseña de un usuario cierra sus sesiones al instante; renombrarlo o reenviar los mismos valores no.
+- **Sin auto-bloqueo:** un admin no puede deshabilitarse, degradarse ni borrarse a sí mismo (409).
+
+**Usuarios** (solo admin): `POST/GET /internal/admin/users`, `GET/PATCH/DELETE /internal/admin/users/{id}`. Nunca devuelven el hash.
+
 ---
 
 ## 8. Multi-tenancy: tenants, proyectos, agentes y canales
@@ -468,6 +524,8 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 
 | Servicio | Dominio |
 |---|---|
+| **Consola web (PWA)** | https://app.flowsdone.com |
+| Langflow | https://agents.flowsdone.com |
 | n8n | https://auto.flowsdone.com |
 | Langfuse | https://langfuse.flowsdone.com |
 | Evolution API | https://evo.flowsdone.com |
@@ -478,6 +536,18 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 | RabbitMQ Scout | https://broker.flowsdone.com |
 | Weaviate GUI | https://vector.flowsdone.com |
 | OpenSearch Dashboards | https://logs.flowsdone.com |
+
+### Consola web (PWA) — `app.flowsdone.com`
+
+Ruta `pwa` en `traefik-dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.
+
+**Puesta en marcha (una sola vez):**
+
+1. **DNS:** crear el registro `A` `app` → la IP del VPS (la misma que los demás subdominios) **antes** del merge a `main`. Si el DNS aún no resuelve cuando Traefik intenta el challenge HTTP-01, Let's Encrypt falla y hay que esperar (límite de 5 validaciones fallidas por hora).
+2. **`.env` del VPS:** `PUBLIC_BASE_URL=https://…` (de esto depende que la cookie salga `Secure`), `PWA_AUTH_MODE=http` (**nunca** `mock` en producción: habilita cuentas de demostración) y, si querés el editor embebido, `PWA_LANGFLOW_URL=https://agents.flowsdone.com`. Las variables `PWA_*` tienen default seguro en el compose, así que un `.env` sin ellas no rompe el deploy.
+3. **Merge a `main`:** el deploy construye la imagen `pwa`, aplica la migración `0005_users` y levanta todo (incluido `pwa`).
+4. **Primer admin:** `docker compose --profile prod exec api python -m app.cli.create_user --email … --name "…" --role admin`.
+5. **Verificar:** `https://app.flowsdone.com` muestra el login; `docker compose --profile prod ps` con `fd_pwa` en `healthy`.
 
 El canal de voz (sección 18) y su softphone de prueba (sección 19) no tienen dominio propio — cuelgan del mismo `platform.flowsdone.com` que ya usan el admin API y los webhooks de texto, sin reescritura de path.
 

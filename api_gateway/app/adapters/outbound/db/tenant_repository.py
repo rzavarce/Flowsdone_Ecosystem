@@ -84,6 +84,25 @@ class SqlAlchemyTenantRepository(TenantRepositoryPort):
             result = await session.execute(select(TenantModel).order_by(TenantModel.created_at))
             return [_to_domain(m) for m in result.scalars().all()]
 
+    async def list_by_ids(self, tenant_ids: List[UUID]) -> List[Tenant]:
+        """Fetch several tenants at once.
+
+        Args:
+            tenant_ids (List[UUID]): Ids to look up; unknown ids are skipped.
+
+        Returns:
+            List[Tenant]: The matching tenants, ordered by creation date.
+        """
+        if not tenant_ids:
+            return []
+        async with self._sessionmaker() as session:
+            result = await session.execute(
+                select(TenantModel)
+                .where(TenantModel.id.in_(tenant_ids))
+                .order_by(TenantModel.created_at)
+            )
+            return [_to_domain(m) for m in result.scalars().all()]
+
     async def update(self, tenant_id: UUID, **fields: Any) -> Optional[Tenant]:
         """Update a tenant's fields.
 

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#04141f" />
+    <meta name="description" content="Consola de la plataforma Flowsdone" />
+    <title>Flowsdone</title>
+    <!-- Anti-flash: aplica el tema guardado antes del primer pintado, para que
+         no parpadee claro/oscuro mientras React arranca. Debe mantenerse
+         alineado con src/core/theme/themes.ts (clave y valores). -->
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('fd-theme') || '{}')
+        var themes = ['flowsdone', 'agentic', 'corporate']
+        var theme = themes.indexOf(s.theme) > -1 ? s.theme : 'flowsdone'
+        var dark =
+          s.mode === 'dark' ||
+          (s.mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = theme
+        if (dark) document.documentElement.classList.add('dark')
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
