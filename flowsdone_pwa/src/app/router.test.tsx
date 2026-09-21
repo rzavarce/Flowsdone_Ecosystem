@@ -21,8 +21,8 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Agentes', 'Ajustes']],
-    ['tenant_manager', ['Dashboard', 'Conversaciones', 'Canales', 'Agentes', 'Ajustes']],
+    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
+    ['tenant_manager', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
     ['botmaster', ['Agentes', 'Ajustes']],
     ['client', ['Dashboard', 'Ajustes']],
   ])('%s ve el menú esperado', async (role, expected) => {
@@ -65,6 +65,8 @@ describe('menú y acceso por perfil', () => {
     ['client', '/canales'],
     ['client', '/agentes'],
     ['client', '/conversaciones'],
+    ['botmaster', '/tenants'],
+    ['client', '/tenants'],
   ])('%s recibe 403 al abrir %s por URL directa', async (role, path) => {
     renderApp(path, fakeAuthApi(makeUser(role)))
     expect(await h1('Sin acceso')).toBeInTheDocument()

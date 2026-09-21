@@ -86,4 +86,38 @@ describe('mockAdminApi', () => {
     await expect(api.deleteChannelApp('twitter')).rejects.toMatchObject({ status: 404 })
     await expect(api.revealChannelAppCredentials('tiktok')).rejects.toMatchObject({ status: 404 })
   })
+
+  it('tenants: lista, crea, edita y rechaza un slug repetido (409)', async () => {
+    const api = make()
+    expect((await api.listTenants()).map((t) => t.id)).toEqual(['t1', 't2', 't3'])
+    const created = await api.createTenant({ name: 'Nuevo', slug: 'nuevo' })
+    expect(created).toMatchObject({ name: 'Nuevo', slug: 'nuevo', status: 'active' })
+    await expect(api.createTenant({ name: 'Otro', slug: 'nuevo' })).rejects.toMatchObject({ status: 409 })
+
+    expect((await api.updateTenant(created.id, { name: 'Renombrado', status: 'suspended' }))).toMatchObject({ name: 'Renombrado', status: 'suspended', slug: 'nuevo' })
+    await expect(api.updateTenant(created.id, { slug: 'clinica-vital' })).rejects.toMatchObject({ status: 409 })
+    await expect(api.updateTenant('nope', {})).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('borrar un tenant arrastra en cascada sus proyectos, agentes y canales (como la base de datos)', async () => {
+    const api = make()
+    await api.deleteTenant('t1')
+    expect((await api.listTenants()).map((t) => t.id)).toEqual(['t2', 't3'])
+    expect((await api.listProjects()).map((p) => p.id)).toEqual(['p2'])
+    expect((await api.listAgents()).map((a) => a.id)).toEqual(['a2'])
+    expect((await api.listChannelConnections()).map((c) => c.id)).toEqual(['c3'])
+    await expect(api.deleteTenant('t1')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('proyectos: editar respeta la unicidad dentro del tenant; borrar arrastra agentes y canales', async () => {
+    const api = make()
+    const second = await api.createProject({ tenant_id: 't1', name: 'Segundo', slug: 'segundo' })
+    await expect(api.updateProject(second.id, { slug: 'atencion' })).rejects.toMatchObject({ status: 409 })
+    expect(await api.updateProject(second.id, { name: 'Segundo B', status: 'suspended' })).toMatchObject({ name: 'Segundo B', status: 'suspended' })
+
+    await api.deleteProject('p1')
+    expect((await api.listAgents()).map((a) => a.id)).toEqual(['a2'])
+    expect((await api.listChannelConnections()).map((c) => c.id)).toEqual(['c3'])
+    await expect(api.deleteProject('p1')).rejects.toMatchObject({ status: 404 })
+  })
 })

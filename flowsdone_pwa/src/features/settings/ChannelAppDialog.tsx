@@ -5,7 +5,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { useUpsertChannelApp } from '@/core/admin/hooks'
-import { describeError } from '@/features/channels/describeError'
+import { describeError } from '@/core/http/describeError'
 import type { ChannelAppConfig } from './channelApps'
 
 /** Props de {@link ChannelAppDialog}. */

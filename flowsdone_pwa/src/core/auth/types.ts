@@ -15,6 +15,8 @@ export type Permission =
   | 'channels:manage'
   | 'agents:edit' // editor de agentes (Langflow embebido)
   | 'settings:view'
+  | 'projects:manage' // pantalla Tenants: proyectos de los tenants propios (admin y gestor)
+  | 'tenants:manage' // crear, editar, suspender y borrar tenants (solo admin)
   | 'platform:manage' // credenciales compartidas de proveedores (Meta, X, TikTok, Twilio)
 
 /** Organización cliente de la plataforma; unidad de aislamiento de datos. */

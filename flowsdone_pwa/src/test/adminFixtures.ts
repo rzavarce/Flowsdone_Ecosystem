@@ -1,10 +1,18 @@
-import type { Agent, ChannelConnection, Project } from '@/core/admin/types'
+import type { Agent, ChannelConnection, Project, TenantRecord } from '@/core/admin/types'
 
 /**
  * Datos de la API admin alineados con los tenants de `renderApp` (t1 Clínica Vital,
  * t2 Inmobiliaria Norte, t3 Tienda Aurora). El tenant t3 no tiene proyectos, a propósito:
  * permite probar el alta de proyecto en línea.
  */
+const t0 = '2026-08-01T10:00:00Z'
+/** Los tres tenants de `renderApp` con sus datos completos; t3 (sin proyectos) está suspendido. */
+export const TENANTS: TenantRecord[] = [
+  { id: 't1', name: 'Clínica Vital', slug: 'clinica-vital', status: 'active', created_at: t0, updated_at: t0 },
+  { id: 't2', name: 'Inmobiliaria Norte', slug: 'inmobiliaria-norte', status: 'active', created_at: t0, updated_at: t0 },
+  { id: 't3', name: 'Tienda Aurora', slug: 'tienda-aurora', status: 'suspended', created_at: t0, updated_at: t0 },
+]
+
 export const PROJECTS: Project[] = [
   { id: 'p1', tenant_id: 't1', name: 'Atención', slug: 'atencion', status: 'active' },
   { id: 'p2', tenant_id: 't2', name: 'Ventas', slug: 'ventas', status: 'active' },
@@ -33,4 +41,4 @@ export const CONNECTIONS: ChannelConnection[] = [
   conn({ id: 'c3', project_id: 'p2', agent_id: 'a2', channel_type: 'instagram', external_id: '17841400000000', display_name: 'Instagram Norte', has_credentials: true, status: 'inactive' }),
 ]
 
-export const SEED = { projects: PROJECTS, agents: AGENTS, connections: CONNECTIONS }
+export const SEED = { tenants: TENANTS, projects: PROJECTS, agents: AGENTS, connections: CONNECTIONS }

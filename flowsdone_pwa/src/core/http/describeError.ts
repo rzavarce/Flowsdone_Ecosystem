@@ -1,4 +1,4 @@
-import { ApiError } from '@/core/http/apiFetch'
+import { ApiError } from './apiFetch'
 
 /**
  * Traduce un error del gateway a un mensaje accionable para la persona usuaria.

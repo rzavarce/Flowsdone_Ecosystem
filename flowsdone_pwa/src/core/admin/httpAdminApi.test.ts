@@ -70,4 +70,37 @@ describe('httpAdminApi', () => {
     expect(await c.api.revealChannelAppCredentials('meta')).toEqual({ webhook_verify_token: 'tok' })
     expect(c.call()[0]).toBe('/api/admin/channel-apps/meta/credentials')
   })
+
+  it('tenants: GET/POST/PATCH/DELETE sobre /api/admin/tenants', async () => {
+    const list = setup([])
+    await list.api.listTenants()
+    expect(list.call()[0]).toBe('/api/admin/tenants')
+
+    const create = setup({ id: 't' })
+    await create.api.createTenant({ name: 'N', slug: 'n' })
+    expect(create.call()[1].method).toBe('POST')
+    expect(JSON.parse(create.call()[1].body as string)).toEqual({ name: 'N', slug: 'n' })
+
+    const patch = setup({ id: 't' })
+    await patch.api.updateTenant('t-9', { status: 'suspended' })
+    expect(patch.call()[0]).toBe('/api/admin/tenants/t-9')
+    expect(patch.call()[1].method).toBe('PATCH')
+    expect(JSON.parse(patch.call()[1].body as string)).toEqual({ status: 'suspended' })
+
+    const del = setup(undefined, 204)
+    await expect(del.api.deleteTenant('t-9')).resolves.toBeUndefined()
+    expect(del.call()[1].method).toBe('DELETE')
+  })
+
+  it('proyectos: PATCH y DELETE sobre /api/admin/projects/{id}', async () => {
+    const patch = setup({ id: 'p' })
+    await patch.api.updateProject('p-1', { name: 'X' })
+    expect(patch.call()[0]).toBe('/api/admin/projects/p-1')
+    expect(patch.call()[1].method).toBe('PATCH')
+
+    const del = setup(undefined, 204)
+    await del.api.deleteProject('p-1')
+    expect(del.call()[0]).toBe('/api/admin/projects/p-1')
+    expect(del.call()[1].method).toBe('DELETE')
+  })
 })

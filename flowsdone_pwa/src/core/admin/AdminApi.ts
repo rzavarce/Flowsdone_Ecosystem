@@ -5,8 +5,12 @@ import type {
   ChannelConnection,
   CreateChannelConnectionInput,
   CreateProjectInput,
+  CreateTenantInput,
   Project,
+  TenantRecord,
   UpdateChannelConnectionInput,
+  UpdateProjectInput,
+  UpdateTenantInput,
 } from './types'
 
 /**
@@ -17,9 +21,21 @@ import type {
  * gateway aplica el rol y el alcance por tenant (lo ajeno responde 404).
  */
 export interface AdminApi {
+  /** Tenants visibles (todos para un admin; solo los propios para el resto). */
+  listTenants(): Promise<TenantRecord[]>
+  /** Solo admin. */
+  createTenant(input: CreateTenantInput): Promise<TenantRecord>
+  /** Solo admin. `status: 'suspended'` corta el enrutado de todos sus canales. */
+  updateTenant(id: string, patch: UpdateTenantInput): Promise<TenantRecord>
+  /** Solo admin. Borra EN CASCADA sus proyectos, agentes y canales. */
+  deleteTenant(id: string): Promise<void>
+
   /** Proyectos visibles, opcionalmente de un tenant. */
   listProjects(tenantId?: string): Promise<Project[]>
   createProject(input: CreateProjectInput): Promise<Project>
+  updateProject(id: string, patch: UpdateProjectInput): Promise<Project>
+  /** Borra EN CASCADA sus agentes y canales. */
+  deleteProject(id: string): Promise<void>
 
   /** Agentes visibles, opcionalmente de un proyecto. */
   listAgents(projectId?: string): Promise<Agent[]>

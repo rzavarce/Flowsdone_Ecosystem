@@ -13,6 +13,38 @@ export type ChannelType =
 /** Proveedores con una app compartida para toda la plataforma. */
 export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio'
 
+/** Estado de ciclo de vida de tenants y proyectos. `suspended` corta el enrutado de sus canales sin borrar datos. */
+export type LifecycleStatus = 'active' | 'suspended'
+
+/** Un tenant tal como lo devuelve la API admin (el de la sesión, `core/auth`, solo trae id y nombre). */
+export interface TenantRecord {
+  id: string
+  name: string
+  slug: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateTenantInput {
+  name: string
+  slug: string
+}
+
+/** Campos editables de un tenant; los omitidos no cambian. */
+export interface UpdateTenantInput {
+  name?: string
+  slug?: string
+  status?: LifecycleStatus
+}
+
+/** Campos editables de un proyecto; los omitidos no cambian. */
+export interface UpdateProjectInput {
+  name?: string
+  slug?: string
+  status?: LifecycleStatus
+}
+
 export interface Project {
   id: string
   tenant_id: string

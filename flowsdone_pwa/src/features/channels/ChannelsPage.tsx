@@ -12,7 +12,7 @@ import { useTenant } from '@/core/tenant/useTenant'
 import { CHANNEL_TYPES } from './channelTypes'
 import { ConnectionCard } from './ConnectionCard'
 import { ConnectionDialog } from './ConnectionDialog'
-import { describeError } from './describeError'
+import { describeError } from '@/core/http/describeError'
 import { useChannelsView } from './useChannelsView'
 
 /** Qué diálogo está abierto: crear, editar una conexión, o ninguno. */

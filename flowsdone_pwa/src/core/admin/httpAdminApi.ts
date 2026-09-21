@@ -1,6 +1,6 @@
 import { apiFetch } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
-import type { Agent, ChannelApp, ChannelConnection, Project } from './types'
+import type { Agent, ChannelApp, ChannelConnection, Project, TenantRecord } from './types'
 
 /**
  * Adaptador contra el gateway real. En el navegador las rutas van por
@@ -16,8 +16,15 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
   }
 
   return {
+    listTenants: () => call<TenantRecord[]>('/tenants'),
+    createTenant: (input) => call<TenantRecord>('/tenants', 'POST', input),
+    updateTenant: (id, patch) => call<TenantRecord>(`/tenants/${id}`, 'PATCH', patch),
+    deleteTenant: (id) => call<void>(`/tenants/${id}`, 'DELETE'),
+
     listProjects: (tenantId) => call<Project[]>(`/projects${query({ tenant_id: tenantId })}`),
     createProject: (input) => call<Project>('/projects', 'POST', input),
+    updateProject: (id, patch) => call<Project>(`/projects/${id}`, 'PATCH', patch),
+    deleteProject: (id) => call<void>(`/projects/${id}`, 'DELETE'),
 
     listAgents: (projectId) => call<Agent[]>(`/agents${query({ project_id: projectId })}`),
 

@@ -9,7 +9,7 @@ import { useCreateConnection, useUpdateConnection } from '@/core/admin/hooks'
 import type { ChannelConnection, ChannelType } from '@/core/admin/types'
 import { useTenant } from '@/core/tenant/useTenant'
 import { CHANNEL_TYPE_LIST, CHANNEL_TYPES, maskExternalId } from './channelTypes'
-import { describeError } from './describeError'
+import { describeError } from '@/core/http/describeError'
 import { NewProjectForm } from './NewProjectForm'
 import type { ChannelsView } from './useChannelsView'
 

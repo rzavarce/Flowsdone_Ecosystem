@@ -7,7 +7,7 @@ import { Card, CardHeader } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner } from '@/components/ui/Spinner'
 import { useChannelApps, useDeleteChannelApp, useRevealChannelApp } from '@/core/admin/hooks'
-import { describeError } from '@/features/channels/describeError'
+import { describeError } from '@/core/http/describeError'
 import { CHANNEL_APPS, type ChannelAppConfig } from './channelApps'
 import { ChannelAppDialog } from './ChannelAppDialog'
 

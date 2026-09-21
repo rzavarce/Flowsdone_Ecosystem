@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { useCreateProject } from '@/core/admin/hooks'
 import type { Project } from '@/core/admin/types'
 import type { Tenant } from '@/core/auth/types'
-import { describeError } from './describeError'
-import { slugify } from './channelTypes'
+import { describeError } from '@/core/http/describeError'
+import { slugify } from '@/lib/slug'
 
 /** Props de {@link NewProjectForm}. */
 export interface NewProjectFormProps {
