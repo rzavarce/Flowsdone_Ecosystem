@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.domain.models.agent import Agent
 from app.domain.models.project import Project
 from app.domain.models.workflow_config import WorkflowConfig
+from app.domain.ports.outbound import AlreadyExistsError
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import (
     FakeAuthSessionRepo,
@@ -45,17 +46,22 @@ class InMemoryRepo:
     is the attribute `list_by_*` filters on (`project_id` / `tenant_id`).
     """
 
-    def __init__(self, build, owner_field: Optional[str] = None) -> None:
+    def __init__(self, build, owner_field: Optional[str] = None, unique_key=None) -> None:
         self.items: Dict[UUID, Any] = {}
         self._build = build
         self._owner = owner_field
+        # Como la restricción UNIQUE de la base: create() repetido -> AlreadyExistsError.
+        self._unique_key = unique_key
 
     def add(self, item: Any) -> Any:
         self.items[item.id] = item
         return item
 
     async def create(self, **fields: Any) -> Any:
-        return self.add(self._build(**fields))
+        item = self._build(**fields)
+        if self._unique_key and any(self._unique_key(i) == self._unique_key(item) for i in self.items.values()):
+            raise AlreadyExistsError("duplicate")
+        return self.add(item)
 
     async def get_by_id(self, item_id: UUID) -> Optional[Any]:
         return self.items.get(item_id)
@@ -110,9 +116,11 @@ class World:
         now = _now()
         self.tenant_a = make_tenant(name="Tenant A", slug="a")
         self.tenant_b = make_tenant(name="Tenant B", slug="b")
-        self.tenants = InMemoryRepo(lambda **f: make_tenant(**f))
+        self.tenants = InMemoryRepo(lambda **f: make_tenant(**f), unique_key=lambda t: t.slug)
         self.projects = InMemoryRepo(
-            lambda **f: Project(id=uuid4(), status="active", created_at=now, updated_at=now, **f), "tenant_id"
+            lambda **f: Project(id=uuid4(), status="active", created_at=now, updated_at=now, **f),
+            "tenant_id",
+            unique_key=lambda p: (p.tenant_id, p.slug),
         )
         self.agents = InMemoryRepo(
             lambda **f: Agent(id=uuid4(), status="active", created_at=now, updated_at=now, **f), "project_id"
@@ -121,7 +129,9 @@ class World:
             lambda **f: WorkflowConfig(id=uuid4(), status="active", created_at=now, updated_at=now, **f),
             "project_id",
         )
-        self.connections = InMemoryRepo(lambda **f: make_channel_connection(**f), "project_id")
+        self.connections = InMemoryRepo(
+            lambda **f: make_channel_connection(**f), "project_id", unique_key=lambda c: (c.channel_type, c.external_id)
+        )
         for t in (self.tenant_a, self.tenant_b):
             self.tenants.add(t)
 

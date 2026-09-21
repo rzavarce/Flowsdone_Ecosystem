@@ -16,6 +16,15 @@ from app.domain.models.tenant import Tenant
 from app.domain.models.workflow_config import WorkflowConfig
 
 
+class AlreadyExistsError(Exception):
+    """Raised by a repository's `create`/`update` when a unique constraint would
+    be violated (e.g. a duplicate slug or an already-connected channel).
+
+    The HTTP layer maps it to `409 Conflict`; without it the database error
+    would surface as a `500`.
+    """
+
+
 class TenantRepositoryPort(Protocol):
     """CRUD contract for tenants."""
 

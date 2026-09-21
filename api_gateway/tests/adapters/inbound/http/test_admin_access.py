@@ -390,3 +390,30 @@ async def test_api_key_can_manage_users_and_is_not_subject_to_self_lockout(world
         made = await _call(c, "POST", "/users", api_key=settings.ADMIN_API_KEY, json=_new_user(world))
         deleted = await _call(c, "DELETE", f"/users/{world.by_role['admin'].id}", api_key=settings.ADMIN_API_KEY)
     assert made.status_code == 201 and deleted.status_code == 204
+
+
+# ------------------------------------------------------ duplicados -> 409 (no 500)
+
+
+async def test_duplicates_answer_409_instead_of_500(world):
+    """La violación UNIQUE de la base llega como AlreadyExistsError y se muestra como 409."""
+    token = await world.token("admin")
+    conn = {"project_id": str(world.project_a.id), "agent_id": str(world.agent_a.id),
+            "channel_type": "whatsapp_evolution", "external_id": "instancia-repetida"}
+    async with world.client() as c:
+        first = await _call(c, "POST", "/channel-connections", token=token, json=conn)
+        again = await _call(c, "POST", "/channel-connections", token=token, json=conn)
+        tenant = await _call(c, "POST", "/tenants", token=token, json={"name": "Otro A", "slug": "a"})
+        project = await _call(c, "POST", "/projects", token=token,
+                              json={"tenant_id": str(world.tenant_a.id), "name": "Otro", "slug": "pa"})
+    assert first.status_code == 201
+    assert again.status_code == tenant.status_code == project.status_code == 409
+    assert again.json() == {"detail": "already exists"}
+
+
+async def test_the_same_slug_is_fine_in_a_different_tenant(world):
+    token = await world.token("admin")
+    async with world.client() as c:
+        resp = await _call(c, "POST", "/projects", token=token,
+                           json={"tenant_id": str(world.tenant_b.id), "name": "Otro", "slug": "pa"})
+    assert resp.status_code == 201

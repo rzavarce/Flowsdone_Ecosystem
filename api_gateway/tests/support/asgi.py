@@ -11,6 +11,8 @@ from typing import Any, AsyncIterator
 import httpx
 from fastapi import APIRouter, FastAPI
 
+from app.adapters.inbound.http.errors import register_error_handlers
+
 
 @asynccontextmanager
 async def client_for_router(router: APIRouter, **state: Any) -> AsyncIterator[httpx.AsyncClient]:
@@ -29,6 +31,7 @@ async def client_for_router(router: APIRouter, **state: Any) -> AsyncIterator[ht
         in-process.
     """
     app = FastAPI()
+    register_error_handlers(app)
     app.include_router(router)
     for key, value in state.items():
         setattr(app.state, key, value)

@@ -13,6 +13,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.adapters.inbound.http.admin import router as admin_router
 from app.adapters.inbound.http.auth import router as auth_router
+from app.adapters.inbound.http.errors import register_error_handlers
 from app.adapters.inbound.http.channels import router as channels_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
@@ -393,6 +394,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 instrument_fastapi_app(app)
+register_error_handlers(app)
 
 
 class NoCacheStaticFiles(StaticFiles):
