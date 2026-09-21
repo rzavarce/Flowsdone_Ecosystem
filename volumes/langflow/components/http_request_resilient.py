@@ -28,6 +28,11 @@ the component, so the model can't redirect the request (and the key with
 it) to another host. `path` is appended to `url` one segment at a time,
 percent-encoded, with "." / ".." segments rejected, so it can't change the
 host nor climb out of the base URL's own path prefix either.
+
+`response_fields` (optional) trims the JSON response down to the listed
+fields before it is returned. That keeps an Agent tool call from dumping a
+whole API payload (images, long descriptions, per-warehouse breakdowns...)
+into the model's context when it only needs a handful of values.
 """
 
 from __future__ import annotations
@@ -44,6 +49,36 @@ from langflow.schema import Data
 
 _DEFAULT_RETRYABLE_STATUS_CODES = "429,500,502,503,504"
 _HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+
+
+def _project_fields(value: Any, paths: list[list[str]]) -> Any:
+    """Keeps only the requested fields of a JSON value, preserving its shape.
+
+    Lists are projected element by element, so a path like `data.sku` works
+    the same on `{"data": {...}}` and on `{"data": [{...}, {...}]}`. Keys that
+    don't exist are skipped, and a scalar reached before the path ends is
+    returned as is.
+
+    Args:
+        value (Any): Parsed JSON (dict, list or scalar).
+        paths (list[list[str]]): Field paths, each as a list of keys
+            (`brand.title` -> `["brand", "title"]`). Asking for both `a` and
+            `a.b` keeps the whole of `a`.
+
+    Returns:
+        Any: `value` reduced to the requested fields.
+    """
+    if isinstance(value, list):
+        return [_project_fields(item, paths) for item in value]
+    if not isinstance(value, dict):
+        return value
+    projected = {}
+    for key in dict.fromkeys(path[0] for path in paths):
+        if key not in value:
+            continue
+        sub_paths = [path[1:] for path in paths if path[0] == key]
+        projected[key] = value[key] if any(not sub_path for sub_path in sub_paths) else _project_fields(value[key], sub_paths)
+    return projected
 
 
 class ResilientHTTPRequestComponent(Component):
@@ -98,6 +133,17 @@ class ResilientHTTPRequestComponent(Component):
             advanced=True,
             tool_mode=True,
             info="Objeto JSON para POST/PUT/PATCH. Vacío = sin body.",
+        ),
+        StrInput(
+            name="response_fields",
+            display_name="Campos de la respuesta",
+            advanced=True,
+            info=(
+                "CSV de campos a conservar de la respuesta JSON; el resto se descarta. Usa '.' para "
+                "campos anidados, ej. 'sku,title,brand.title,price,stock.available'. Si la respuesta "
+                "viene envuelta, incluye el prefijo (ej. 'data.sku'); dentro de listas aplica a cada "
+                "elemento. Vacío = respuesta completa."
+            ),
         ),
         SecretStrInput(
             name="api_key",
@@ -218,6 +264,17 @@ class ResilientHTTPRequestComponent(Component):
         encoded = "/".join(quote(segment, safe="") for segment in segments)
         return urlunsplit(parts._replace(path=f"{parts.path.rstrip('/')}/{encoded}"))
 
+    def _parse_response_fields(self) -> list[list[str]]:
+        """Parses `response_fields` into a list of key paths.
+
+        Returns:
+            list[list[str]]: One list of keys per requested field (`brand.title` ->
+            `["brand", "title"]`), or `[]` if the input is empty (keep everything).
+        """
+        # getattr: flows saved before `response_fields` existed have no such field until the node is updated.
+        raw = getattr(self, "response_fields", "") or ""
+        return [part.strip().split(".") for part in raw.split(",") if part.strip()]
+
     def _parse_retryable_codes(self) -> set[int]:
         """Parses `retryable_status_codes` into a set of ints.
 
@@ -265,6 +322,9 @@ class ResilientHTTPRequestComponent(Component):
             payload: Any = response.json()
         except ValueError:
             payload = response.text
+        fields = self._parse_response_fields()
+        if fields and isinstance(payload, (dict, list)):
+            payload = _project_fields(payload, fields)
         result = {
             "success": True,
             "status_code": response.status_code,

@@ -155,6 +155,7 @@ def _make_component(**overrides):
     component.headers_json = ""
     component.query_params_json = ""
     component.body_json = ""
+    component.response_fields = ""
     component.api_key = ""
     component.api_key_header = "Authorization"
     component.api_key_scheme = "Bearer"
@@ -473,4 +474,86 @@ def test_only_path_query_params_and_body_are_exposed_to_the_model_as_tool_params
     }
 
     assert tool_inputs == {"path", "query_params_json", "body_json"}
+
+
+_PRODUCT = {
+    "documentId": "dblkj5zjinq11mwa0ff8g5q5",
+    "sku": "AUCE21.5",
+    "title": 'MONITOR AUCE 21.5" 75HZ 1600x900 NEGRO',
+    "longDescription": "Monitor de gama de entrada...",
+    "images": [{"id": 487, "url": "https://cdn.example/IMG_2371.webp"}],
+    "brand": {"title": "AUCE", "slug": "auce"},
+    "price": 60,
+    "priceDiscount": None,
+    "discountFinishDate": None,
+    "stock": {"totalQuantity": 4, "totalReserved": 0, "available": 4, "byWarehouse": [{"warehouseId": "1"}]},
+}
+
+
+def _request_data(payload, **overrides):
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data=payload)]
+    component = _make_component(**overrides)
+    return asyncio.run(component.make_request()).data["data"]
+
+
+def test_empty_response_fields_returns_the_full_response():
+    assert _request_data(_PRODUCT) == _PRODUCT
+
+
+def test_response_fields_keeps_only_the_listed_fields_including_nested_ones():
+    data = _request_data(_PRODUCT, response_fields="sku, title, brand.title, price, stock.available")
+
+    assert data == {
+        "sku": "AUCE21.5",
+        "title": 'MONITOR AUCE 21.5" 75HZ 1600x900 NEGRO',
+        "brand": {"title": "AUCE"},
+        "price": 60,
+        "stock": {"available": 4},
+    }
+
+
+def test_response_fields_keeps_null_values_that_exist_in_the_response():
+    data = _request_data(_PRODUCT, response_fields="price,priceDiscount")
+
+    assert data == {"price": 60, "priceDiscount": None}
+
+
+def test_response_fields_skips_fields_that_do_not_exist():
+    data = _request_data(_PRODUCT, response_fields="sku,nope,brand.nope")
+
+    assert data == {"sku": "AUCE21.5", "brand": {}}
+
+
+def test_response_fields_applies_to_each_element_of_a_wrapped_list():
+    payload = {"data": [_PRODUCT, {**_PRODUCT, "sku": "OTRO", "price": 99}], "meta": {"total": 2}}
+
+    data = _request_data(payload, response_fields="data.sku,data.price")
+
+    assert data == {"data": [{"sku": "AUCE21.5", "price": 60}, {"sku": "OTRO", "price": 99}]}
+
+
+def test_response_fields_requesting_a_whole_object_keeps_all_of_it():
+    data = _request_data(_PRODUCT, response_fields="stock,stock.available")
+
+    assert data == {"stock": _PRODUCT["stock"]}
+
+
+def test_response_fields_does_not_touch_a_non_json_response():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, text="OK")]
+    component = _make_component(response_fields="sku")
+
+    result = asyncio.run(component.make_request())
+
+    assert result.data["data"] == "OK"
+
+
+def test_component_without_response_fields_still_works_for_flows_saved_before_it_existed():
+    _reset()
+    _FakeAsyncClient.next_script = [_FakeResponse(200, json_data=_PRODUCT)]
+    component = _make_component()
+    del component.response_fields
+
+    assert asyncio.run(component.make_request()).data["data"] == _PRODUCT
 
