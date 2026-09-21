@@ -1,4 +1,4 @@
-import { Bot, LayoutDashboard, MessageSquare, Plug, Settings, type LucideIcon } from 'lucide-react'
+import { Bot, Building2, LayoutDashboard, MessageSquare, Plug, Settings, type LucideIcon } from 'lucide-react'
 import type { Permission } from '@/core/auth/types'
 
 /** Entrada del menú principal (sidebar y barra inferior comparten esta lista). */
@@ -14,6 +14,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, anyOf: ['dashboard:view', 'reports:view'] },
   { to: '/conversaciones', label: 'Conversaciones', icon: MessageSquare, anyOf: ['conversations:manage'] },
   { to: '/canales', label: 'Canales', icon: Plug, anyOf: ['channels:manage'] },
+  { to: '/tenants', label: 'Tenants', icon: Building2, anyOf: ['projects:manage'] },
   { to: '/agentes', label: 'Agentes', icon: Bot, anyOf: ['agents:edit'] },
   { to: '/ajustes', label: 'Ajustes', icon: Settings, anyOf: ['settings:view'] },
 ]

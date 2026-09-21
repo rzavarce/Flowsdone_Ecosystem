@@ -5,10 +5,12 @@ import { useAuth } from './useAuth'
 import { fakeAuthApi, makeUser } from '@/test/renderApp'
 
 function Probe() {
-  const { status, user, login, logout } = useAuth()
+  const { status, user, login, logout, refreshUser } = useAuth()
   return (
     <div>
       <span data-testid="s">{`${status}|${user?.role ?? '-'}`}</span>
+      <span data-testid="tenants">{user?.tenants.map((t) => t.name).join(',') ?? '-'}</span>
+      <button onClick={() => void refreshUser()}>refrescar</button>
       <button onClick={() => void login({ email: 'a', password: 'b' })}>login</button>
       <button onClick={() => void logout()}>logout</button>
     </div>
@@ -60,5 +62,30 @@ describe('AuthProvider', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => render(<Probe />)).toThrow(/AuthProvider/)
     spy.mockRestore()
+  })
+
+  it('refreshUser vuelve a pedir al usuario (p. ej. sus tenants cambiaron) sin cerrar la sesión', async () => {
+    const before = makeUser('admin')
+    const after = { ...before, tenants: [...before.tenants, { id: 't-new', name: 'Tenant Nuevo' }] }
+    let current = before
+    const api = { restore: async () => current, login: async () => current, logout: async () => {} }
+    render(<AuthProvider api={api}><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('s')).toHaveTextContent('authenticated'))
+    expect(screen.getByTestId('tenants').textContent).not.toContain('Tenant Nuevo')
+
+    current = after
+    await act(async () => screen.getByText('refrescar').click())
+    expect(screen.getByTestId('tenants').textContent).toContain('Tenant Nuevo')
+    expect(screen.getByTestId('s')).toHaveTextContent('authenticated')
+  })
+
+  it('refreshUser ignora un resultado vacío (fallo de red) en vez de cerrar la sesión', async () => {
+    let calls = 0
+    const api = { restore: async () => (calls++ === 0 ? makeUser('client') : null), login: async () => makeUser('client'), logout: async () => {} }
+    render(<AuthProvider api={api}><Probe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('s')).toHaveTextContent('authenticated|client'))
+
+    await act(async () => screen.getByText('refrescar').click())
+    expect(screen.getByTestId('s')).toHaveTextContent('authenticated|client')
   })
 })

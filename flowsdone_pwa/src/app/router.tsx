@@ -11,6 +11,7 @@ import { ChannelsPage } from '@/features/channels/ChannelsPage'
 import { ConversationsPage } from '@/features/conversations/ConversationsPage'
 import { NotFoundPage } from '@/features/NotFoundPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { TenantsPage } from '@/features/tenants/TenantsPage'
 import { DashboardRoute } from './DashboardRoute'
 import { RootRedirect } from './RootRedirect'
 
@@ -42,6 +43,7 @@ export const routes = [
       { path: '/dashboard', element: <DashboardRoute /> },
       { path: '/conversaciones', element: guarded('conversations:manage', <ConversationsPage />) },
       { path: '/canales', element: guarded('channels:manage', <ChannelsPage />) },
+      { path: '/tenants', element: guarded('projects:manage', <TenantsPage />) },
       { path: '/agentes', element: guarded('agents:edit', <AgentsPage />) },
       { path: '/ajustes', element: guarded('settings:view', <SettingsPage />) },
       { path: '*', element: <NotFoundPage /> },

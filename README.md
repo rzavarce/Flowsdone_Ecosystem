@@ -297,6 +297,8 @@ Otras defensas:
 - **Sesiones al día:** editar el rol, los tenants, el estado o la contraseña de un usuario cierra sus sesiones al instante; renombrarlo o reenviar los mismos valores no.
 - **Sin auto-bloqueo:** un admin no puede deshabilitarse, degradarse ni borrarse a sí mismo (409).
 
+**Estado de tenants y proyectos:** al enrutar un mensaje entrante el gateway exige que la conexión, el agente, el proyecto **y el tenant** estén `active`. Poner un tenant o un proyecto en `suspended` corta sus canales sin borrar datos (el tenant no se comprobaba antes: suspenderlo no tenía efecto). Borrar un tenant o un proyecto arrastra en cascada sus proyectos, agentes y canales.
+
 **Conflictos:** una violación de unicidad de la base de datos (slug de tenant o proyecto repetido, canal ya conectado, etc.) se traduce en el repositorio a `AlreadyExistsError` y responde **409** (`{"detail": "already exists"}`); antes salía como `500`. Otros errores de integridad (una FK rota) siguen siendo 500 a propósito: son bugs, no conflictos.
 
 **Usuarios** (solo admin): `POST/GET /internal/admin/users`, `GET/PATCH/DELETE /internal/admin/users/{id}`. Nunca devuelven el hash.

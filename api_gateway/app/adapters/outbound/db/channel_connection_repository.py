@@ -12,7 +12,7 @@ from app.domain.models.channel_connection import ChannelConnection
 from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.ports.outbound import ChannelConnectionRepositoryPort
 from app.adapters.outbound.db.crypto import decrypt_credentials, encrypt_credentials
-from app.adapters.outbound.db.models import AgentModel, ChannelConnectionModel, ProjectModel
+from app.adapters.outbound.db.models import AgentModel, ChannelConnectionModel, ProjectModel, TenantModel
 from app.adapters.outbound.db.errors import duplicate_as_already_exists
 
 
@@ -119,9 +119,11 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
     ) -> Optional[ChannelResolution]:
         """Resolve an inbound webhook to its tenant/project/agent.
 
-        Joins across channel_connections, agents, and projects so the
-        message router gets everything it needs in a single query,
-        restricted to active records on all three.
+        Joins across channel_connections, agents, projects and tenants so
+        the message router gets everything it needs in a single query,
+        restricted to active records on all four. A suspended tenant
+        therefore stops answering on every one of its channels, while
+        its data is kept.
 
         Args:
             channel_type (str): Channel type of the incoming webhook.
@@ -136,12 +138,14 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
                 select(ChannelConnectionModel, AgentModel, ProjectModel)
                 .join(AgentModel, AgentModel.id == ChannelConnectionModel.agent_id)
                 .join(ProjectModel, ProjectModel.id == ChannelConnectionModel.project_id)
+                .join(TenantModel, TenantModel.id == ProjectModel.tenant_id)
                 .where(
                     ChannelConnectionModel.channel_type == channel_type,
                     ChannelConnectionModel.external_id == external_id,
                     ChannelConnectionModel.status == "active",
                     AgentModel.status == "active",
                     ProjectModel.status == "active",
+                    TenantModel.status == "active",
                 )
             )
             result = await session.execute(stmt)

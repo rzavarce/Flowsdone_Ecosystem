@@ -119,17 +119,3 @@ export function maskExternalId(type: ChannelType, externalId: string): string {
   // Formato inesperado: no se asume nada; solo se deja un prefijo para reconocerlo.
   return `${externalId.slice(0, 4)}••••••••`
 }
-
-/**
- * Convierte un nombre en un slug (minúsculas, sin acentos, con guiones).
- *
- * @example slugify('Atención al paciente') // 'atencion-al-paciente'
- */
-export function slugify(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}

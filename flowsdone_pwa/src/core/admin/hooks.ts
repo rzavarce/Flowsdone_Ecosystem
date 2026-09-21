@@ -1,24 +1,102 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuth } from '@/core/auth/useAuth'
 import type {
   ChannelAppProvider,
   CreateChannelConnectionInput,
   CreateProjectInput,
+  CreateTenantInput,
   UpdateChannelConnectionInput,
+  UpdateProjectInput,
+  UpdateTenantInput,
 } from './types'
 import { useAdminApi } from './useAdminApi'
 
 /** Claves de caché. Agrupadas para invalidar de forma coherente tras una mutación. */
 export const adminKeys = {
+  tenants: ['tenants'] as const,
   projects: ['projects'] as const,
   agents: ['agents'] as const,
   connections: ['channel-connections'] as const,
   apps: ['channel-apps'] as const,
 }
 
+/** Tenants visibles con todos sus datos (slug, estado…). */
+export function useTenants() {
+  const api = useAdminApi()
+  return useQuery({ queryKey: adminKeys.tenants, queryFn: () => api.listTenants() })
+}
+
 /** Proyectos visibles; con `tenantId` solo los de ese tenant. */
 export function useProjects(tenantId?: string) {
   const api = useAdminApi()
   return useQuery({ queryKey: [...adminKeys.projects, tenantId ?? 'all'], queryFn: () => api.listProjects(tenantId) })
+}
+
+/**
+ * Invalida lo que un borrado en cascada pudo dejar obsoleto (proyectos, agentes y canales).
+ * @param qc - El cliente de caché.
+ */
+function invalidateTree(qc: ReturnType<typeof useQueryClient>) {
+  return Promise.all([adminKeys.projects, adminKeys.agents, adminKeys.connections].map((queryKey) => qc.invalidateQueries({ queryKey })))
+}
+
+/** Crea un tenant, refresca la lista y el selector de tenant de la sesión. */
+export function useCreateTenant() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  const { refreshUser } = useAuth()
+  return useMutation({
+    mutationFn: (input: CreateTenantInput) => api.createTenant(input),
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: adminKeys.tenants }), refreshUser()])
+    },
+  })
+}
+
+/** Edita o suspende/reactiva un tenant. */
+export function useUpdateTenant() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  const { refreshUser } = useAuth()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateTenantInput }) => api.updateTenant(id, patch),
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: adminKeys.tenants }), refreshUser()])
+    },
+  })
+}
+
+/** Borra un tenant (en cascada) y refresca todo lo que colgaba de él. */
+export function useDeleteTenant() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  const { refreshUser } = useAuth()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteTenant(id),
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: adminKeys.tenants }), invalidateTree(qc), refreshUser()])
+    },
+  })
+}
+
+/** Edita o suspende/reactiva un proyecto. */
+export function useUpdateProject() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateProjectInput }) => api.updateProject(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.projects }),
+  })
+}
+
+/** Borra un proyecto (en cascada: agentes y canales). */
+export function useDeleteProject() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteProject(id),
+    onSuccess: () => invalidateTree(qc),
+  })
 }
 
 /** Agentes visibles para el perfil. */

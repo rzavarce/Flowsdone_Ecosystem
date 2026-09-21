@@ -90,6 +90,15 @@ La consola habla con `/internal/admin/*` del gateway a través de `/api/admin/*`
 - Un canal cuelga de un proyecto y su agente debe ser del mismo proyecto (el gateway lo valida). Si el tenant no tiene proyectos, el diálogo permite crear el primero; si el proyecto no tiene agentes, avisa (los agentes se crean en la sección Agentes).
 - Al editar no se puede mover de proyecto ni cambiar el identificador (el gateway no lo permite); las credenciales solo se envían si se escriben (vacío = conservar).
 
+## Tenants y proyectos
+
+`/tenants` (admin y gestor), en una sola pantalla: la lista de tenants a la izquierda y, a la derecha, el detalle del elegido con sus proyectos.
+
+- **Admin:** crea, edita, suspende/reactiva y borra tenants, y gestiona sus proyectos. **Gestor:** solo ve sus tenants y gestiona sus proyectos (el gateway lo impone; la UI oculta lo demás).
+- **Suspender** (tenant o proyecto) corta el enrutado de sus canales **sin borrar nada**; reactivar es inmediato. El gateway comprueba el estado del canal, del agente, del proyecto **y del tenant** al resolver un mensaje entrante.
+- **Borrar es en cascada** (proyectos → agentes → canales). El aviso cuenta lo que hay *ahora* (se piden los datos otra vez antes de mostrarlo, no se usa la caché) y, para un tenant o un proyecto con contenido, hay que **escribir su slug** para confirmar.
+- El selector de tenant de la barra superior sale de `/auth/me`, así que tras crear, renombrar o borrar un tenant se vuelve a pedir el usuario (`refreshUser`) y el selector se actualiza solo.
+
 ## Integraciones de plataforma
 
 En **Ajustes** (solo admin): credenciales de la app compartida de cada proveedor (Meta, X, TikTok, Twilio), que firman los webhooks de *todos* los tenants. Los secretos guardados nunca se muestran ni vuelven al navegador; solo se pueden reemplazar. La única excepción es el token de verificación de Meta (hay que pegarlo en el panel de Meta): se muestra a demanda y se oculta solo a los 30 s.

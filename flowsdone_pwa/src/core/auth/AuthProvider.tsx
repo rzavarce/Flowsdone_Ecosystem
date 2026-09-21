@@ -54,7 +54,16 @@ export function AuthProvider({ children, api }: AuthProviderProps) {
     setSession({ status: 'anonymous', user: null })
   }, [client])
 
-  const value = useMemo<AuthContextValue>(() => ({ ...session, login, logout }), [session, login, logout])
+  const refreshUser = useCallback(async () => {
+    const user = await client.restore().catch(() => null)
+    // Un `null` puede ser un fallo de red transitorio: solo se actualiza con datos válidos.
+    if (user) setSession({ status: 'authenticated', user })
+  }, [client])
+
+  const value = useMemo<AuthContextValue>(
+    () => ({ ...session, login, logout, refreshUser }),
+    [session, login, logout, refreshUser],
+  )
 
   return <AuthContext value={value}>{children}</AuthContext>
 }

@@ -1,6 +1,6 @@
 import { ApiError } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
-import type { Agent, ChannelApp, ChannelAppProvider, ChannelConnection, Project } from './types'
+import type { Agent, ChannelApp, ChannelAppProvider, ChannelConnection, Project, TenantRecord } from './types'
 
 /**
  * Adaptador de MAQUETA: datos en memoria coherentes con los tenants del
@@ -11,6 +11,13 @@ import type { Agent, ChannelApp, ChannelAppProvider, ChannelConnection, Project 
  */
 
 const NOW = '2026-09-01T10:00:00Z'
+
+const TENANTS: TenantRecord[] = [
+  { id: 't-vital', name: 'Clínica Vital', slug: 'clinica-vital', status: 'active', created_at: NOW, updated_at: NOW },
+  { id: 't-norte', name: 'Inmobiliaria Norte', slug: 'inmobiliaria-norte', status: 'active', created_at: NOW, updated_at: NOW },
+  { id: 't-aurora', name: 'Tienda Aurora', slug: 'tienda-aurora', status: 'active', created_at: NOW, updated_at: NOW },
+  { id: 't-fibra', name: 'Fibra Hogar', slug: 'fibra-hogar', status: 'suspended', created_at: NOW, updated_at: NOW },
+]
 
 const PROJECTS: Project[] = [
   { id: 'p-vital-1', tenant_id: 't-vital', name: 'Atención al paciente', slug: 'atencion', status: 'active' },
@@ -39,11 +46,12 @@ export interface MockAdminOptions {
   /** Latencia simulada por llamada, en ms. */
   latencyMs?: number
   /** Datos de partida propios (los tests los alinean con sus tenants); por defecto, los de demostración. */
-  seed?: { projects?: Project[]; agents?: Agent[]; connections?: ChannelConnection[] }
+  seed?: { tenants?: TenantRecord[]; projects?: Project[]; agents?: Agent[]; connections?: ChannelConnection[] }
 }
 
 /** Crea el adaptador mock; cada instancia parte de datos limpios. */
 export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOptions = {}): AdminApi {
+  const tenants = (seed.tenants ?? TENANTS).map((t) => ({ ...t }))
   const projects = (seed.projects ?? PROJECTS).map((p) => ({ ...p }))
   const agents = (seed.agents ?? AGENTS).map((a) => ({ ...a }))
   const connections = (seed.connections ?? CONNECTIONS).map((c) => ({ ...c }))
@@ -60,8 +68,44 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     }
   }
   const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T
+  const removeWhere = <T,>(list: T[], keep: (item: T) => boolean) => {
+    const kept = list.filter(keep)
+    list.splice(0, list.length, ...kept)
+  }
+  /** Como ON DELETE CASCADE de la base: un proyecto arrastra sus agentes y canales. */
+  const cascadeProject = (projectId: string) => {
+    removeWhere(connections, (c) => c.project_id !== projectId)
+    removeWhere(agents, (a) => a.project_id !== projectId)
+    removeWhere(projects, (p) => p.id !== projectId)
+  }
 
   return {
+    async listTenants() {
+      await wait(latencyMs)
+      return clone(tenants)
+    },
+    async createTenant(input) {
+      await wait(latencyMs)
+      if (tenants.some((t) => t.slug === input.slug)) throw new ApiError(409, 'already exists')
+      const now = new Date().toISOString()
+      const tenant: TenantRecord = { id: `t-${++seq}`, status: 'active', created_at: now, updated_at: now, ...input }
+      tenants.push(tenant)
+      return clone(tenant)
+    },
+    async updateTenant(id, patch) {
+      await wait(latencyMs)
+      const tenant = need(tenants.find((t) => t.id === id), 'tenant')
+      if (patch.slug && tenants.some((t) => t.id !== id && t.slug === patch.slug)) throw new ApiError(409, 'already exists')
+      Object.assign(tenant, patch, { updated_at: new Date().toISOString() })
+      return clone(tenant)
+    },
+    async deleteTenant(id) {
+      await wait(latencyMs)
+      need(tenants.find((t) => t.id === id), 'tenant')
+      for (const p of projects.filter((p) => p.tenant_id === id)) cascadeProject(p.id)
+      removeWhere(tenants, (t) => t.id !== id)
+    },
+
     async listProjects(tenantId) {
       await wait(latencyMs)
       return clone(projects.filter((p) => !tenantId || p.tenant_id === tenantId))
@@ -69,11 +113,26 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     async createProject(input) {
       await wait(latencyMs)
       if (projects.some((p) => p.tenant_id === input.tenant_id && p.slug === input.slug)) {
-        throw new ApiError(409, 'a project with that slug already exists')
+        throw new ApiError(409, 'already exists')
       }
       const project: Project = { id: `p-${++seq}`, status: 'active', ...input }
       projects.push(project)
       return clone(project)
+    },
+
+    async updateProject(id, patch) {
+      await wait(latencyMs)
+      const project = need(projects.find((p) => p.id === id), 'project')
+      if (patch.slug && projects.some((p) => p.id !== id && p.tenant_id === project.tenant_id && p.slug === patch.slug)) {
+        throw new ApiError(409, 'already exists')
+      }
+      Object.assign(project, patch)
+      return clone(project)
+    },
+    async deleteProject(id) {
+      await wait(latencyMs)
+      need(projects.find((p) => p.id === id), 'project')
+      cascadeProject(id)
     },
 
     async listAgents(projectId) {
@@ -90,7 +149,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       need(projects.find((p) => p.id === input.project_id), 'project')
       assertAgentInProject(input.agent_id, input.project_id)
       if (connections.some((c) => c.channel_type === input.channel_type && c.external_id === input.external_id)) {
-        throw new ApiError(409, 'this channel is already connected')
+        throw new ApiError(409, 'already exists')
       }
       const now = new Date().toISOString()
       const connection: ChannelConnection = {
