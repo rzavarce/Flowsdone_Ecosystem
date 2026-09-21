@@ -20,6 +20,13 @@ classmethod used by the native component) does NOT thread tenant through,
 so this component builds the Weaviate instance directly and calls its
 instance methods instead, to reach that tenant support.
 
+LangChain's Weaviate wrapper only asks the server for `text_key` unless it
+is given an explicit `attributes` list, and Weaviate.from_documents() is what
+normally fills that list in from the ingested metadata. Since this component
+builds the wrapper directly, it has to resolve that list itself (see
+`_resolve_attributes`), otherwise every search returns bare text with none of
+the stored metadata (sku, ids, ...), which an Agent needs to act on a hit.
+
 One component per Langflow project would duplicate this same logic with a
 different `tenant` value hardcoded in each; instead this single component
 takes tenant as a required input, so any flow in any project can reuse it
@@ -86,6 +93,17 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
                 "Nombre del campo en los metadatos (ej. 'sku') a partir del cual se computa un "
                 "id determinístico (uuid5) para cada objeto, así los reruns de sync actualizan "
                 "en vez de duplicar. Vacío = Weaviate genera un id aleatorio en cada insert."
+            ),
+        ),
+        StrInput(
+            name="metadata_fields",
+            display_name="Campos de metadatos a devolver",
+            advanced=True,
+            info=(
+                "CSV de propiedades de la colección que se devuelven junto al texto en cada "
+                "resultado de la búsqueda (ej. 'documentId,sku'). Vacío = todas las propiedades "
+                "de la colección salvo la del texto. Un nombre que no exista en la colección "
+                "hace fallar la búsqueda."
             ),
         ),
         StrInput(
@@ -162,6 +180,25 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
             return
         client.schema.add_class_tenants(self.index_name, [weaviate.Tenant(name=self.tenant)])
 
+    def _resolve_attributes(self, client: weaviate.Client) -> list[str]:
+        """Decides which stored properties a search returns next to the text.
+
+        Args:
+            client (weaviate.Client): Connected Weaviate v3 client.
+
+        Returns:
+            list[str]: The `metadata_fields` CSV if set; otherwise every property of
+            the collection except `text_key`, or `[]` if the collection doesn't exist yet.
+        """
+        # getattr: flows saved before `metadata_fields` existed have no such field until the node is updated.
+        requested = [f.strip() for f in (getattr(self, "metadata_fields", "") or "").split(",") if f.strip()]
+        if requested:
+            return [name for name in requested if name != self.text_key]
+        if not client.schema.exists(self.index_name):
+            return []
+        properties = client.schema.get(self.index_name).get("properties", [])
+        return [prop["name"] for prop in properties if prop["name"] != self.text_key]
+
     def _compute_uuids(self, metadatas: list[dict]) -> list[str] | None:
         """Computes deterministic uuid5 ids from `id_key`, if configured.
 
@@ -224,6 +261,7 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
             text_key=self.text_key,
             embedding=self.embedding,
             by_text=self.search_by_text,
+            attributes=self._resolve_attributes(client),
         )
 
         self.ingest_data = self._prepare_ingest_data()

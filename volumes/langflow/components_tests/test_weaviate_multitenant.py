@@ -29,12 +29,13 @@ class _FakeWeaviateVectorStore:
 
     last_instance = None
 
-    def __init__(self, client, index_name, text_key, embedding, by_text):
+    def __init__(self, client, index_name, text_key, embedding, by_text, attributes=None):
         self.client = client
         self.index_name = index_name
         self.text_key = text_key
         self.embedding = embedding
         self.by_text = by_text
+        self.attributes = attributes
         self.add_texts_calls = []
         self.similarity_search_calls = []
         type(self).last_instance = self
@@ -66,6 +67,10 @@ class _FakeSchema:
     tenants: dict = {}
     create_class_calls: list = []
     add_class_tenants_calls: list = []
+    properties: dict = {}
+
+    def get(self, class_name):
+        return {"class": class_name, "properties": [{"name": n} for n in type(self).properties.get(class_name, [])]}
 
     def exists(self, class_name):
         return class_name in type(self).classes
@@ -90,6 +95,7 @@ def _reset_weaviate_schema_state():
     _FakeSchema.tenants = {}
     _FakeSchema.create_class_calls = []
     _FakeSchema.add_class_tenants_calls = []
+    _FakeSchema.properties = {}
 
 
 class _FakeWeaviateClient:
@@ -223,6 +229,7 @@ def _make_component(**overrides):
     component.text_key = "text"
     component.id_key = ""
     component.where_filter_json = ""
+    component.metadata_fields = ""
     component.search_by_text = False
     component.auto_provision = True
     component.embedding = None
@@ -379,3 +386,50 @@ def test_build_vector_store_does_not_touch_schema_when_auto_provision_is_false()
 
     assert _FakeSchema.create_class_calls == []
     assert _FakeSchema.add_class_tenants_calls == []
+
+
+def test_build_vector_store_returns_every_collection_property_but_the_text_key_by_default():
+    _reset_weaviate_schema_state()
+    _FakeSchema.classes.add("Productos")
+    _FakeSchema.tenants["Productos"] = {"fibralan"}
+    _FakeSchema.properties["Productos"] = ["text", "documentId", "sku", "active"]
+    component = _make_component()
+
+    component.build_vector_store()
+
+    assert _FakeWeaviateVectorStore.last_instance.attributes == ["documentId", "sku", "active"]
+
+
+def test_build_vector_store_uses_metadata_fields_when_set():
+    _reset_weaviate_schema_state()
+    _FakeSchema.classes.add("Productos")
+    _FakeSchema.tenants["Productos"] = {"fibralan"}
+    _FakeSchema.properties["Productos"] = ["text", "documentId", "sku", "active"]
+    component = _make_component(metadata_fields=" documentId , sku ,text")
+
+    component.build_vector_store()
+
+    assert _FakeWeaviateVectorStore.last_instance.attributes == ["documentId", "sku"]
+
+
+def test_build_vector_store_passes_no_attributes_when_the_collection_does_not_exist_yet():
+    _reset_weaviate_schema_state()
+    component = _make_component(auto_provision=False)
+
+    component.build_vector_store()
+
+    assert _FakeWeaviateVectorStore.last_instance.attributes == []
+
+
+def test_component_without_metadata_fields_still_works_for_flows_saved_before_it_existed():
+    _reset_weaviate_schema_state()
+    _FakeSchema.classes.add("Productos")
+    _FakeSchema.tenants["Productos"] = {"fibralan"}
+    _FakeSchema.properties["Productos"] = ["text", "documentId"]
+    component = _make_component()
+    del component.metadata_fields
+
+    component.build_vector_store()
+
+    assert _FakeWeaviateVectorStore.last_instance.attributes == ["documentId"]
+
