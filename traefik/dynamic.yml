@@ -1,6 +1,7 @@
 # Rutas estáticas de Traefik — file provider
 # Actualizá los dominios acá si cambian (no toman variables de .env)
-# Traefik las recarga solo gracias a --providers.file.watch=true
+# Traefik las recarga solo (--providers.file.watch=true sobre la carpeta ./traefik, que
+# se monta entera para que vea los reemplazos que hace `git pull`). No hace falta reiniciarlo.
 
 http:
   middlewares:
