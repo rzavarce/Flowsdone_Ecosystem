@@ -788,7 +788,7 @@ services:
 
   # ------------------------------------------------------------------
   # TRAEFIK — solo profile prod. Rutea por dominio usando el file
-  # provider (traefik-dynamic.yml), no lee labels de Docker.
+  # provider (traefik/dynamic.yml), no lee labels de Docker.
   # ------------------------------------------------------------------
 
   traefik:
@@ -797,7 +797,7 @@ services:
     image: ${TRAEFIK_IMAGE}
     container_name: ${CONTAINER_PREFIX}_traefik
     command:
-      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.directory=/etc/traefik/dynamic"
       - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
@@ -814,7 +814,11 @@ services:
       - "${TRAEFIK_HTTP_PORT}:80"
       - "${TRAEFIK_HTTPS_PORT}:443"
     volumes:
-      - ./traefik-dynamic.yml:/etc/traefik/dynamic.yml:ro
+      # Se monta la CARPETA, no el archivo suelto: `git pull` reemplaza los archivos
+      # por otros nuevos (otro inodo) y un bind mount de un solo archivo sigue viendo
+      # el viejo, así que Traefik nunca recargaba las rutas nuevas. Con la carpeta,
+      # el watcher las detecta solo.
+      - ./traefik:/etc/traefik/dynamic:ro
       - ./volumes/letsencrypt:/letsencrypt
     networks:
       - flowsdone-net

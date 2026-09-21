@@ -102,7 +102,7 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
                                                               └──▶ Langfuse (traces, vía OTLP público)
 
   Proxy (solo profile prod)
-  Traefik (file provider, traefik-dynamic.yml) ──▶ HTTPS por dominio ──▶ cada servicio
+  Traefik (file provider, traefik/dynamic.yml) ──▶ HTTPS por dominio ──▶ cada servicio
 ```
 
 > 📞 **Canal de voz (no está en el diagrama de arriba, ver sección 18):** sigue el mismo principio (webhook → resolver tenant/proyecto/agente → Kafka → Langflow → entrega de vuelta), pero con su propio topic (`VOICE_KAFKA_TOPIC`) y worker dedicado (`kafka_voice_worker`), y con Twilio ConversationRelay haciendo STT/TTS por WebSocket en vez de un webhook de texto simple.
@@ -202,7 +202,7 @@ docker compose logs -f rabbitmq_inbound_worker
 Para producción, además necesitás:
 - Completar `SSL_EMAIL` en `.env` (Let's Encrypt lo requiere).
 - Que los dominios `DOMAIN_*` apunten (DNS) a la IP pública de este host.
-- Ajustar los dominios en `traefik-dynamic.yml` si difieren de los que trae por defecto (ver sección 11 — Traefik usa el **file provider**, no lee variables de `.env` ni labels de Docker).
+- Ajustar los dominios en `traefik/dynamic.yml` si difieren de los que trae por defecto (ver sección 11 — Traefik usa el **file provider**, no lee variables de `.env` ni labels de Docker).
 
 ```bash
 docker compose --profile prod up -d
@@ -520,7 +520,7 @@ Solo con `--profile prod` (o `COMPOSE_PROFILES=prod`):
 
 ## 11. Dominios de producción (prod, vía Traefik)
 
-Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider — los labels `traefik.*` que puedan aparecer en el compose **no tienen efecto**. Los dominios reales están hardcodeados en `traefik-dynamic.yml`; las variables `DOMAIN_*` del `.env` son solo referencia/documentación y **no** se leen automáticamente. Si cambiás un dominio, actualizalo en los dos lugares.
+Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider — los labels `traefik.*` que puedan aparecer en el compose **no tienen efecto**. Los dominios reales están hardcodeados en `traefik/dynamic.yml`; las variables `DOMAIN_*` del `.env` son solo referencia/documentación y **no** se leen automáticamente. Si cambiás un dominio, actualizalo en los dos lugares.
 
 | Servicio | Dominio |
 |---|---|
@@ -539,7 +539,7 @@ Traefik usa el **file provider** (`traefik-dynamic.yml`), no el Docker provider 
 
 ### Consola web (PWA) — `app.flowsdone.com`
 
-Ruta `pwa` en `traefik-dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.
+Ruta `pwa` en `traefik/dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.
 
 **Puesta en marcha (una sola vez):**
 
@@ -732,7 +732,7 @@ Buscá en los logs de `api` `*.not_routable` (ej. `channels.whatsapp_evolution.n
 
 ### Traefik no rutea un dominio nuevo
 
-Confirmá que agregaste el router **y** el service en `traefik-dynamic.yml` (no alcanza con la variable `DOMAIN_*` del `.env` — Traefik no la lee, ver sección 11).
+Confirmá que agregaste el router **y** el service en `traefik/dynamic.yml` (no alcanza con la variable `DOMAIN_*` del `.env` — Traefik no la lee, ver sección 11).
 
 ---
 
