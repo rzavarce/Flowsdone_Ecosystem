@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+/* El modo oscuro se controla con la clase `.dark` en <html> (ThemeProvider),
+   no con prefers-color-scheme directo, para permitir el override manual. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens semánticos -> utilidades de Tailwind (bg-surface, text-muted, etc.). */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-2: var(--primary-2);
+  --color-accent: var(--accent);
+  --color-ring: var(--primary);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --radius-card: 1rem;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12);
+}
+
+/* Neutros (modo claro). */
+:root {
+  --background: oklch(0.982 0.004 265);
+  --foreground: oklch(0.21 0.02 265);
+  --surface: oklch(1 0 0);
+  --surface-muted: oklch(0.965 0.006 265);
+  --border: oklch(0.91 0.008 265);
+  --muted: oklch(0.5 0.02 265);
+  --success: oklch(0.62 0.16 155);
+  --warning: oklch(0.75 0.16 75);
+  --danger: oklch(0.6 0.22 25);
+  --primary-foreground: oklch(0.99 0 0);
+  color-scheme: light;
+}
+
+/* Neutros (modo oscuro). */
+.dark {
+  --background: oklch(0.16 0.015 265);
+  --foreground: oklch(0.96 0.005 265);
+  --surface: oklch(0.205 0.018 265);
+  --surface-muted: oklch(0.245 0.02 265);
+  --border: oklch(0.3 0.022 265);
+  --muted: oklch(0.72 0.02 265);
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------
+   Presets de template. Cada uno solo define los dos colores de marca;
+   el resto (acentos suaves, gradientes) se deriva con color-mix, así
+   funciona igual en claro y oscuro. Para sumar un preset: agregar un
+   bloque acá y una entrada en src/core/theme/themes.ts.
+   ------------------------------------------------------------------ */
+[data-theme='aurora'] {
+  --primary: oklch(0.56 0.23 278);
+  --primary-2: oklch(0.62 0.24 315);
+}
+[data-theme='ocean'] {
+  --primary: oklch(0.57 0.16 240);
+  --primary-2: oklch(0.68 0.13 200);
+}
+[data-theme='sunset'] {
+  --primary: oklch(0.6 0.21 35);
+  --primary-2: oklch(0.63 0.23 5);
+}
+[data-theme='emerald'] {
+  --primary: oklch(0.55 0.14 160);
+  --primary-2: oklch(0.66 0.15 130);
+}
+
+/* En oscuro el color de marca sube de luminosidad para conservar contraste
+   como texto/borde sobre fondos oscuros; por eso el texto sobre él pasa a
+   oscuro. El selector doble cubre <html> y también las vistas previas del
+   selector de template (data-theme en un descendiente). */
+.dark {
+  --primary-foreground: oklch(0.16 0.02 265);
+}
+.dark[data-theme='aurora'],
+.dark [data-theme='aurora'] {
+  --primary: oklch(0.7 0.18 278);
+  --primary-2: oklch(0.72 0.19 315);
+}
+.dark[data-theme='ocean'],
+.dark [data-theme='ocean'] {
+  --primary: oklch(0.72 0.14 235);
+  --primary-2: oklch(0.8 0.12 200);
+}
+.dark[data-theme='sunset'],
+.dark [data-theme='sunset'] {
+  --primary: oklch(0.74 0.17 40);
+  --primary-2: oklch(0.72 0.19 8);
+}
+.dark[data-theme='emerald'],
+.dark [data-theme='emerald'] {
+  --primary: oklch(0.74 0.15 160);
+  --primary-2: oklch(0.8 0.15 130);
+}
+
+/* Derivados del preset activo. */
+:root,
+[data-theme] {
+  --accent: color-mix(in oklab, var(--primary) 12%, var(--surface));
+  --gradient-brand: linear-gradient(135deg, var(--primary), var(--primary-2));
+}
+
+@layer base {
+  html {
+    background: var(--background);
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    /* Evita el "rebote" que rompe la sensación de app en la PWA instalada. */
+    overscroll-behavior-y: none;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  /* Respeta a quien pidió menos movimiento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Safe areas para móviles con notch cuando corre instalada. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}

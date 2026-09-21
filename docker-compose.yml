@@ -587,6 +587,31 @@ services:
     cpus: ${API_CPUS}
 
   # ------------------------------------------------------------------
+  # PWA — consola web (React + Vite, servida por nginx)
+  # ------------------------------------------------------------------
+  # Los ${VAR:-default} evitan que el deploy falle en un VPS cuyo .env
+  # todavía no tenga estas variables (mem_limit vacío rompe `compose up`).
+
+  pwa:
+    <<: *common
+    build:
+      context: ./flowsdone_pwa
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX}_pwa
+    ports:
+      - "${PWA_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - flowsdone-net
+    mem_limit: ${PWA_MEM_LIMIT:-128m}
+    cpus: ${PWA_CPUS:-0.25}
+
+  # ------------------------------------------------------------------
   # WORKERS — KAFKA
   # ------------------------------------------------------------------
 
