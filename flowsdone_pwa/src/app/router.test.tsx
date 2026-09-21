@@ -51,10 +51,12 @@ describe('menú y acceso por perfil', () => {
     expect(screen.queryByText('Tiempo de respuesta')).not.toBeInTheDocument()
   })
 
-  it('el botmaster cae directamente en el editor de agentes', async () => {
+  it('el botmaster cae directamente en Agentes (la lista de su tenant, sin editor de Langflow)', async () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')))
     expect(await h1('Agentes')).toBeInTheDocument()
-    expect(screen.getByText(/se embeberá Langflow/)).toBeInTheDocument()
+    // El botmaster no recibe el editor de Langflow (ver AgentsPage): solo la lista de su tenant.
+    expect(screen.queryByText(/se embeberá Langflow/)).not.toBeInTheDocument()
+    expect(await screen.findByText(/es solo para el equipo de la plataforma/)).toBeInTheDocument()
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Principal' })
     expect(within(sidebar!).getByRole('link', { name: 'Agentes' })).toHaveAttribute('aria-current', 'page')
   })

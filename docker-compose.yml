@@ -453,8 +453,11 @@ services:
       context: .
       dockerfile: dockers/Dockerfile.langflow
     container_name: ${CONTAINER_PREFIX}_langflow
+    # Solo loopback: el acceso remoto es por Traefik (agents.<dominio>) y, en
+    # producción, hoy solo para el equipo de la plataforma. Publicar el 7860 en
+    # todas las interfaces era una segunda puerta a la misma app.
     ports:
-      - "${LANGFLOW_PORT}:7860"
+      - "127.0.0.1:${LANGFLOW_PORT}:7860"
     volumes:
       - ./volumes/langflow/components:/app/langflow/components
       - ./volumes/langflow/settings:/app/langflow/settings
@@ -473,6 +476,20 @@ services:
       # Variables tipo Credential guardados con la clave anterior
       # (cryptography.fernet.InvalidToken). Fija y estable entre deploys.
       LANGFLOW_SECRET_KEY: ${LANGFLOW_SECRET_KEY}
+      # --- Acceso a la interfaz de Langflow ---------------------------------
+      # Langflow 1.4 arranca con AUTO_LOGIN=true: quien abra la URL entra como
+      # superusuario SIN contraseña (y un superusuario ejecuta Python arbitrario
+      # en este contenedor, que recibe secretos de la plataforma). Se desactiva y
+      # se exige una contraseña propia. Si la variable falta, docker compose se
+      # niega a arrancar en vez de desplegar con la de por defecto (`langflow`).
+      # OJO: el superusuario que YA existe conserva su contraseña anterior aunque
+      # cambie esta variable; hay que cambiarla ANTES con
+      # scripts/ops/langflow_set_superuser_password.sh (ver README, sección Langflow).
+      LANGFLOW_AUTO_LOGIN: "false"
+      LANGFLOW_SUPERUSER: ${LANGFLOW_SUPERUSER:-langflow}
+      LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:?Falta LANGFLOW_SUPERUSER_PASSWORD en .env (contraseña fuerte; ver README, sección Langflow)}
+      # Un registro nuevo queda inactivo hasta que el superusuario lo active.
+      LANGFLOW_NEW_USER_IS_ACTIVE: "false"
       # Default de la URL de Weaviate para components/weaviate_multitenant.py
       # (os.environ, nunca hardcodeado en el componente) - mismo patron que
       # GATEWAY_INTERNAL_URL mas abajo.

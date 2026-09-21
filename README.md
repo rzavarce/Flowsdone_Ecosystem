@@ -541,6 +541,33 @@ Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider 
 | Weaviate GUI | https://vector.flowsdone.com |
 | OpenSearch Dashboards | https://logs.flowsdone.com |
 
+### Langflow (`agents.flowsdone.com`): acceso y seguridad
+
+**Riesgo (corregido):** Langflow 1.4 arranca con `AUTO_LOGIN=true` y la cuenta `langflow`/`langflow`: quien abriera la URL entraba como superusuario **sin contraseña**, y un superusuario de Langflow ejecuta Python arbitrario en su contenedor (que recibe `ADMIN_API_KEY`, la URL de Postgres con su contraseña, claves de Langfuse…). Además Langflow **no tiene multi-tenancy**: una sola cuenta es dueña de todos los flujos (y el gateway los ejecuta con una única API key), así que quien vea su interfaz ve los flujos de **todos** los clientes y sus variables guardadas.
+
+**Reglas actuales:**
+- La interfaz de Langflow es **solo para el equipo de la plataforma (admin)**, con login real. La consola (PWA) ofrece el editor embebido únicamente a `platform:manage` (admin); gestores y botmasters ven la lista de agentes de su tenant, que sale del gateway (ya filtrada por rol y tenant). Hay un test de regresión que impide ofrecerlo a otros roles.
+- El compose fuerza `LANGFLOW_AUTO_LOGIN=false`, `LANGFLOW_NEW_USER_IS_ACTIVE=false` y **exige** `LANGFLOW_SUPERUSER_PASSWORD` (si falta, `docker compose` no arranca en vez de desplegar con la de por defecto). El puerto 7860 se publica solo en `127.0.0.1`.
+- Con el auto-login cerrado la API key del gateway (`LANGFLOW_API_KEY`) pasa a ser **imprescindible** (antes Langflow aceptaba peticiones sin clave): comprobar que es válida antes de desplegar.
+
+**⚠️ El superusuario que ya existe conserva su contraseña anterior** (`langflow`) aunque cambies la variable — comprobado con un Langflow 1.4.0 temporal (sin el paso 3, `langflow`/`langflow` sigue entrando y la variable no sirve). Por eso existe `scripts/ops/langflow_set_superuser_password.sh`, que la cambia leyéndola de `.env` por stdin (no aparece en la salida ni en el historial) y funciona tanto con el auto-login aún activo como si ya se cerró.
+
+**Puesta en marcha en un Langflow existente (VPS o local), en este orden:**
+1. *(Contención, si Langflow está expuesto)* comentar el router `langflow` de `traefik/dynamic.yml` (se recarga solo). El gateway sigue llegando a Langflow por la red interna.
+2. Añadir a `.env` una contraseña fuerte, sin mostrarla: `printf 'LANGFLOW_SUPERUSER=langflow\nLANGFLOW_SUPERUSER_PASSWORD=%s\n' "$(openssl rand -base64 24 | tr -d '\n')" >> .env`
+3. **Antes de cerrar el auto-login**, `scripts/ops/langflow_check_agent_flows.sh prod`: comprueba que la API key del gateway es válida y que el flujo de **cada agente** existe y es legible por esa clave (sale con código 1 si un agente con canales activos no lo es). Con el login real Langflow deja de aceptar peticiones sin clave y la clave solo ve lo que le pertenece. *(En el entorno local había 2 agentes de prueba con flujos inexistentes: ya estaban rotos, el script los marca.)*
+4. Desplegar (recrea Langflow con `AUTO_LOGIN=false`) y **después** ejecutar `scripts/ops/langflow_set_superuser_password.sh prod`. Es seguro en cualquier orden mientras la ruta pública siga cerrada.
+5. Verificar: `GET /api/v1/auto_login` ya no devuelve token (400), `langflow`/`langflow` es rechazado, y el login con la contraseña nueva entra.
+6. Reabrir la ruta (`git checkout traefik/dynamic.yml`) solo cuando 5 esté verde. **Cierra sesión o borra las cookies de Langflow en tu navegador**: un token emitido por el auto-login sigue siendo válido (la caducidad por defecto es de horas/días) y por eso puede parecer que "sigue entrando directo" aunque ya no lo haga; una ventana privada lo confirma.
+7. **Si hubo exposición, auditar antes de rotar** (solo lectura). Un atacante con acceso pudo dejar persistencia:
+   `docker compose --profile prod exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d langflowdb -c "select name, created_at, last_used_at from apikey order by created_at" -c "select username, is_superuser, is_active from \"user\"" -c "select name, updated_at from flow where user_id is not null order by updated_at desc limit 10"'`
+   Cualquier API key, usuario o flujo que no reconozcas se elimina. Los tokens de sesión ya emitidos solo se invalidan rotando `LANGFLOW_SECRET_KEY` (o esperando su caducidad).
+8. **Rotar los secretos que vio ese contenedor** si hubo exposición: `ADMIN_API_KEY`, la contraseña de Postgres, `LANGFUSE_*` y las claves de proveedores de IA guardadas en Langflow (`LANGFLOW_SECRET_KEY` con cuidado: deja ilegibles las variables cifradas de Langflow). Para saber si hubo abuso: `docker compose --profile prod logs traefik --since 720h | grep agents.flowsdone.com | grep -E "auto_login|validate/code|custom_component"`.
+
+**Nota:** tras cerrar el auto-login la API key lista solo los flujos de su usuario (p. ej. 3 en local en lugar de 36): los demás son las **plantillas de ejemplo de Langflow** (Basic Prompting, Blog Writer…), que Langflow crea sin propietario a propósito. No hay que asignarles dueño; asignarlas llenaría tu lista de copias.
+
+**Pendiente (endurecimiento):** el flujo "Onboarding - Alta de cliente (interno)" usa `GATEWAY_ADMIN_API_KEY` (control total de la API admin) desde dentro de Langflow; conviene darle una credencial de alcance limitado. Para editar agentes por tenant sin Langflow, plantillas mantenidas por el equipo y parámetros editables desde la consola; para un cliente que exija edición visual libre, una instancia de Langflow dedicada.
+
 ### Consola web (PWA) — `app.flowsdone.com`
 
 Ruta `pwa` en `traefik/dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.

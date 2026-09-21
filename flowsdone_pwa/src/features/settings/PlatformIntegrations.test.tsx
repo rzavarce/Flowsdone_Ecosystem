@@ -109,9 +109,11 @@ describe('token de verificación de Meta', () => {
     await userEvent.click(screen.getByRole('button', { name: /Ver token de verificación/ }))
     await screen.findByLabelText('Token de verificación')
 
-    const hide = timeouts.mock.calls.find(([, ms]) => ms === 30_000)
-    expect(hide).toBeDefined()
-    act(() => (hide![0] as () => void)())
+    // OJO: React Query también programa un temporizador de 30 s (su staleTime). No se puede
+    // asumir cuál es "el nuestro": se disparan todos los de 30 s y debe haberse ocultado.
+    const thirtySeconds = timeouts.mock.calls.filter(([, ms]) => ms === 30_000)
+    expect(thirtySeconds.length).toBeGreaterThan(0)
+    act(() => thirtySeconds.forEach(([callback]) => (callback as () => void)()))
     await waitFor(() => expect(screen.queryByLabelText('Token de verificación')).not.toBeInTheDocument())
   })
 
