@@ -287,6 +287,13 @@ compose up -d --remove-orphans --no-deps api kafka_inbound_worker kafka_outbound
 sleep 15
 success "Gateway y workers arrancados."
 
+# Consola web (PWA). Estático servido por nginx: no depende del gateway para
+# arrancar (nginx resuelve `api` al usarlo), pero se levanta después para que
+# el primer login ya encuentre el gateway arriba.
+log "Arrancando la consola web (pwa)…"
+compose up -d --remove-orphans --no-deps pwa
+wait_healthy pwa 120
+
 phase "Fase 5 — Paneles web"
 if ! $SKIP_UI; then
   UI_SERVICES=(redis-insight rabbitmq-scout weaviate-gui)

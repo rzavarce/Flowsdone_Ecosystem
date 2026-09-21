@@ -14,6 +14,18 @@ http:
         regex: "^/(.*)"
         replacement: "/static/flowsdone/$1"
 
+    # Consola web (PWA). HSTS se pone acá porque es Traefik quien termina TLS
+    # (el nginx del contenedor solo ve http). SIN includeSubdomains a propósito:
+    # los demás subdominios (webchat, langfuse…) tienen su propio ciclo de vida
+    # y no deberían quedar forzados a https por esta ruta.
+    pwa-security:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: false
+        stsPreload: false
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+
   routers:
     n8n:
       rule: "Host(`auto.flowsdone.com`)"
@@ -93,6 +105,20 @@ http:
       middlewares:
         - flowsdone-static
 
+    # Consola web (PWA React servida por nginx dentro del contenedor `pwa`).
+    # Mismo origen para la SPA y su API: nginx reenvía /api/auth/* al gateway,
+    # por eso NO hace falta CORS y la cookie de sesión (httpOnly, host-only)
+    # queda aislada en este host. Requiere un registro DNS `app` -> IP del VPS
+    # ANTES del deploy, o el challenge HTTP-01 de Let's Encrypt fallará.
+    pwa:
+      rule: "Host(`app.flowsdone.com`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: pwa-svc
+      middlewares:
+        - pwa-security
+
     minio:
       rule: "Host(`buckets.flowsdone.com`)"
       entrypoints: [websecure]
@@ -155,6 +181,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://api:8000"
+
+    pwa-svc:
+      loadBalancer:
+        servers:
+          - url: "http://pwa:80"
 
     minio-svc:
       loadBalancer:
