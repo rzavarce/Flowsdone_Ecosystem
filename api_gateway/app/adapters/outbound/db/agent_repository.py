@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.domain.models.agent import Agent
 from app.domain.ports.outbound import AgentRepositoryPort
 from app.adapters.outbound.db.models import AgentModel
+from app.adapters.outbound.db.errors import duplicate_as_already_exists
 
 
 def _to_domain(model: AgentModel) -> Agent:
@@ -77,7 +78,8 @@ class SqlAlchemyAgentRepository(AgentRepositoryPort):
                 is_default=is_default,
             )
             session.add(model)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 
@@ -128,7 +130,8 @@ class SqlAlchemyAgentRepository(AgentRepositoryPort):
             for key, value in fields.items():
                 if value is not None:
                     setattr(model, key, value)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 

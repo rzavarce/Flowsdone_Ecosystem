@@ -57,6 +57,7 @@ except Exception:
 
 from app.domain.ports.outbound.admin_repositories import (  # noqa: F401
     AgentRepositoryPort,
+    AlreadyExistsError,
     ChannelAppRepositoryPort,
     ChannelConnectionRepositoryPort,
     ProjectRepositoryPort,

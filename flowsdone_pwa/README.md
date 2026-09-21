@@ -73,6 +73,27 @@ En la UI se usa el componente `components/layout/Logo` (`icon` | `wordmark` | `f
 - Un build de producción usa `http` salvo que se fuerce `VITE_AUTH_MODE=mock`, para que las cuentas demo no lleguen al VPS por accidente.
 - Tenant activo: `core/tenant` (`TenantProvider`, `useTenant`) + selector en la barra superior.
 
+## Datos de la API admin
+
+La consola habla con `/internal/admin/*` del gateway a través de `/api/admin/*` (nginx o el proxy de Vite reescriben el prefijo). Solo se exponen los recursos que la UI usa (`tenants`, `projects`, `agents`, `channel-connections`, `channel-apps`); para sumar `users` o `workflows`, agregar el recurso a la lista blanca de `nginx.conf`.
+
+- `core/http/apiFetch.ts`: cliente compartido (cookie, cabecera anti-CSRF, `ApiError` con el `detail` del gateway).
+- `core/admin/`: puerto `AdminApi` con adaptador HTTP y **mock** (mismo patrón que la autenticación; con `VITE_AUTH_MODE=mock` no hace falta backend), más hooks de TanStack Query. Un 401 cierra la sesión y la caché se vacía al cambiar de persona.
+- El gateway ya devuelve solo lo que el perfil puede ver (rol + tenant); la UI añade el recorte por el tenant activo.
+
+## Canales
+
+`/canales` (admin y gestor): lista, alta, edición y baja de conexiones de canal del tenant activo.
+
+- Cada tipo de canal declara qué necesita (`features/channels/channelTypes.ts`, verificado contra los webhooks/senders del gateway): p. ej. Facebook/Instagram piden el token de la página; Telegram registra el webhook solo.
+- El `external_id` de Telegram **es el token del bot**: la UI nunca lo pinta completo.
+- Un canal cuelga de un proyecto y su agente debe ser del mismo proyecto (el gateway lo valida). Si el tenant no tiene proyectos, el diálogo permite crear el primero; si el proyecto no tiene agentes, avisa (los agentes se crean en la sección Agentes).
+- Al editar no se puede mover de proyecto ni cambiar el identificador (el gateway no lo permite); las credenciales solo se envían si se escriben (vacío = conservar).
+
+## Integraciones de plataforma
+
+En **Ajustes** (solo admin): credenciales de la app compartida de cada proveedor (Meta, X, TikTok, Twilio), que firman los webhooks de *todos* los tenants. Los secretos guardados nunca se muestran ni vuelven al navegador; solo se pueden reemplazar. La única excepción es el token de verificación de Meta (hay que pegarlo en el panel de Meta): se muestra a demanda y se oculta solo a los 30 s.
+
 ## Estructura
 
 ```

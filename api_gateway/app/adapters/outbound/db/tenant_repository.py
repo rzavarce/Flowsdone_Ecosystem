@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.domain.models.tenant import Tenant
 from app.domain.ports.outbound import TenantRepositoryPort
 from app.adapters.outbound.db.models import TenantModel
+from app.adapters.outbound.db.errors import duplicate_as_already_exists
 
 
 def _to_domain(model: TenantModel) -> Tenant:
@@ -57,7 +58,8 @@ class SqlAlchemyTenantRepository(TenantRepositoryPort):
         async with self._sessionmaker() as session:
             model = TenantModel(name=name, slug=slug)
             session.add(model)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 
@@ -121,7 +123,8 @@ class SqlAlchemyTenantRepository(TenantRepositoryPort):
             for key, value in fields.items():
                 if value is not None:
                     setattr(model, key, value)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 

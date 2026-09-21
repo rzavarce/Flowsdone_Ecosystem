@@ -1,4 +1,5 @@
 import { RouterProvider } from 'react-router-dom'
+import { AdminApiProvider } from '@/core/admin/AdminApiProvider'
 import { AuthProvider } from '@/core/auth/AuthProvider'
 import { ThemeProvider } from '@/core/theme/ThemeProvider'
 import { TenantProvider } from '@/core/tenant/TenantProvider'
@@ -10,7 +11,9 @@ export function App() {
     <ThemeProvider>
       <AuthProvider>
         <TenantProvider>
-          <RouterProvider router={router} />
+          <AdminApiProvider>
+            <RouterProvider router={router} />
+          </AdminApiProvider>
         </TenantProvider>
       </AuthProvider>
     </ThemeProvider>

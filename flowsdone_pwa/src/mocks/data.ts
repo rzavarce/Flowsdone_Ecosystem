@@ -26,14 +26,6 @@ export interface ConversationSummary {
   status: { label: string; tone: BadgeTone }
 }
 
-export interface ChannelSummary {
-  id: string
-  name: string
-  description: string
-  status: { label: string; tone: BadgeTone }
-  messages: number
-}
-
 export const STATS: readonly Stat[] = [
   { id: 'conversations', label: 'Conversaciones hoy', value: '1.284', delta: 12.4 },
   { id: 'messages', label: 'Mensajes procesados', value: '18.902', delta: 8.1 },
@@ -57,13 +49,4 @@ export const RECENT_CONVERSATIONS: readonly ConversationSummary[] = [
   { id: 'c3', contact: 'Lucía Fernández', channel: 'Instagram', preview: 'Gracias, ya quedó resuelto 🙌', time: 'hace 24 min', status: { label: 'Resuelta', tone: 'success' } },
   { id: 'c4', contact: 'Andrés Salcedo', channel: 'Telegram', preview: '¿Tienen facturación electrónica?', time: 'hace 41 min', status: { label: 'IA', tone: 'primary' } },
   { id: 'c5', contact: 'Marta Quintero', channel: 'WhatsApp', preview: 'No me llegó el código de acceso.', time: 'hace 1 h', status: { label: 'Escalada', tone: 'warning' } },
-]
-
-export const CHANNELS: readonly ChannelSummary[] = [
-  { id: 'whatsapp', name: 'WhatsApp', description: 'Evolution API', status: { label: 'Conectado', tone: 'success' }, messages: 9420 },
-  { id: 'webchat', name: 'Webchat', description: 'Widget propio (WebSocket)', status: { label: 'Conectado', tone: 'success' }, messages: 5210 },
-  { id: 'instagram', name: 'Instagram', description: 'Meta Graph API', status: { label: 'Conectado', tone: 'success' }, messages: 2318 },
-  { id: 'telegram', name: 'Telegram', description: 'Bot API', status: { label: 'Conectado', tone: 'success' }, messages: 1204 },
-  { id: 'voice', name: 'Voz', description: 'Softphone / transcripción', status: { label: 'Pendiente', tone: 'warning' }, messages: 0 },
-  { id: 'facebook', name: 'Facebook', description: 'Messenger', status: { label: 'Desconectado', tone: 'danger' }, messages: 0 },
 ]

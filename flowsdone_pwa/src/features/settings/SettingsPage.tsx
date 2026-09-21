@@ -1,9 +1,13 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { ThemePicker } from '@/components/theme/ThemePicker'
+import { can } from '@/core/auth/permissions'
+import { useAuth } from '@/core/auth/useAuth'
+import { PlatformIntegrations } from './PlatformIntegrations'
 
-/** Ajustes: por ahora, solo la apariencia (template y modo de color). */
+/** Ajustes: apariencia (todos) e integraciones de plataforma (solo admin). */
 export function SettingsPage() {
+  const { user } = useAuth()
   return (
     <>
       <PageHeader title="Ajustes" description="Personaliza la consola a tu gusto." />
@@ -13,6 +17,11 @@ export function SettingsPage() {
           <ThemePicker />
         </div>
       </Card>
+      {can(user, 'platform:manage') && (
+        <div className="mt-6">
+          <PlatformIntegrations />
+        </div>
+      )}
     </>
   )
 }

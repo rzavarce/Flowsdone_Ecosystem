@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.domain.models.workflow_config import WorkflowConfig
 from app.domain.ports.outbound import WorkflowConfigRepositoryPort
 from app.adapters.outbound.db.models import WorkflowConfigModel
+from app.adapters.outbound.db.errors import duplicate_as_already_exists
 
 
 def _to_domain(model: WorkflowConfigModel) -> WorkflowConfig:
@@ -78,7 +79,8 @@ class SqlAlchemyWorkflowConfigRepository(WorkflowConfigRepositoryPort):
                 config=config or {},
             )
             session.add(model)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 
@@ -132,7 +134,8 @@ class SqlAlchemyWorkflowConfigRepository(WorkflowConfigRepositoryPort):
             for key, value in fields.items():
                 if value is not None:
                     setattr(model, key, value)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 

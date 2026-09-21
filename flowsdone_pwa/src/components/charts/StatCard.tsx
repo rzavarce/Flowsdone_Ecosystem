@@ -11,7 +11,7 @@ export function StatCard({ stat }: { stat: Stat }) {
   return (
     <Card className="p-4 sm:p-5">
       <p className="text-sm text-muted">{stat.label}</p>
-      <p className="mt-2 text-2xl font-bold sm:text-3xl tracking-tight">{stat.value}</p>
+      <p className="mt-2 font-display text-2xl font-bold sm:text-3xl tracking-tight">{stat.value}</p>
       <Badge tone={up ? 'success' : 'danger'} className="mt-3">
         <Trend className="size-3.5" aria-hidden="true" />
         {formatDelta(stat.delta)}

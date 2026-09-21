@@ -38,6 +38,7 @@ export default defineConfig({
       workbox: {
         // SPA: cualquier ruta de navegación cae al index.html precacheado,
         // salvo las del backend, que no deben interceptarse.
+        globPatterns: ['**/*.{js,css,html,woff2}'],
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//, /^\/ws/, /^\/internal\//, /^\/webhooks\//],
       },
@@ -52,6 +53,11 @@ export default defineConfig({
     // En desarrollo, /api -> gateway (igual que hace nginx en el contenedor), para
     // que la cookie de sesión sea del mismo origen. Con VITE_AUTH_MODE=mock no se usa.
     proxy: {
+      // Más específico primero: /api/admin/* -> /internal/admin/* (como nginx).
+      '/api/admin': {
+        target: process.env.VITE_DEV_API_TARGET ?? 'http://localhost:8000',
+        rewrite: (path) => path.replace(/^\/api\/admin/, '/internal/admin'),
+      },
       '/api': {
         target: process.env.VITE_DEV_API_TARGET ?? 'http://localhost:8000',
         rewrite: (path) => path.replace(/^\/api/, ''),

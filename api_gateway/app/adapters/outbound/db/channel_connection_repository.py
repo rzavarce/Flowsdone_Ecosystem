@@ -13,6 +13,7 @@ from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.ports.outbound import ChannelConnectionRepositoryPort
 from app.adapters.outbound.db.crypto import decrypt_credentials, encrypt_credentials
 from app.adapters.outbound.db.models import AgentModel, ChannelConnectionModel, ProjectModel
+from app.adapters.outbound.db.errors import duplicate_as_already_exists
 
 
 def _to_domain(model: ChannelConnectionModel) -> ChannelConnection:
@@ -94,7 +95,8 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
                 config=config or {},
             )
             session.add(model)
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 
@@ -202,7 +204,8 @@ class SqlAlchemyChannelConnectionRepository(ChannelConnectionRepositoryPort):
                 if value is not None:
                     setattr(model, key, value)
 
-            await session.commit()
+            with duplicate_as_already_exists():
+                await session.commit()
             await session.refresh(model)
             return _to_domain(model)
 
