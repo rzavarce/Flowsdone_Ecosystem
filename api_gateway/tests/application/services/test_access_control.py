@@ -25,7 +25,7 @@ def _principal(role, tenant_ids=None):
 
 
 def test_policy_covers_every_resource_with_read_and_write():
-    assert set(POLICY) == {"tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users"}
+    assert set(POLICY) == {"tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users", "langflow"}
     for actions in POLICY.values():
         assert set(actions) == {"read", "write"}
 
@@ -41,7 +41,7 @@ def test_client_role_appears_nowhere_in_the_policy():
 
 
 def test_only_admin_touches_global_or_platform_level_resources():
-    for resource in ("channel_apps", "users"):
+    for resource in ("channel_apps", "users", "langflow"):
         assert POLICY[resource]["read"] == {"admin"} == POLICY[resource]["write"]
     assert POLICY["tenants"]["write"] == {"admin"}
 

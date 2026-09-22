@@ -441,3 +441,26 @@ class UserOut(BaseModel):
     last_login_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class LangflowSessionCreate(BaseModel):
+    """Body for opening the embedded Langflow as a tenant's user.
+
+    Attributes:
+        tenant_id (UUID): Tenant whose agents should be shown.
+        project_id (Optional[UUID]): Project whose folder to land on; the
+            tenant's first project when omitted.
+    """
+
+    tenant_id: UUID
+    project_id: Optional[UUID] = None
+
+
+class LangflowSessionOut(BaseModel):
+    """URL the console loads in the iframe (a single-use ticket inside).
+
+    Attributes:
+        url (str): Gateway SSO URL; valid for a few seconds and only once.
+    """
+
+    url: str

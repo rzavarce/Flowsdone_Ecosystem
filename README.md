@@ -568,6 +568,30 @@ Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider 
 
 **Pendiente (endurecimiento):** el flujo "Onboarding - Alta de cliente (interno)" usa `GATEWAY_ADMIN_API_KEY` (control total de la API admin) desde dentro de Langflow; conviene darle una credencial de alcance limitado. Para editar agentes por tenant sin Langflow, plantillas mantenidas por el equipo y parámetros editables desde la consola; para un cliente que exija edición visual libre, una instancia de Langflow dedicada.
 
+### Langflow embebido por tenant (inicio de sesión único)
+
+En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langflow **ya con la sesión iniciada** y solo con los agentes de ese tenant. Sin segundo login.
+
+- **Un usuario de Langflow por tenant** (`tenant-<slug>`, contraseña aleatoria cifrada en `langflow_accounts`) y **una carpeta por proyecto** (`langflow_folders`). Se crean solos la primera vez que se abre el tenant.
+- **Ticket de un solo uso.** La PWA pide `POST /internal/admin/langflow/session` (solo `admin`, con la comprobación de alcance de siempre). El gateway devuelve `…/langflow-sso?ticket=…` (Redis, 30 s, un solo canje) y el iframe lo carga. El gateway canjea el ticket, entra a Langflow **desde el servidor** y pone las cookies de Langflow (`access_token_lf`, `refresh_token_lf`) en la respuesta. La contraseña de Langflow nunca llega al navegador.
+- **Por qué funciona dentro del iframe:** `app.` y `agents.` son el mismo *sitio* (subdominios de `flowsdone.com`), así que las cookies `SameSite=Lax` viajan. La ruta `agents.flowsdone.com/langflow-sso` la enruta Traefik al gateway (router `langflow-sso`, prioridad 100) para que las cookies queden en el host de Langflow.
+- **Variables del `.env` del VPS** (las lee el gateway): `LANGFLOW_PUBLIC_URL=https://agents.flowsdone.com` y `LANGFLOW_SSO_BASE_URL=https://agents.flowsdone.com`. Con `https` las cookies salen `Secure`. Si faltan, el gateway usa las de local (`localhost`) y el editor no cargará en producción.
+- **Local:** gateway (`localhost:8000`) y Langflow (`localhost:7860`) comparten cookies porque las cookies ignoran el puerto; los defaults ya sirven.
+- **Migración:** `0006_langflow_sso` (la aplica el deploy).
+
+**Llevar los agentes que ya existen a su tenant.** Los flujos actuales son del usuario `langflow`; el usuario del tenant no los ve hasta que se le asignan. Langflow no tiene API para cambiar el propietario, así que:
+
+1. Abre una vez cada tenant en **Agentes** (crea su usuario y sus carpetas).
+2. `scripts/ops/langflow_adopt_flows.sh prod` (simulación) y, si el plan es correcto, `… prod --apply`.
+3. `scripts/ops/langflow_check_agent_flows.sh prod`: el gateway sigue ejecutando todo con la API key del superusuario, que puede leer y ejecutar flujos de otros usuarios (comprobado contra Langflow 1.4.0).
+
+**Alcance y límites (léelo antes de abrirlo a más perfiles).**
+- La separación por usuario y carpeta es **de vista, no un límite de seguridad**. Quien edita puede añadir un componente con código Python que corre en el contenedor de Langflow y desde ahí alcanza sus variables de entorno, la base de datos y la red interna. Por eso el editor sigue siendo **solo para `admin`** (recurso `langflow` de `POLICY`); gestores y botmasters ven la lista de agentes en solo lectura.
+- Abrirlo a botmasters o clientes exige antes: quitar `ADMIN_API_KEY` del entorno de Langflow, un rol de base de datos restringido y una red separada, o una instancia de Langflow por tenant.
+- El ticket viaja en la URL: queda en los logs de acceso de Traefik, pero solo vale una vez y 30 s.
+- Al cerrar sesión en la consola, las cookies de Langflow siguen vivas en el navegador hasta que caducan (1 h la de acceso).
+- Si renombras un proyecto, su carpeta en Langflow conserva el nombre antiguo.
+
 ### Consola web (PWA) — `app.flowsdone.com`
 
 Ruta `pwa` en `traefik/dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.
@@ -575,7 +599,7 @@ Ruta `pwa` en `traefik/dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el 
 **Puesta en marcha (una sola vez):**
 
 1. **DNS:** crear el registro `A` `app` → la IP del VPS (la misma que los demás subdominios) **antes** del merge a `main`. Si el DNS aún no resuelve cuando Traefik intenta el challenge HTTP-01, Let's Encrypt falla y hay que esperar (límite de 5 validaciones fallidas por hora).
-2. **`.env` del VPS:** `PUBLIC_BASE_URL=https://…` (de esto depende que la cookie salga `Secure`), `PWA_AUTH_MODE=http` (**nunca** `mock` en producción: habilita cuentas de demostración) y, si querés el editor embebido, `PWA_LANGFLOW_URL=https://agents.flowsdone.com`. Las variables `PWA_*` tienen default seguro en el compose, así que un `.env` sin ellas no rompe el deploy.
+2. **`.env` del VPS:** `PUBLIC_BASE_URL=https://…` (de esto depende que la cookie salga `Secure`), `PWA_AUTH_MODE=http` (**nunca** `mock` en producción: habilita cuentas de demostración) y, para el editor embebido, `LANGFLOW_PUBLIC_URL=https://agents.flowsdone.com` y `LANGFLOW_SSO_BASE_URL=https://agents.flowsdone.com` (los lee el gateway, no la PWA; ver «Langflow embebido por tenant»). Las variables `PWA_*` tienen default seguro en el compose, así que un `.env` sin ellas no rompe el deploy.
 3. **Merge a `main`:** el deploy construye la imagen `pwa`, aplica la migración `0005_users` y levanta todo (incluido `pwa`).
 4. **Primer admin:** `docker compose --profile prod exec api python -m app.cli.create_user --email … --name "…" --role admin`.
 5. **Verificar:** `https://app.flowsdone.com` muestra el login; `docker compose --profile prod ps` con `fd_pwa` en `healthy`.

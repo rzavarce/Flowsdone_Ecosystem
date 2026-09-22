@@ -37,6 +37,9 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     listChannelApps: () => call<ChannelApp[]>('/channel-apps'),
     upsertChannelApp: (provider, credentials) => call<ChannelApp>(`/channel-apps/${provider}`, 'PUT', { credentials }),
     deleteChannelApp: (provider) => call<void>(`/channel-apps/${provider}`, 'DELETE'),
+    createLangflowSession: (tenantId, projectId) =>
+      call('/langflow/session', 'POST', { tenant_id: tenantId, project_id: projectId }),
+
     revealChannelAppCredentials: async (provider) =>
       (await call<{ credentials: Record<string, unknown> }>(`/channel-apps/${provider}/credentials`)).credentials,
   }

@@ -111,3 +111,13 @@ export interface UpdateChannelConnectionInput {
   credentials?: Record<string, string>
   status?: string
 }
+
+/** Sesión para abrir Langflow como el usuario de un tenant. */
+export interface LangflowSession {
+  /**
+   * URL del gateway que se carga en el iframe. Lleva un ticket de un solo uso que
+   * caduca en segundos: hay que pedir una nueva cada vez que se monta el editor.
+   * Vacía en el adaptador mock (no hay Langflow real).
+   */
+  url: string
+}

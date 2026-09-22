@@ -120,4 +120,10 @@ describe('mockAdminApi', () => {
     expect((await api.listChannelConnections()).map((c) => c.id)).toEqual(['c3'])
     await expect(api.deleteProject('p1')).rejects.toMatchObject({ status: 404 })
   })
+
+  it('la sesión de Langflow es vacía (maqueta) y falla con un tenant que no existe', async () => {
+    const api = make()
+    expect(await api.createLangflowSession('t1')).toEqual({ url: '' })
+    await expect(api.createLangflowSession('nope')).rejects.toMatchObject({ status: 404 })
+  })
 })

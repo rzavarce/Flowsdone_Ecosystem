@@ -16,10 +16,8 @@ COPY . .
 # demostración: usarlo SOLO en maquetas locales, nunca en producción.
 ARG VITE_AUTH_MODE=http
 ARG VITE_API_BASE_URL=/api
-ARG VITE_LANGFLOW_URL=
 ENV VITE_AUTH_MODE=$VITE_AUTH_MODE \
-    VITE_API_BASE_URL=$VITE_API_BASE_URL \
-    VITE_LANGFLOW_URL=$VITE_LANGFLOW_URL
+    VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN npm run build
 
 # ---- runtime: nginx sirve el estático --------------------------------

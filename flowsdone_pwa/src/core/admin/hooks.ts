@@ -18,6 +18,7 @@ export const adminKeys = {
   agents: ['agents'] as const,
   connections: ['channel-connections'] as const,
   apps: ['channel-apps'] as const,
+  langflowSession: ['langflow-session'] as const,
 }
 
 /** Tenants visibles con todos sus datos (slug, estado…). */
@@ -187,4 +188,25 @@ export function useDeleteChannelApp() {
 export function useRevealChannelApp() {
   const api = useAdminApi()
   return useMutation({ mutationFn: (provider: ChannelAppProvider) => api.revealChannelAppCredentials(provider) })
+}
+
+/**
+ * URL de inicio de sesión única de Langflow para un tenant (y, opcional, un proyecto).
+ *
+ * El ticket que lleva se consume una sola vez y caduca en segundos, por eso nunca se
+ * reutiliza desde la caché (`gcTime: 0`) ni se refresca solo mientras el editor está
+ * abierto (`staleTime: Infinity`): recargarlo dejaría el iframe con un enlace ya usado.
+ */
+export function useLangflowSession(tenantId?: string, projectId?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.langflowSession, tenantId, projectId],
+    queryFn: () => api.createLangflowSession(tenantId as string, projectId),
+    enabled: Boolean(tenantId),
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  })
 }

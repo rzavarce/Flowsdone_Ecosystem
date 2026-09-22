@@ -618,7 +618,6 @@ services:
         # http = backend real (default seguro). mock = cuentas de demo, solo maquetas locales.
         VITE_AUTH_MODE: ${PWA_AUTH_MODE:-http}
         VITE_API_BASE_URL: ${PWA_API_BASE_URL:-/api}
-        VITE_LANGFLOW_URL: ${PWA_LANGFLOW_URL:-}
     container_name: ${CONTAINER_PREFIX}_pwa
     # Solo loopback por defecto: en producción el acceso público es por Traefik
     # (https://app.flowsdone.com); publicar el 80 del contenedor en todas las

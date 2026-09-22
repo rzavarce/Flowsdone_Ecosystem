@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from app.adapters.inbound.http.admin.agents import router as agents_router
 from app.adapters.inbound.http.admin.channel_apps import router as channel_apps_router
 from app.adapters.inbound.http.admin.channel_connections import router as channel_connections_router
+from app.adapters.inbound.http.admin.langflow import router as langflow_router
 from app.adapters.inbound.http.admin.projects import router as projects_router
 from app.adapters.inbound.http.admin.tenants import router as tenants_router
 from app.adapters.inbound.http.admin.users import router as users_router
@@ -27,5 +28,6 @@ for _sub_router in (
     channel_connections_router,
     channel_apps_router,
     users_router,
+    langflow_router,
 ):
     router.include_router(_sub_router)

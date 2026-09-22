@@ -70,6 +70,14 @@ class Settings(BaseModel):
     # Langflow
     LANGFLOW_BASE_URL: str = "http://langflow:7860"
     LANGFLOW_API_KEY: Optional[str] = None
+    # Embedded editor SSO. PUBLIC_URL is where the browser reaches Langflow;
+    # SSO_BASE_URL is where it reaches the gateway's /langflow-sso endpoint.
+    # In production both are the same host (Traefik routes /langflow-sso to
+    # the gateway); locally they are different ports of `localhost`, which
+    # share cookies (cookies ignore the port).
+    LANGFLOW_PUBLIC_URL: str = "http://localhost:7860"
+    LANGFLOW_SSO_BASE_URL: str = "http://localhost:8000"
+    LANGFLOW_SSO_TICKET_TTL_SECONDS: int = 30
 
     # Multi-tenant SaaS: admin API + credentials encryption
     ADMIN_API_KEY: str = "dev-admin-key-change-me"
@@ -200,6 +208,9 @@ settings = Settings(
 
     LANGFLOW_BASE_URL=os.getenv("LANGFLOW_BASE_URL", "http://langflow:7860"),
     LANGFLOW_API_KEY=os.getenv("LANGFLOW_API_KEY"),
+    LANGFLOW_PUBLIC_URL=os.getenv("LANGFLOW_PUBLIC_URL", "http://localhost:7860").rstrip("/"),
+    LANGFLOW_SSO_BASE_URL=os.getenv("LANGFLOW_SSO_BASE_URL", "http://localhost:8000").rstrip("/"),
+    LANGFLOW_SSO_TICKET_TTL_SECONDS=int(os.getenv("LANGFLOW_SSO_TICKET_TTL_SECONDS", "30")),
 
     ADMIN_API_KEY=os.getenv("ADMIN_API_KEY", "dev-admin-key-change-me"),
 

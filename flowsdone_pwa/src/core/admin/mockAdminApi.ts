@@ -214,6 +214,11 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       if (!apps.delete(provider)) throw new ApiError(404, 'channel_app not found')
     },
+    async createLangflowSession(tenantId) {
+      await wait(latencyMs)
+      need(tenants.find((t) => t.id === tenantId), 'tenant')
+      return { url: '' } // sin Langflow real: la UI muestra la maqueta del lienzo
+    },
     async revealChannelAppCredentials(provider) {
       await wait(latencyMs)
       return clone(need(apps.get(provider), 'channel_app').credentials)
