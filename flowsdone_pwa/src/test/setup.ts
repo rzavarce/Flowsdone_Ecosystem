@@ -7,7 +7,26 @@ afterEach(() => {
   localStorage.clear()
   document.documentElement.className = ''
   document.documentElement.removeAttribute('data-theme')
+  fullscreenState.element = null
 })
+
+// jsdom no implementa la Fullscreen API (sus métodos existen en los tipos de
+// TypeScript, pero no en tiempo de ejecución). Se simula sobre un solo
+// elemento "en pantalla completa" a la vez (como el navegador) y disparando
+// `fullscreenchange`, que es lo que consume LangflowEmbed. Se pisa como
+// `any` porque `document.fullscreenElement` es de solo lectura.
+const fullscreenState: { element: Element | null } = { element: null }
+if (typeof document.exitFullscreen !== 'function') {
+  Object.defineProperty(document, 'fullscreenElement', { get: () => fullscreenState.element })
+  document.exitFullscreen = async () => {
+    fullscreenState.element = null
+    document.dispatchEvent(new Event('fullscreenchange'))
+  }
+  Element.prototype.requestFullscreen = async function (this: Element) {
+    fullscreenState.element = this
+    document.dispatchEvent(new Event('fullscreenchange'))
+  }
+}
 
 // jsdom no implementa matchMedia; los tests lo pisan cuando necesitan
 // simular prefers-color-scheme.

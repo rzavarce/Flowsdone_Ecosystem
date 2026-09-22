@@ -5,8 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_MODE?: string
   /** Base de la API del gateway (default `/api`). */
   readonly VITE_API_BASE_URL?: string
-  /** URL de Langflow a embeber en /agentes. */
-  readonly VITE_LANGFLOW_URL?: string
 }
 
 interface ImportMeta {

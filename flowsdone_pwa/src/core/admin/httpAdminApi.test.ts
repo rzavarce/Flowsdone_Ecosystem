@@ -103,4 +103,12 @@ describe('httpAdminApi', () => {
     expect(del.call()[0]).toBe('/api/admin/projects/p-1')
     expect(del.call()[1].method).toBe('DELETE')
   })
+
+  it('abre Langflow: POST /api/admin/langflow/session con tenant_id y project_id', async () => {
+    const a = setup({ url: 'https://agents.x/langflow-sso?ticket=t' })
+    expect(await a.api.createLangflowSession('t1', 'p1')).toEqual({ url: 'https://agents.x/langflow-sso?ticket=t' })
+    expect(a.call()[0]).toBe('/api/admin/langflow/session')
+    expect(a.call()[1].method).toBe('POST')
+    expect(JSON.parse(a.call()[1].body as string)).toEqual({ tenant_id: 't1', project_id: 'p1' })
+  })
 })

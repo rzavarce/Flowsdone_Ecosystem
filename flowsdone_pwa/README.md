@@ -62,7 +62,7 @@ En la UI se usa el componente `components/layout/Logo` (`icon` | `wordmark` | `f
 |---|---|---|
 | `admin` | Todo, en todos los tenants (incluye "Todos los tenants"). | Dashboard |
 | `tenant_manager` | Todo, pero solo en sus tenants asignados. | Dashboard |
-| `botmaster` | Solo crear/editar agentes (Langflow embebido, `/agentes`). | Agentes |
+| `botmaster` | Ve los agentes de sus tenants (solo lectura en `/agentes`; el editor de Langflow es solo del admin). | Agentes |
 | `client` | Paneles y gráficos de solo lectura de su organización. | Mi panel |
 
 - La UI pregunta por **permisos**, nunca por roles: `src/core/auth/permissions.ts` (`ROLE_PERMISSIONS`) es la única matriz. Rutas (`RequirePermission`) y menú (`useNavItems`) la consumen.
@@ -75,7 +75,7 @@ En la UI se usa el componente `components/layout/Logo` (`icon` | `wordmark` | `f
 
 ## Datos de la API admin
 
-La consola habla con `/internal/admin/*` del gateway a través de `/api/admin/*` (nginx o el proxy de Vite reescriben el prefijo). Solo se exponen los recursos que la UI usa (`tenants`, `projects`, `agents`, `channel-connections`, `channel-apps`); para sumar `users` o `workflows`, agregar el recurso a la lista blanca de `nginx.conf`.
+La consola habla con `/internal/admin/*` del gateway a través de `/api/admin/*` (nginx o el proxy de Vite reescriben el prefijo). Solo se exponen los recursos que la UI usa (`tenants`, `projects`, `agents`, `channel-connections`, `channel-apps`, `langflow`); para sumar `users` o `workflows`, agregar el recurso a la lista blanca de `nginx.conf`.
 
 - `core/http/apiFetch.ts`: cliente compartido (cookie, cabecera anti-CSRF, `ApiError` con el `detail` del gateway).
 - `core/admin/`: puerto `AdminApi` con adaptador HTTP y **mock** (mismo patrón que la autenticación; con `VITE_AUTH_MODE=mock` no hace falta backend), más hooks de TanStack Query. Un 401 cierra la sesión y la caché se vacía al cambiar de persona.
@@ -98,6 +98,14 @@ La consola habla con `/internal/admin/*` del gateway a través de `/api/admin/*`
 - **Suspender** (tenant o proyecto) corta el enrutado de sus canales **sin borrar nada**; reactivar es inmediato. El gateway comprueba el estado del canal, del agente, del proyecto **y del tenant** al resolver un mensaje entrante.
 - **Borrar es en cascada** (proyectos → agentes → canales). El aviso cuenta lo que hay *ahora* (se piden los datos otra vez antes de mostrarlo, no se usa la caché) y, para un tenant o un proyecto con contenido, hay que **escribir su slug** para confirmar.
 - El selector de tenant de la barra superior sale de `/auth/me`, así que tras crear, renombrar o borrar un tenant se vuelve a pedir el usuario (`refreshUser`) y el selector se actualiza solo.
+
+## Agentes y Langflow embebido
+
+`/agentes`: el **admin** elige un tenant en el selector y ve el editor de Langflow embebido, ya con la sesión iniciada como el usuario de ese tenant (solo sus agentes); con «Todos los tenants» pide elegir uno. El resto de perfiles ve la lista de agentes de su tenant, sin editor.
+
+- La URL del iframe la da el gateway (`POST /api/admin/langflow/session` → `url`), con un ticket de un solo uso: por eso `useLangflowSession` no se cachea (`gcTime: 0`) y el iframe se monta con `key={tenantId}` (cada tenant, su ticket). Ya no existe `VITE_LANGFLOW_URL`.
+- En modo `mock` no hay Langflow real: se muestra el lienzo de ejemplo.
+- Detalles (usuario por tenant, carpeta por proyecto, límites de seguridad) en el README raíz, sección «Langflow embebido por tenant».
 
 ## Integraciones de plataforma
 
@@ -144,6 +152,6 @@ docker compose --profile dev up -d --build pwa   # http://localhost:${PWA_PORT:-
 PWA_AUTH_MODE=mock docker compose --profile dev up -d --build pwa
 ```
 
-Variables (opcionales, con default en el compose): `PWA_PORT`, `PWA_MEM_LIMIT`, `PWA_CPUS`, `PWA_AUTH_MODE` (`http` | `mock`), `PWA_API_BASE_URL`, `PWA_LANGFLOW_URL`. Las tres últimas se incrustan en el JS al construir la imagen. Para probar la maqueta en contenedor: `PWA_AUTH_MODE=mock` en el `.env` local (nunca en el VPS).
+Variables (opcionales, con default en el compose): `PWA_PORT`, `PWA_MEM_LIMIT`, `PWA_CPUS`, `PWA_AUTH_MODE` (`http` | `mock`), `PWA_API_BASE_URL`. Las dos últimas se incrustan en el JS al construir la imagen. Para probar la maqueta en contenedor: `PWA_AUTH_MODE=mock` en el `.env` local (nunca en el VPS).
 
 Estado: **maqueta**. Los datos salen de `src/mocks/data.ts`; la conexión al gateway, la autenticación y la ruta pública en Traefik son features siguientes.

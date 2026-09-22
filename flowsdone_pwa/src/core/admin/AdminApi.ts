@@ -11,6 +11,7 @@ import type {
   UpdateChannelConnectionInput,
   UpdateProjectInput,
   UpdateTenantInput,
+  LangflowSession,
 } from './types'
 
 /**
@@ -53,4 +54,11 @@ export interface AdminApi {
   deleteChannelApp(provider: ChannelAppProvider): Promise<void>
   /** Revela las credenciales en claro de un proveedor (solo admin). Úsese con cuidado. */
   revealChannelAppCredentials(provider: ChannelAppProvider): Promise<Record<string, unknown>>
+
+  /**
+   * Solo admin. Prepara el Langflow del tenant (su usuario y una carpeta por proyecto)
+   * y devuelve la URL de inicio de sesión única para el iframe. Con `projectId` abre
+   * la carpeta de ese proyecto; sin él, la del primero.
+   */
+  createLangflowSession(tenantId: string, projectId?: string): Promise<LangflowSession>
 }

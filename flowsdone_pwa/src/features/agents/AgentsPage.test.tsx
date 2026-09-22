@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { AdminApi } from '@/core/admin/AdminApi'
 import { createMockAdminApi } from '@/core/admin/mockAdminApi'
 import type { Role } from '@/core/auth/types'
@@ -8,35 +9,87 @@ import { SEED } from '@/test/adminFixtures'
 import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 
 const api = (over: Partial<AdminApi> = {}): AdminApi => ({ ...createMockAdminApi({ latencyMs: 0, seed: SEED }), ...over })
-const LANGFLOW_URL = 'https://agents.example.test/'
+const LANGFLOW_URL = 'https://agents.example.test/langflow-sso?ticket=abc'
+const selectTenant = (id: string) => userEvent.selectOptions(screen.getByRole('combobox', { name: 'Tenant activo' }), id)
+const session = (url = LANGFLOW_URL) => vi.fn().mockResolvedValue({ url })
 
 async function open(role: Role, adminApi: AdminApi = api()) {
   renderApp('/agentes', fakeAuthApi(makeUser(role)), adminApi)
   await screen.findByRole('heading', { level: 1, name: 'Agentes' })
 }
 
-afterEach(() => vi.unstubAllEnvs())
-
 describe('editor de Langflow: solo para el equipo de la plataforma', () => {
-  it('el admin ve el editor embebido', async () => {
-    vi.stubEnv('VITE_LANGFLOW_URL', LANGFLOW_URL)
-    await open('admin')
-    expect(screen.getByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
+  it('el admin, con un tenant elegido, ve el editor con la URL de inicio de sesión que da el gateway', async () => {
+    const createLangflowSession = session()
+    await open('admin', api({ createLangflowSession }))
+    await selectTenant('t1')
+    expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
+    expect(createLangflowSession).toHaveBeenCalledWith('t1', undefined)
   })
 
-  it('el admin sin URL configurada ve la maqueta del lienzo', async () => {
-    await open('admin')
-    expect(screen.getByText(/se embeberá Langflow/)).toBeInTheDocument()
+  it('el botón de pantalla completa entra y sale, y cambia de icono y de etiqueta', async () => {
+    await open('admin', api({ createLangflowSession: session() }))
+    await selectTenant('t1')
+    await screen.findByTitle('Editor de agentes (Langflow)')
+    const container = screen.getByTitle('Editor de agentes (Langflow)').parentElement as HTMLElement
+
+    expect(document.fullscreenElement).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Ver a pantalla completa' }))
+    expect(document.fullscreenElement).toBe(container)
+
+    const exit = await screen.findByRole('button', { name: 'Salir de pantalla completa' })
+    await userEvent.click(exit)
+    expect(document.fullscreenElement).toBeNull()
+    expect(await screen.findByRole('button', { name: 'Ver a pantalla completa' })).toBeInTheDocument()
   })
 
-  // Regresión de seguridad: Langflow no separa tenants, quien abre su interfaz ve TODO.
-  it.each(['tenant_manager', 'botmaster'] as const)('%s NUNCA recibe el iframe de Langflow, aunque la URL esté configurada', async (role) => {
-    vi.stubEnv('VITE_LANGFLOW_URL', LANGFLOW_URL)
-    await open(role)
+  it('con "Todos los tenants" pide elegir uno y no abre Langflow', async () => {
+    const createLangflowSession = session()
+    await open('admin', api({ createLangflowSession }))
+    expect(await screen.findByText('Elige un tenant')).toBeInTheDocument()
+    expect(document.querySelector('iframe')).toBeNull()
+    expect(createLangflowSession).not.toHaveBeenCalled()
+  })
+
+  it('al cambiar de tenant pide una sesión nueva y recarga el iframe (el ticket es de un solo uso)', async () => {
+    const createLangflowSession = vi
+      .fn()
+      .mockResolvedValueOnce({ url: 'https://agents.example.test/langflow-sso?ticket=uno' })
+      .mockResolvedValueOnce({ url: 'https://agents.example.test/langflow-sso?ticket=dos' })
+    await open('admin', api({ createLangflowSession }))
+    await selectTenant('t1')
+    expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', expect.stringContaining('ticket=uno'))
+    await selectTenant('t2')
+    await waitFor(() =>
+      expect(screen.getByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', expect.stringContaining('ticket=dos')),
+    )
+    expect(createLangflowSession.mock.calls.map((c) => c[0])).toEqual(['t1', 't2'])
+  })
+
+  it('si el gateway falla muestra el error y "Reintentar" pide otra sesión', async () => {
+    const createLangflowSession = vi.fn().mockRejectedValueOnce(new ApiError(502, 'langflow unavailable')).mockResolvedValue({ url: LANGFLOW_URL })
+    await open('admin', api({ createLangflowSession }))
+    await selectTenant('t1')
+    expect(await screen.findByText(/No se pudo abrir Langflow: langflow unavailable/)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    expect(await screen.findByTitle('Editor de agentes (Langflow)')).toBeInTheDocument()
+  })
+
+  it('sin Langflow real (modo maqueta) muestra el lienzo de ejemplo', async () => {
+    await open('admin')
+    await selectTenant('t1')
+    expect(await screen.findByText(/se embeberá Langflow/)).toBeInTheDocument()
+  })
+
+  // Regresión de seguridad: separar por usuario en Langflow es de vista, no un límite de seguridad.
+  it.each(['tenant_manager', 'botmaster'] as const)('%s NUNCA recibe el iframe de Langflow ni pide una sesión', async (role) => {
+    const createLangflowSession = session()
+    await open(role, api({ createLangflowSession }))
     await screen.findByText(/es solo para el equipo de la plataforma/)
     expect(screen.queryByTitle('Editor de agentes (Langflow)')).not.toBeInTheDocument()
     expect(document.querySelector('iframe')).toBeNull()
-    expect(document.body.innerHTML).not.toContain(LANGFLOW_URL)
+    expect(createLangflowSession).not.toHaveBeenCalled()
+    expect(document.body.innerHTML).not.toContain('langflow-sso')
   })
 })
 
