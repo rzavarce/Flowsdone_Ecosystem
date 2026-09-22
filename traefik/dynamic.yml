@@ -49,6 +49,18 @@ http:
         certresolver: myresolver
       service: langflow-svc
 
+    # Cierre del inicio de sesión único del editor embebido: el gateway canjea el
+    # ticket, entra a Langflow como el usuario del tenant y pone las cookies EN ESTE
+    # host (por eso pasa por agents., no por platform.). Prioridad mayor que el
+    # router `langflow` para ganarle en esta ruta exacta.
+    langflow-sso:
+      rule: "Host(`agents.flowsdone.com`) && Path(`/langflow-sso`)"
+      priority: 100
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: webchat-svc
+
     evolution:
       rule: "Host(`evo.flowsdone.com`)"
       entrypoints: [websecure]

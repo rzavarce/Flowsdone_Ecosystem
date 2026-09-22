@@ -385,6 +385,10 @@ class FakeRedisClient:
     async def get(self, key: str) -> Optional[str]:
         return self.store.get(key)
 
+    async def getdel(self, key: str) -> Optional[str]:
+        self.ttls.pop(key, None)
+        return self.store.pop(key, None)
+
     async def delete(self, key: str) -> None:
         self.store.pop(key, None)
         self.ttls.pop(key, None)

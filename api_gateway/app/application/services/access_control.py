@@ -32,7 +32,7 @@ __all__ = [
 ]
 
 Resource = Literal[
-    "tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users"
+    "tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users", "langflow"
 ]
 Action = Literal["read", "write"]
 
@@ -54,6 +54,9 @@ POLICY: dict[str, dict[str, FrozenSet[str]]] = {
     "channel_connections": {"read": _MANAGERS, "write": _MANAGERS},
     "channel_apps": {"read": _ADMIN, "write": _ADMIN},
     "users": {"read": _ADMIN, "write": _ADMIN},
+    # Opening the Langflow editor as a tenant's user. Platform staff only: the
+    # per-tenant separation is a view, not a security boundary (see README).
+    "langflow": {"read": _ADMIN, "write": _ADMIN},
 }
 
 

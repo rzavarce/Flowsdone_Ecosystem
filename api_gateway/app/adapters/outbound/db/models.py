@@ -268,3 +268,29 @@ class UserTenantModel(Base):
         ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LangflowAccountModel(Base):
+    """Row for the Langflow user that stands for a tenant (password encrypted)."""
+
+    __tablename__ = "langflow_accounts"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), primary_key=True
+    )
+    username: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    credentials: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    langflow_user_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LangflowFolderModel(Base):
+    """Row linking a gateway project to its folder in the tenant's Langflow."""
+
+    __tablename__ = "langflow_folders"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    folder_id: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

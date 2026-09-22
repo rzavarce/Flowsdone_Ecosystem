@@ -15,6 +15,7 @@ from app.adapters.inbound.http.admin import router as admin_router
 from app.adapters.inbound.http.auth import router as auth_router
 from app.adapters.inbound.http.errors import register_error_handlers
 from app.adapters.inbound.http.channels import router as channels_router
+from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
 from app.adapters.inbound.http.voice_demo import router as voice_demo_router
@@ -26,12 +27,15 @@ from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegi
 from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
 from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
+from app.adapters.outbound.db.langflow_account_repository import SqlAlchemyLangflowAccountRepository
 from app.adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
 from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
 from app.adapters.outbound.db.user_repository import SqlAlchemyUserRepository
 from app.adapters.outbound.session.redis_auth_session_repository import RedisAuthSessionRepository
 from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
+from app.adapters.outbound.session.redis_sso_ticket_store import RedisSsoTicketStore
 from app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
 from app.adapters.outbound.queue.factory import PublisherFactory
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
@@ -53,6 +57,7 @@ from app.application.use_cases.delete_channel_connection import DeleteChannelCon
 from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.application.use_cases.ingest_message import IngestMessageUseCase
+from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
 from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
@@ -318,6 +323,25 @@ async def lifespan(app: FastAPI):
 
     logger.info("channel_connection.use_cases.initialized")
 
+    # Embedded Langflow SSO: one Langflow user per tenant, one folder per
+    # project, and single-use tickets (Redis) to hand the browser over.
+    langflow_accounts = SqlAlchemyLangflowAccountRepository(db_sessionmaker)
+    langflow_admin = LangflowAdminClient()
+    langflow_tickets = RedisSsoTicketStore(redis_client)
+    app.state.langflow_admin_client = langflow_admin
+    app.state.prepare_langflow_session_use_case = PrepareLangflowSessionUseCase(
+        tenant_repo=app.state.tenant_repo,
+        project_repo=app.state.project_repo,
+        accounts=langflow_accounts,
+        langflow=langflow_admin,
+        secret_generator=secret_generator,
+        tickets=langflow_tickets,
+        ticket_ttl_seconds=settings.LANGFLOW_SSO_TICKET_TTL_SECONDS,
+    )
+    app.state.redeem_langflow_ticket_use_case = RedeemLangflowTicketUseCase(
+        accounts=langflow_accounts, langflow=langflow_admin, tickets=langflow_tickets
+    )
+
     # Outbound handler (WebSocket + native channel senders). Built
     # after the database repositories so it can be given a real
     # channel_connection_repo.
@@ -379,6 +403,10 @@ async def lifespan(app: FastAPI):
         if rabbit_pub:
             await rabbit_pub.stop()
             logger.info("rabbitmq.publisher.stopped")
+
+    langflow_admin_client = getattr(app.state, "langflow_admin_client", None)
+    if langflow_admin_client:
+        await langflow_admin_client.aclose()
 
     db_engine = getattr(app.state, "db_engine", None)
     if db_engine:
@@ -454,3 +482,4 @@ app.include_router(voice_router)
 app.include_router(voice_demo_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(langflow_sso_router)
