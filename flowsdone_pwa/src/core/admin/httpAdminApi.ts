@@ -7,6 +7,7 @@ import type {
   Conversation,
   ConversationDetail,
   LangflowFlow,
+  OnboardingStatus,
   CostRate,
   Plan,
   PricingInsight,
@@ -50,6 +51,8 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     createAgent: (input) => call<Agent>('/agents', 'POST', input),
     updateAgent: (id, patch) => call<Agent>(`/agents/${id}`, 'PATCH', patch),
     deleteAgent: (id) => call<void>(`/agents/${id}`, 'DELETE'),
+    createBaseAgent: (input) => call<Agent>('/agents/base', 'POST', input),
+    getOnboarding: (tenantId) => call<OnboardingStatus>(`/tenants/${tenantId}/onboarding`),
     listLangflowFlows: (projectId) => call<LangflowFlow[]>(`/langflow/flows${query({ project_id: projectId })}`),
 
     listChannelConnections: (projectId) =>

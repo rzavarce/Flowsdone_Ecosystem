@@ -120,6 +120,45 @@ export interface UpdateAgentInput {
   status?: LifecycleStatus
 }
 
+/** How the base agent talks to customers. */
+export type AgentTone = 'cercano' | 'profesional' | 'formal'
+
+/**
+ * Input for the new-client wizard's base agent: a chat flow with memory and
+ * a prompt built from these answers, created in the project's Langflow folder
+ * and registered as its default agent.
+ */
+export interface BaseAgentInput {
+  project_id: string
+  assistant_name: string
+  tone: AgentTone
+  /** About the business and how to attend (opening hours, what not to do…). */
+  instructions: string
+}
+
+/** Onboarding checklist item keys. */
+export type OnboardingCheckKey = 'billing' | 'client_account' | 'plan' | 'project' | 'agent' | 'openai_key' | 'channel'
+
+/** One onboarding checklist item. `unknown`: Langflow could not be reached to check it. */
+export interface OnboardingCheck {
+  key: OnboardingCheckKey
+  status: 'ok' | 'warning' | 'missing' | 'unknown'
+  detail: string | null
+}
+
+/** Wizard steps, in order. */
+export type OnboardingStep = 'company' | 'plan' | 'project' | 'agent' | 'summary'
+
+/** Where a tenant's onboarding stands (computed from what exists, never stored). */
+export interface OnboardingStatus {
+  tenant_id: string
+  /** First wizard step still to do (`summary` when the four are done). */
+  next_step: OnboardingStep
+  /** Project the wizard works on (the tenant's first one), if any. */
+  project_id: string | null
+  checks: OnboardingCheck[]
+}
+
 /** A flow in a project's Langflow folder, with the agent already registered for it (if any). */
 export interface LangflowFlow {
   id: string

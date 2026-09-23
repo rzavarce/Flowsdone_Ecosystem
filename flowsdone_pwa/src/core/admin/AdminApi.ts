@@ -3,7 +3,9 @@ import type {
   ChannelApp,
   ChannelAppProvider,
   ChannelConnection,
+  BaseAgentInput,
   CreateAgentInput,
+  OnboardingStatus,
   CreateChannelConnectionInput,
   LangflowFlow,
   UpdateAgentInput,
@@ -75,6 +77,10 @@ export interface AdminApi {
   updateAgent(id: string, patch: UpdateAgentInput): Promise<Agent>
   /** Fails with 409 while channels are still connected to it. */
   deleteAgent(id: string): Promise<void>
+  /** Creates the project's base agent (new-client wizard) and makes it the default one. */
+  createBaseAgent(input: BaseAgentInput): Promise<Agent>
+  /** A tenant's onboarding checklist and the wizard step to resume at (admin/tenant_manager). */
+  getOnboarding(tenantId: string): Promise<OnboardingStatus>
   /** Flows in a project's Langflow folder (provisions the tenant's Langflow if needed). */
   listLangflowFlows(projectId: string): Promise<LangflowFlow[]>
 
