@@ -8,7 +8,7 @@ import { useCreateCostRate } from '@/core/admin/billingHooks'
 import type { CostRate, CostRateInput } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { kindLabel, unitLabel } from '@/features/billing/labels'
-import { parseMoney } from '@/lib/money'
+import { microsToInput, parseMoney } from '@/lib/money'
 import { useTranslation } from 'react-i18next'
 
 /** Props for {@link CostRateDialog}. */
@@ -117,7 +117,7 @@ export function CostRateDialog({ initial, onClose }: CostRateDialogProps) {
         </Field>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={t('costs.dialog.price')} error={errors.price}>
-            <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,37" />
+            <Input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={microsToInput(370_000)} />
           </Field>
           <Field label={t('costs.dialog.perQuantity')} hint={t('costs.dialog.perQuantityHint')} error={errors.perQuantity}>
             <Input inputMode="numeric" value={perQuantity} onChange={(e) => setPerQuantity(e.target.value)} />
