@@ -41,6 +41,10 @@ Resource = Literal[
     "users",
     "langflow",
     "tenant_billing",
+    "conversations",
+    "plans",
+    "cost_rates",
+    "billing",
 ]
 Action = Literal["read", "write"]
 
@@ -76,6 +80,17 @@ POLICY: dict[str, dict[str, FrozenSet[str]]] = {
     # A client sees their own read-only through /me/billing-profile instead
     # of this - never through the admin API (see users, above).
     "tenant_billing": {"read": _MANAGERS, "write": _MANAGERS},
+    # Conversation inbox (records, transcripts, per-conversation cost) of
+    # the caller's tenants. Nothing writes through it yet.
+    "conversations": {"read": _ALL_STAFF, "write": _MANAGERS},
+    # Commercial plans and the cost catalog: Flowsdone's own pricing and
+    # costs, admin only.
+    "plans": {"read": _ADMIN, "write": _ADMIN},
+    "cost_rates": {"read": _ADMIN, "write": _ADMIN},
+    # A tenant's subscription, usage and statements. Managers read them
+    # for their tenants (costs/margin are stripped for anyone but admin,
+    # see admin/billing.py); only admin assigns plans or closes periods.
+    "billing": {"read": _MANAGERS, "write": _ADMIN},
 }
 
 

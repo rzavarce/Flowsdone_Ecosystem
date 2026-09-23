@@ -258,3 +258,154 @@ async def test_switch_app_raises_not_routable_when_session_does_not_exist():
 
     with pytest.raises(ChannelMessageNotRoutable):
         await switchboard.switch_app(session_id="missing-session", to_app="zendesk")
+
+
+# --- handle_inbound_turn(): conversation tracking ---------------------------
+
+
+def _tracker(*, publisher_fails: bool = False):
+    from datetime import timedelta
+
+    from app.application.services.conversation_tracker import ConversationTracker
+    from app.domain.models.conversation import ConversationLifecyclePolicy
+    from api_gateway.tests.support.fakes import (
+        FakeConversationEventPublisher,
+        FakeConversationRepository,
+    )
+
+    repo = FakeConversationRepository()
+    events = FakeConversationEventPublisher(fail=publisher_fails)
+    tracker = ConversationTracker(
+        conversation_repo=repo,
+        event_publisher=events,
+        session_history_repo=FakeSessionHistoryRepository(),
+        policy=ConversationLifecyclePolicy(inactivity=timedelta(hours=24), max_duration=timedelta(days=7)),
+    )
+    return tracker, repo, events
+
+
+async def test_inbound_turn_opens_a_conversation_before_calling_the_connector():
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, repo, events = _tracker()
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=FakeSessionRepository(),
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+    )
+
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram",
+        external_id="bot-1",
+        external_conversation_key="chat-42",
+        sender_id="user-7",
+        message_text="hola",
+        raw_payload={},
+    )
+
+    [conversation] = repo.conversations.values()
+    # The connector already sees the conversation (it becomes Langflow's session_id).
+    assert connector.calls[0]["session"].conversation_id == conversation.id
+    assert events.events[0].text == "hola"
+
+
+async def test_inbound_turn_still_reaches_the_connector_when_conversation_tracking_fails():
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, _, _ = _tracker(publisher_fails=True)
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=FakeSessionRepository(),
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+    )
+
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram",
+        external_id="bot-1",
+        external_conversation_key="chat-42",
+        sender_id="user-7",
+        message_text="hola",
+        raw_payload={},
+    )
+
+    assert len(connector.calls) == 1
+
+
+# --- handle_inbound_turn(): quota ----------------------------------------------
+
+
+class _Gate:
+    def __init__(self, allowed=True, fail=False):
+        self.allowed = allowed
+        self.fail = fail
+        self.calls = []
+
+    async def admit(self, *, tenant_id, channel_type, now):
+        from app.domain.models.billing import QuotaDecision
+
+        self.calls.append((tenant_id, channel_type))
+        if self.fail:
+            raise RuntimeError("redis down")
+        return QuotaDecision(allowed=self.allowed, reason="x", channel_type=channel_type)
+
+
+def _quota_switchboard(gate):
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, _, events = _tracker()
+    session_repo = FakeSessionRepository()
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=session_repo,
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+        quota_gate=gate,
+    )
+    return switchboard, connector, events, session_repo, resolution
+
+
+async def _turn(switchboard):
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram", external_id="bot-1", external_conversation_key="chat-42",
+        sender_id="user-7", message_text="hola", raw_payload={},
+    )
+
+
+async def test_a_message_refused_by_the_quota_is_recorded_but_never_dispatched():
+    gate = _Gate(allowed=False)
+    switchboard, connector, events, session_repo, resolution = _quota_switchboard(gate)
+
+    await _turn(switchboard)
+
+    assert gate.calls == [(resolution.tenant_id, "telegram")]
+    assert connector.calls == []
+    assert events.events[0].billable is False
+    assert session_repo.saved  # the session (and its conversation) is kept
+
+
+async def test_an_admitted_message_is_dispatched_and_billable():
+    switchboard, connector, events, _, _ = _quota_switchboard(_Gate(allowed=True))
+
+    await _turn(switchboard)
+
+    assert len(connector.calls) == 1
+    assert events.events[0].billable is True
+
+
+async def test_a_failing_quota_check_fails_open():
+    switchboard, connector, _, _, _ = _quota_switchboard(_Gate(fail=True))
+
+    await _turn(switchboard)
+
+    assert len(connector.calls) == 1

@@ -1,6 +1,22 @@
-import { apiFetch } from '@/core/http/apiFetch'
+import { ApiError, apiFetch } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
-import type { Agent, ChannelApp, ChannelConnection, Project, TenantBillingProfile, TenantRecord, UserRecord } from './types'
+import type {
+  Agent,
+  ChannelApp,
+  ChannelConnection,
+  Conversation,
+  ConversationDetail,
+  CostRate,
+  Plan,
+  PricingInsight,
+  Project,
+  Statement,
+  Subscription,
+  TenantBillingProfile,
+  TenantRecord,
+  UnratedMeter,
+  UserRecord,
+} from './types'
 
 /**
  * Adapter against the real gateway. In the browser, routes go through
@@ -54,6 +70,43 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     uploadUserAvatar: (id, image) =>
       apiFetch<UserRecord>(`/admin/users/${id}/avatar`, { method: 'PUT', blob: image, fetchFn, baseUrl }),
     removeUserAvatar: (id) => call<UserRecord>(`/users/${id}/avatar`, 'DELETE'),
+    listConversations: (filters = {}) =>
+      call<Conversation[]>(
+        `/conversations${query(
+          Object.fromEntries(
+            Object.entries(filters).map(([k, v]) => [k, v === undefined || v === '' ? undefined : String(v)]),
+          ),
+        )}`,
+      ),
+    getConversation: (id) => call<ConversationDetail>(`/conversations/${id}`),
+
+    listPlans: () => call<Plan[]>('/plans'),
+    createPlan: (input) => call<Plan>('/plans', 'POST', input),
+    updatePlan: (id, patch) => call<Plan>(`/plans/${id}`, 'PATCH', patch),
+    deletePlan: (id) => call<void>(`/plans/${id}`, 'DELETE'),
+    getPlanPricingInsight: (id, days) =>
+      call<PricingInsight>(`/plans/${id}/pricing-insight${query({ days: days === undefined ? undefined : String(days) })}`),
+
+    listCostRates: () => call<CostRate[]>('/cost-rates'),
+    createCostRate: (input) => call<CostRate>('/cost-rates', 'POST', input),
+    deleteCostRate: (id) => call<void>(`/cost-rates/${id}`, 'DELETE'),
+    listUnratedMeters: (days) =>
+      call<UnratedMeter[]>(`/cost-rates/unrated${query({ days: days === undefined ? undefined : String(days) })}`),
+
+    getSubscription: async (tenantId) => {
+      try {
+        return await call<Subscription>(`/tenants/${tenantId}/subscription`)
+      } catch (error) {
+        // 404 = sin suscripción (el tenant en sí ya lo validó la pantalla).
+        if (error instanceof ApiError && error.status === 404) return null
+        throw error
+      }
+    },
+    putSubscription: (tenantId, input) => call<Subscription>(`/tenants/${tenantId}/subscription`, 'PUT', input),
+    deleteSubscription: (tenantId) => call<void>(`/tenants/${tenantId}/subscription`, 'DELETE'),
+    getStatement: (tenantId, period) => call<Statement>(`/tenants/${tenantId}/statement${query({ period })}`),
+    listStatements: (tenantId) => call<Statement[]>(`/tenants/${tenantId}/statements`),
+
     userAvatarUrl: (user) =>
       user.avatar_updated_at
         ? `${base}/admin/users/${user.id}/avatar?v=${encodeURIComponent(user.avatar_updated_at)}`

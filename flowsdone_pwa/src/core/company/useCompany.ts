@@ -11,3 +11,12 @@ export function useCompany() {
   const [api] = useState(() => createCompanyApi())
   return useQuery({ queryKey: ['my-company'], queryFn: () => api.getMyCompany() })
 }
+
+/**
+ * Usage and charges of the logged-in user's tenant for a month (current if
+ * `period` is omitted) - `GET /me/usage`, `client` accounts only.
+ */
+export function useMyUsage(period?: string) {
+  const [api] = useState(() => createCompanyApi())
+  return useQuery({ queryKey: ['my-usage', period ?? 'current'], queryFn: () => api.getMyUsage(period) })
+}

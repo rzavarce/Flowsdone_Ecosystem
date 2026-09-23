@@ -4,6 +4,7 @@ together at startup and exposes the resulting `app`.
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -41,6 +42,21 @@ from app.adapters.outbound.session.redis_auth_session_repository import RedisAut
 from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
 from app.adapters.outbound.session.redis_sso_ticket_store import RedisSsoTicketStore
 from app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from app.adapters.outbound.billing.redis_quota_counter import RedisQuotaCounter
+from app.adapters.outbound.clickhouse.http_client import ClickHouseHttpClient
+from app.adapters.outbound.clickhouse.message_archive import ClickHouseMessageArchive
+from app.adapters.outbound.clickhouse.usage_store import ClickHouseUsageStore
+from app.adapters.outbound.conversations.event_publishers import (
+    BrokerConversationEventPublisher,
+    NullConversationEventPublisher,
+)
+from app.adapters.outbound.db.billing_repositories import (
+    SqlAlchemyPlanRepository,
+    SqlAlchemyStatementRepository,
+    SqlAlchemySubscriptionRepository,
+)
+from app.adapters.outbound.db.conversation_repository import SqlAlchemyConversationRepository
+from app.adapters.outbound.db.usage_repositories import SqlAlchemyCostRateRepository
 from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
 from app.adapters.outbound.queue.factory import PublisherFactory
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
@@ -53,6 +69,16 @@ from app.adapters.outbound.session.postgres_session_history_repository import (
 from app.adapters.outbound.session.redis_session_repository import RedisSessionRepository
 from app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
 from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
+from app.application.services.conversation_tracker import ConversationTracker
+from app.application.services.quota_alerts import QuotaAlertMailer
+from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.billing import (
+    CloseBillingPeriodUseCase,
+    ComputeStatementUseCase,
+    ListUnratedMetersUseCase,
+    PlanPricingInsightUseCase,
+)
+from app.application.use_cases.conversation_queries import GetConversationDetailUseCase
 from app.application.services.switchboard import Switchboard
 from app.application.services.ws_registry import WSRegistry
 from app.application.services.access_control import AccessControl
@@ -79,6 +105,7 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
+from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
 from app.core.tracing import instrument_fastapi_app, setup_tracing
 from app.infrastructure.database import create_engine, create_sessionmaker
@@ -265,6 +292,35 @@ async def lifespan(app: FastAPI):
 
     logger.info("database.repositories.ready")
 
+    # Conversations: live records in Postgres, every message published
+    # to CONVERSATION_EVENTS_TOPIC for the conversations worker to
+    # archive into ClickHouse. Without Kafka, conversations are still
+    # tracked but messages are not archived.
+    if settings.ENABLE_KAFKA:
+        conversation_events_kafka = KafkaPublisher(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            topic=settings.CONVERSATION_EVENTS_TOPIC,
+        )
+        await conversation_events_kafka.start()
+        app.state.conversation_events_kafka_publisher = conversation_events_kafka
+        conversation_event_publisher = BrokerConversationEventPublisher(conversation_events_kafka)
+    else:
+        conversation_event_publisher = NullConversationEventPublisher()
+
+    conversation_repo = SqlAlchemyConversationRepository(db_sessionmaker)
+    app.state.conversation_repo = conversation_repo
+    conversation_tracker = ConversationTracker(
+        conversation_repo=conversation_repo,
+        event_publisher=conversation_event_publisher,
+        session_history_repo=session_history_repo,
+        policy=ConversationLifecyclePolicy(
+            inactivity=timedelta(seconds=settings.CONVERSATION_INACTIVITY_SECONDS),
+            max_duration=timedelta(seconds=settings.CONVERSATION_MAX_DURATION_SECONDS),
+        ),
+    )
+    app.state.conversation_tracker = conversation_tracker
+    logger.info("conversations.tracker.ready")
+
     # Console (PWA) authentication: users in Postgres, opaque sessions and
     # login throttling in Redis (same client as voice/switchboard; own key
     # prefixes), scrypt for passwords.
@@ -424,6 +480,62 @@ async def lifespan(app: FastAPI):
         accounts=langflow_accounts, langflow=langflow_admin, tickets=langflow_tickets
     )
 
+    # Conversation archive and usage (ClickHouse), plans/subscriptions/
+    # statements (Postgres) and the quota gate (Redis counters) - see
+    # README section 24. Built after email_sender (quota alerts) and before
+    # Switchboard (which checks every inbound message against the quota).
+    clickhouse = ClickHouseHttpClient(
+        base_url=settings.CLICKHOUSE_URL,
+        database=settings.CLICKHOUSE_DATABASE,
+        user=settings.CLICKHOUSE_APP_USER,
+        password=settings.CLICKHOUSE_APP_PASSWORD,
+    )
+    app.state.clickhouse = clickhouse
+    usage_store = ClickHouseUsageStore(clickhouse)
+    app.state.cost_rate_repo = SqlAlchemyCostRateRepository(db_sessionmaker)
+    app.state.plan_repo = SqlAlchemyPlanRepository(db_sessionmaker)
+    app.state.subscription_repo = SqlAlchemySubscriptionRepository(db_sessionmaker)
+    app.state.statement_repo = SqlAlchemyStatementRepository(db_sessionmaker)
+    quota_gate = QuotaGate(
+        subscriptions=app.state.subscription_repo,
+        plans=app.state.plan_repo,
+        counters=RedisQuotaCounter(redis_client),
+        usage_store=usage_store,
+        notifier=QuotaAlertMailer(
+            mailer=email_sender,
+            billing_profiles=app.state.tenant_billing_profile_repo,
+            tenants=app.state.tenant_repo,
+        ),
+    )
+    app.state.quota_gate = quota_gate
+    app.state.get_conversation_detail_use_case = GetConversationDetailUseCase(
+        conversations=conversation_repo,
+        archive=ClickHouseMessageArchive(clickhouse),
+        usage_store=usage_store,
+        cost_rates=app.state.cost_rate_repo,
+    )
+    compute_statement = ComputeStatementUseCase(
+        usage_store=usage_store,
+        cost_rates=app.state.cost_rate_repo,
+        plans=app.state.plan_repo,
+        subscriptions=app.state.subscription_repo,
+        statements=app.state.statement_repo,
+    )
+    app.state.compute_statement_use_case = compute_statement
+    app.state.close_billing_period_use_case = CloseBillingPeriodUseCase(
+        compute=compute_statement, subscriptions=app.state.subscription_repo, statements=app.state.statement_repo
+    )
+    app.state.plan_pricing_insight_use_case = PlanPricingInsightUseCase(
+        usage_store=usage_store,
+        cost_rates=app.state.cost_rate_repo,
+        plans=app.state.plan_repo,
+        subscriptions=app.state.subscription_repo,
+    )
+    app.state.list_unrated_meters_use_case = ListUnratedMetersUseCase(
+        usage_store=usage_store, cost_rates=app.state.cost_rate_repo
+    )
+    logger.info("billing.dependencies.initialized")
+
     # Outbound handler (WebSocket + native channel senders). Built
     # after the database repositories so it can be given a real
     # channel_connection_repo.
@@ -438,6 +550,7 @@ async def lifespan(app: FastAPI):
         session_repo=session_repo,
         session_history_repo=session_history_repo,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        conversation_tracker=conversation_tracker,
     )
     app.state.outbound_handler = outbound_handler
 
@@ -453,6 +566,8 @@ async def lifespan(app: FastAPI):
         app_connectors=AppConnectorFactory().build_all(ingest_message_use_case=ingest_use_case),
         outbound_handler=outbound_handler,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        conversation_tracker=conversation_tracker,
+        quota_gate=quota_gate,
     )
 
     logger.info("switchboard.initialized")
@@ -475,6 +590,11 @@ async def lifespan(app: FastAPI):
             await voice_kafka_pub.stop()
             logger.info("kafka.voice_publisher.stopped")
 
+        conversation_events_pub = getattr(app.state, "conversation_events_kafka_publisher", None)
+        if conversation_events_pub:
+            await conversation_events_pub.stop()
+            logger.info("kafka.conversation_events_publisher.stopped")
+
     redis_client = getattr(app.state, "redis_client", None)
     if redis_client:
         await redis_client.aclose()
@@ -493,6 +613,10 @@ async def lifespan(app: FastAPI):
     email_sender = getattr(app.state, "email_sender", None)
     if email_sender:
         await email_sender.aclose()
+
+    clickhouse = getattr(app.state, "clickhouse", None)
+    if clickhouse:
+        await clickhouse.aclose()
 
     db_engine = getattr(app.state, "db_engine", None)
     if db_engine:

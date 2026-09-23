@@ -28,6 +28,7 @@ def test_policy_covers_every_resource_with_read_and_write():
     assert set(POLICY) == {
         "tenants", "projects", "agents", "workflows", "channel_connections",
         "channel_apps", "users", "langflow", "tenant_billing",
+        "conversations", "plans", "cost_rates", "billing",
     }
     for actions in POLICY.values():
         assert set(actions) == {"read", "write"}

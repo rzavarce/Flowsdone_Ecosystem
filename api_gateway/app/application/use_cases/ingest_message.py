@@ -43,6 +43,7 @@ class IngestMessageUseCase:
         channel: Optional[str] = None,
         channel_connection_id: Optional[str] = None,
         external_conversation_key: Optional[str] = None,
+        llm_session_id: Optional[str] = None,
     ) -> None:
         """Build and publish a MessageEnvelope with direction "inbound".
 
@@ -64,6 +65,9 @@ class IngestMessageUseCase:
             external_conversation_key (Optional[str]): Id of the
                 recipient on the external platform (remoteJid, psid,
                 chat_id, ...), if applicable.
+            llm_session_id (Optional[str]): Id Langflow should use as its
+                session_id (memory/tracing scope); defaults to
+                `conversation_id` downstream when omitted.
         """
         envelope = MessageEnvelope(
             meta=MessageMeta(
@@ -74,6 +78,7 @@ class IngestMessageUseCase:
                 workflow_id=workflow_id,
                 channel_connection_id=channel_connection_id,
                 external_conversation_key=external_conversation_key,
+                llm_session_id=llm_session_id,
             ),
             transport=transport,
             channel=channel or sender_id,

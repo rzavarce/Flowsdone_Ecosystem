@@ -6,8 +6,8 @@ to support the use cases under test — no real I/O, no framework.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Sequence
 from uuid import UUID, uuid4
 
 from app.domain.models.call_session import CallSession
@@ -15,6 +15,10 @@ from app.domain.models.channel_app import ChannelApp
 from app.domain.models.channel_connection import ChannelConnection
 from app.domain.models.tenant_billing_profile import TenantBillingProfile
 from app.domain.models.channel_resolution import ChannelResolution
+from app.domain.models.conversation import Conversation
+from app.domain.models.conversation_message import ConversationMessageRecorded
+from app.domain.models.usage import CostRate, UsageAggregate, UsageEvent
+from app.domain.models.billing import BillingStatement, Plan, TenantSubscription
 from app.domain.models.session import Session
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User, UserAvatar, UserCredentials
@@ -377,11 +381,30 @@ class FakeRedisClient:
         self.store: Dict[str, str] = {}
         self.ttls: Dict[str, int] = {}
         self.sets: Dict[str, set] = {}
+        self.hashes: Dict[str, Dict[str, str]] = {}
 
-    async def set(self, key: str, value: str, *, ex: Optional[int] = None) -> None:
+    async def hgetall(self, key: str) -> Dict[str, str]:
+        return dict(self.hashes.get(key, {}))
+
+    async def hsetnx(self, key: str, field: str, value: Any) -> int:
+        fields = self.hashes.setdefault(key, {})
+        if field in fields:
+            return 0
+        fields[field] = str(value)
+        return 1
+
+    async def hincrby(self, key: str, field: str, amount: int = 1) -> int:
+        fields = self.hashes.setdefault(key, {})
+        fields[field] = str(int(fields.get(field, "0")) + amount)
+        return int(fields[field])
+
+    async def set(self, key: str, value: str, *, ex: Optional[int] = None, nx: bool = False) -> Optional[bool]:
+        if nx and key in self.store:
+            return None
         self.store[key] = value
         if ex is not None:
             self.ttls[key] = ex
+        return True
 
     async def get(self, key: str) -> Optional[str]:
         return self.store.get(key)
@@ -396,7 +419,7 @@ class FakeRedisClient:
         self.sets.pop(key, None)
 
     async def expire(self, key: str, seconds: int) -> None:
-        if key in self.store or key in self.sets:
+        if key in self.store or key in self.sets or key in self.hashes:
             self.ttls[key] = seconds
 
     async def incr(self, key: str) -> int:
@@ -499,6 +522,365 @@ class FakeSessionHistoryRepository:
                 "reason": reason,
             }
         )
+
+
+def make_conversation(**overrides: Any) -> Conversation:
+    """Build an open Conversation with sane defaults, overridable per test."""
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        session_id=f"{uuid4()}:telegram:chat-1",
+        tenant_id=uuid4(),
+        project_id=uuid4(),
+        agent_id=uuid4(),
+        channel_type="telegram",
+        channel_connection_id=uuid4(),
+        contact="user-1",
+        started_at=now,
+        last_inbound_at=now,
+        last_message_at=now,
+    )
+    defaults.update(overrides)
+    return Conversation(**defaults)
+
+
+class FakeConversationRepository:
+    """In-memory stand-in for ConversationRepositoryPort, mirroring the
+    real one's "one open conversation per session" rule."""
+
+    def __init__(self, *conversations: Conversation, fail: bool = False) -> None:
+        self.conversations: Dict[UUID, Conversation] = {c.id: c for c in conversations}
+        self.recorded: List[Dict[str, Any]] = []
+        self.close_expired_calls: List[Dict[str, Any]] = []
+        self.expired_batches: List[List[Conversation]] = []
+        self.fail = fail
+
+    async def get(self, conversation_id: UUID) -> Optional[Conversation]:
+        if self.fail:
+            raise RuntimeError("database down")
+        return self.conversations.get(conversation_id)
+
+    async def open(self, conversation: Conversation) -> Conversation:
+        for existing in self.conversations.values():
+            if existing.session_id == conversation.session_id and existing.status == "open":
+                return existing
+        self.conversations[conversation.id] = conversation
+        return conversation
+
+    async def record_message(self, conversation_id: UUID, *, direction: str, at: datetime) -> None:
+        self.recorded.append({"conversation_id": conversation_id, "direction": direction, "at": at})
+
+    async def close(self, conversation_id: UUID, *, reason: str, closed_at: datetime) -> bool:
+        conversation = self.conversations.get(conversation_id)
+        if conversation is None or conversation.status != "open":
+            return False
+        self.conversations[conversation_id] = conversation.model_copy(
+            update={"status": "closed", "close_reason": reason, "closed_at": closed_at}
+        )
+        return True
+
+    async def list(
+        self,
+        *,
+        tenant_ids=None,
+        project_id=None,
+        channel_type=None,
+        status=None,
+        contact=None,
+        before=None,
+        limit: int = 50,
+    ) -> List[Conversation]:
+        self.list_calls = getattr(self, "list_calls", []) + [
+            {"tenant_ids": tenant_ids, "project_id": project_id, "channel_type": channel_type,
+             "status": status, "contact": contact, "before": before, "limit": limit}
+        ]
+        items = [
+            c for c in self.conversations.values()
+            if (tenant_ids is None or c.tenant_id in tenant_ids)
+            and (project_id is None or c.project_id == project_id)
+            and (channel_type is None or c.channel_type == channel_type)
+            and (status is None or c.status == status)
+            and (contact is None or contact.lower() in c.contact.lower())
+            and (before is None or c.last_message_at < before)
+        ]
+        return sorted(items, key=lambda c: c.last_message_at, reverse=True)[:limit]
+
+    async def close_expired(
+        self, *, now: datetime, inactivity: timedelta, max_duration: timedelta, limit: int
+    ) -> List[Conversation]:
+        self.close_expired_calls.append(
+            {"now": now, "inactivity": inactivity, "max_duration": max_duration, "limit": limit}
+        )
+        return self.expired_batches.pop(0) if self.expired_batches else []
+
+
+class FakeConversationEventPublisher:
+    """Records published conversation events."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.events: List[ConversationMessageRecorded] = []
+        self.fail = fail
+
+    async def publish_message_recorded(self, event: ConversationMessageRecorded) -> None:
+        if self.fail:
+            raise RuntimeError("kafka down")
+        self.events.append(event)
+
+
+class FakeMessageArchive:
+    """Records archived message batches."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.batches: List[Dict[str, Any]] = []
+        self.fail = fail
+
+    async def insert_messages(
+        self, events: Sequence[ConversationMessageRecorded], *, retention: timedelta
+    ) -> None:
+        if self.fail:
+            raise RuntimeError("clickhouse down")
+        self.batches.append({"events": list(events), "retention": retention})
+
+
+class FakeUsageStore:
+    """In-memory UsageStorePort: dedups by event_id like ReplacingMergeTree
+    and aggregates per day/meter like the real queries."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.events: Dict[UUID, UsageEvent] = {}
+        self.insert_calls = 0
+        self.fail = fail
+
+    async def insert_usage(self, events: Sequence[UsageEvent]) -> None:
+        if self.fail:
+            raise RuntimeError("clickhouse down")
+        self.insert_calls += 1
+        for event in events:
+            self.events[event.event_id] = event
+
+    def _aggregate(self, events) -> List[UsageAggregate]:
+        totals: Dict[tuple, Any] = {}
+        for e in events:
+            key = (e.timestamp.date(), e.tenant_id, e.kind, e.provider, e.channel_type, e.sku, e.unit)
+            totals[key] = totals.get(key, 0) + e.quantity
+        return [
+            UsageAggregate(day=k[0], tenant_id=k[1], kind=k[2], provider=k[3], channel_type=k[4], sku=k[5], unit=k[6], quantity=q)
+            for k, q in sorted(totals.items(), key=lambda kv: str(kv[0]))
+        ]
+
+    async def aggregate_daily(self, *, start: datetime, end: datetime, tenant_id: Optional[UUID] = None) -> List[UsageAggregate]:
+        return self._aggregate(
+            e for e in self.events.values()
+            if start <= e.timestamp < end and (tenant_id is None or e.tenant_id == tenant_id)
+        )
+
+    async def aggregate_conversation(self, *, tenant_id: UUID, conversation_id: UUID) -> List[UsageAggregate]:
+        return self._aggregate(
+            e for e in self.events.values() if e.tenant_id == tenant_id and e.conversation_id == conversation_id
+        )
+
+
+def make_cost_rate(**overrides: Any) -> CostRate:
+    """Build a CostRate with sane defaults, overridable per test."""
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        kind="llm",
+        provider="openai",
+        sku="gpt-4.1-mini*",
+        unit="input_token",
+        price_micros=400_000,
+        per_quantity=1_000_000,
+        valid_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    defaults.update(overrides)
+    return CostRate(**defaults)
+
+
+class FakeCostRateRepo:
+    """In-memory CostRateRepositoryPort."""
+
+    def __init__(self, *rates: CostRate) -> None:
+        self.rates: Dict[UUID, CostRate] = {r.id: r for r in rates}
+
+    async def list_all(self) -> List[CostRate]:
+        return sorted(self.rates.values(), key=lambda r: r.valid_from, reverse=True)
+
+    async def create(self, rate: CostRate) -> CostRate:
+        stored = rate.model_copy(update={"created_at": datetime.now(timezone.utc)})
+        self.rates[rate.id] = stored
+        return stored
+
+    async def delete(self, rate_id: UUID) -> bool:
+        return self.rates.pop(rate_id, None) is not None
+
+
+class FakeSyncCursors:
+    """In-memory SyncCursorRepositoryPort."""
+
+    def __init__(self, **positions: datetime) -> None:
+        self.positions: Dict[str, datetime] = dict(positions)
+
+    async def get(self, name: str) -> Optional[datetime]:
+        return self.positions.get(name)
+
+    async def set(self, name: str, position: datetime) -> None:
+        self.positions[name] = position
+
+
+class FakeLlmUsageSource:
+    """Returns canned generations and records the windows asked for."""
+
+    def __init__(self, generations: Optional[List[Any]] = None) -> None:
+        self.generations = generations or []
+        self.windows: List[tuple] = []
+
+    async def list_generations(self, *, start: datetime, end: datetime) -> List[Any]:
+        self.windows.append((start, end))
+        return [g for g in self.generations if start <= g.start_time < end]
+
+
+def make_plan(**overrides: Any) -> Plan:
+    """Build a Plan with sane defaults, overridable per test."""
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        code=f"plan-{uuid4().hex[:6]}",
+        name="Pro",
+        monthly_fee_micros=49_000_000,
+        included_messages={"whatsapp_evolution": 1000},
+        overage_price_micros={"whatsapp_evolution": 20_000},
+    )
+    defaults.update(overrides)
+    return Plan(**defaults)
+
+
+def make_subscription(**overrides: Any) -> TenantSubscription:
+    """Build a TenantSubscription with sane defaults, overridable per test."""
+    defaults: Dict[str, Any] = dict(
+        tenant_id=uuid4(), plan_id=uuid4(), started_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+    )
+    defaults.update(overrides)
+    return TenantSubscription(**defaults)
+
+
+class FakePlanRepo:
+    """In-memory PlanRepositoryPort."""
+
+    def __init__(self, *plans: Plan) -> None:
+        self.plans: Dict[UUID, Plan] = {p.id: p for p in plans}
+        self.get_calls = 0
+        self.subscriptions: Optional["FakeSubscriptionRepo"] = None
+
+    async def list_all(self) -> List[Plan]:
+        return list(self.plans.values())
+
+    async def get(self, plan_id: UUID) -> Optional[Plan]:
+        self.get_calls += 1
+        return self.plans.get(plan_id)
+
+    async def create(self, plan: Plan) -> Plan:
+        if any(p.code == plan.code for p in self.plans.values()):
+            raise AlreadyExistsError("duplicate code")
+        self.plans[plan.id] = plan
+        return plan
+
+    async def update(self, plan_id: UUID, **fields: Any) -> Optional[Plan]:
+        plan = self.plans.get(plan_id)
+        if plan is None:
+            return None
+        self.plans[plan_id] = plan.model_copy(update=fields)
+        return self.plans[plan_id]
+
+    async def delete(self, plan_id: UUID) -> bool:
+        from app.domain.ports.outbound import PlanInUseError
+
+        if self.subscriptions and any(s.plan_id == plan_id for s in self.subscriptions.items.values()):
+            raise PlanInUseError("in use")
+        return self.plans.pop(plan_id, None) is not None
+
+
+class FakeSubscriptionRepo:
+    """In-memory SubscriptionRepositoryPort."""
+
+    def __init__(self, *subscriptions: TenantSubscription) -> None:
+        self.items: Dict[UUID, TenantSubscription] = {s.tenant_id: s for s in subscriptions}
+        self.get_calls = 0
+
+    async def get(self, tenant_id: UUID) -> Optional[TenantSubscription]:
+        self.get_calls += 1
+        return self.items.get(tenant_id)
+
+    async def list_all(self) -> List[TenantSubscription]:
+        return list(self.items.values())
+
+    async def upsert(self, subscription: TenantSubscription) -> TenantSubscription:
+        self.items[subscription.tenant_id] = subscription
+        return subscription
+
+    async def delete(self, tenant_id: UUID) -> bool:
+        return self.items.pop(tenant_id, None) is not None
+
+
+class FakeStatementRepo:
+    """In-memory StatementRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.items: Dict[tuple, BillingStatement] = {}
+
+    async def get(self, tenant_id: UUID, period: str) -> Optional[BillingStatement]:
+        return self.items.get((tenant_id, period))
+
+    async def list_by_tenant(self, tenant_id: UUID) -> List[BillingStatement]:
+        return sorted((s for (t, _), s in self.items.items() if t == tenant_id), key=lambda s: s.period, reverse=True)
+
+    async def save_closed(self, statement: BillingStatement) -> bool:
+        key = (statement.tenant_id, statement.period)
+        if key in self.items:
+            return False
+        self.items[key] = statement
+        return True
+
+
+class FakeQuotaCounter:
+    """In-memory QuotaCounterPort."""
+
+    def __init__(self) -> None:
+        self.counters: Dict[tuple, Dict[str, int]] = {}
+        self.once: set = set()
+        self.seeded: List[Dict[str, int]] = []
+
+    async def get_all(self, tenant_id: UUID, period: str) -> Optional[Dict[str, int]]:
+        counts = self.counters.get((tenant_id, period))
+        return dict(counts) if counts is not None else None
+
+    async def seed(self, tenant_id: UUID, period: str, counts: Dict[str, int]) -> None:
+        self.seeded.append(dict(counts))
+        current = self.counters.setdefault((tenant_id, period), {})
+        for channel, count in counts.items():
+            current.setdefault(channel, count)
+
+    async def increment(self, tenant_id: UUID, period: str, channel_type: str, by: int = 1) -> int:
+        current = self.counters.setdefault((tenant_id, period), {})
+        current[channel_type] = current.get(channel_type, 0) + by
+        return current[channel_type]
+
+    async def first_time(self, key: str) -> bool:
+        if key in self.once:
+            return False
+        self.once.add(key)
+        return True
+
+
+class FakeQuotaNotifier:
+    """Records quota alerts."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.alerts: List[Dict[str, Any]] = []
+        self.fail = fail
+
+    async def notify(self, *, tenant_id: UUID, period: str, decision: Any, event: str) -> None:
+        if self.fail:
+            raise RuntimeError("smtp down")
+        self.alerts.append({"tenant_id": tenant_id, "period": period, "event": event, "decision": decision})
 
 
 class FakeAppConnector:

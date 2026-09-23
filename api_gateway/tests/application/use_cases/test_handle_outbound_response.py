@@ -294,3 +294,62 @@ async def test_deliver_noop_when_connection_not_found():
     await use_case.deliver(envelope)
 
     assert sender.sent == []
+
+
+# --- conversation tracking on delivery ----------------------------------
+
+
+def _tracked_outbound_use_case(session, *, publisher_fails: bool = False):
+    from datetime import timedelta
+
+    from app.application.services.conversation_tracker import ConversationTracker
+    from app.domain.models.conversation import ConversationLifecyclePolicy
+    from api_gateway.tests.support.fakes import (
+        FakeConversationEventPublisher,
+        FakeConversationRepository,
+        make_conversation,
+    )
+
+    connection = make_channel_connection(channel_type="telegram")
+    conversation = make_conversation(session_id=session.id)
+    session.conversation_id = conversation.id
+    events = FakeConversationEventPublisher(fail=publisher_fails)
+    tracker = ConversationTracker(
+        conversation_repo=FakeConversationRepository(conversation),
+        event_publisher=events,
+        session_history_repo=FakeSessionHistoryRepository(),
+        policy=ConversationLifecyclePolicy(inactivity=timedelta(hours=24), max_duration=timedelta(days=7)),
+    )
+    sender = FakeChannelSender()
+    use_case = HandleOutboundResponseUseCase(
+        channel_connection_repo=FakeChannelConnectionRepo(connection=connection),
+        channel_senders={"telegram": sender},
+        session_repo=FakeSessionRepository(session=session),
+        session_history_repo=FakeSessionHistoryRepository(),
+        conversation_tracker=tracker,
+    )
+    envelope = _envelope(channel_connection_id=str(connection.id))
+    envelope.channel = "telegram"
+    envelope.payload["message"] = "respuesta"
+    return use_case, envelope, events, conversation, sender
+
+
+async def test_deliver_records_the_outbound_message_in_the_current_conversation():
+    session = make_session(id="conv-1", current_app="langflow")
+    use_case, envelope, events, conversation, _ = _tracked_outbound_use_case(session)
+
+    await use_case.deliver(envelope)
+
+    [event] = events.events
+    assert event.conversation_id == conversation.id
+    assert event.direction == "outbound"
+    assert event.text == "respuesta"
+
+
+async def test_deliver_never_raises_when_conversation_recording_fails():
+    session = make_session(id="conv-1")
+    use_case, envelope, _, _, sender = _tracked_outbound_use_case(session, publisher_fails=True)
+
+    await use_case.deliver(envelope)
+
+    assert len(sender.sent) == 1

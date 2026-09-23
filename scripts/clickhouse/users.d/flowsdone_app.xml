@@ -1,0 +1,23 @@
+<!--
+  Usuario de la plataforma para el archivo de conversaciones (base "flowsdone").
+  Se define aquí y no con CREATE USER porque el usuario admin del contenedor
+  (CLICKHOUSE_USER) no tiene access_management. La contraseña sale de la
+  variable CLICKHOUSE_APP_PASSWORD del contenedor, que docker-compose exige
+  (no arranca si falta, así nunca queda un usuario sin contraseña).
+  Solo lectura/escritura sobre flowsdone.*: nada de las tablas de Langfuse.
+-->
+<clickhouse>
+  <users>
+    <flowsdone_app>
+      <password from_env="CLICKHOUSE_APP_PASSWORD"/>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <grants>
+        <query>GRANT SELECT, INSERT, ALTER DELETE ON flowsdone.*</query>
+      </grants>
+    </flowsdone_app>
+  </users>
+</clickhouse>

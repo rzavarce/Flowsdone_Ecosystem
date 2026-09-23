@@ -23,7 +23,7 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Usuarios', 'Agentes', 'Ajustes']],
+    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Usuarios', 'Agentes', 'Planes', 'Ajustes']],
     ['tenant_manager', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
     ['botmaster', ['Conversaciones', 'Canales', 'Agentes', 'Ajustes']],
     ['client', ['Dashboard', 'Mi empresa', 'Ajustes']],

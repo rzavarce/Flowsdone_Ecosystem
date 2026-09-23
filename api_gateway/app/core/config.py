@@ -51,6 +51,37 @@ class Settings(BaseModel):
     # unlike a phone call.
     SESSION_TTL_SECONDS: int = 86400
 
+    # Conversations (see domain/models/conversation.py): a conversation
+    # ends after CONVERSATION_INACTIVITY_SECONDS without a message from
+    # the contact (WhatsApp-style 24h window) or CONVERSATION_MAX_DURATION_SECONDS
+    # after it started, whichever comes first. The conversations worker
+    # closes idle ones every CONVERSATION_SWEEP_INTERVAL_SECONDS.
+    CONVERSATION_INACTIVITY_SECONDS: int = 86400
+    CONVERSATION_MAX_DURATION_SECONDS: int = 604800
+    CONVERSATION_SWEEP_INTERVAL_SECONDS: int = 300
+    # Every recorded message is published here (keyed by conversation
+    # id) and archived into ClickHouse by the conversations worker.
+    CONVERSATION_EVENTS_TOPIC: str = "conversation.events"
+    CONVERSATION_EVENTS_TOPIC_PARTITIONS: int = 6
+    # How long message bodies are kept in the archive (~6 months).
+    MESSAGE_RETENTION_DAYS: int = 183
+
+    # ClickHouse (conversation archive). The app uses its own user,
+    # limited to CLICKHOUSE_DATABASE - never the admin user Langfuse
+    # also uses (see scripts/clickhouse/init-clickhouse.sh).
+    CLICKHOUSE_URL: str = "http://clickhouse:8123"
+    CLICKHOUSE_DATABASE: str = "flowsdone"
+    CLICKHOUSE_APP_USER: str = "flowsdone_app"
+    CLICKHOUSE_APP_PASSWORD: Optional[str] = None
+
+    # LLM token usage is imported from Langfuse (the same project Langflow
+    # traces into) by the usage worker every LLM_USAGE_SYNC_INTERVAL_SECONDS.
+    # Without keys the sync is skipped (logged), nothing else breaks.
+    LANGFUSE_BASE_URL: str = "http://langfuse-web:3000"
+    LANGFUSE_PUBLIC_KEY: Optional[str] = None
+    LANGFUSE_SECRET_KEY: Optional[str] = None
+    LLM_USAGE_SYNC_INTERVAL_SECONDS: int = 300
+
     # RabbitMQ
     ENABLE_RABBITMQ: bool = False
     RABBITMQ_URL: Optional[str] = None
@@ -217,6 +248,23 @@ settings = Settings(
     REDIS_PASSWORD=os.getenv("REDIS_PASSWORD"),
     CALL_SESSION_TTL_SECONDS=int(os.getenv("CALL_SESSION_TTL_SECONDS", "7200")),
     SESSION_TTL_SECONDS=int(os.getenv("SESSION_TTL_SECONDS", "86400")),
+
+    CONVERSATION_INACTIVITY_SECONDS=int(os.getenv("CONVERSATION_INACTIVITY_SECONDS", "86400")),
+    CONVERSATION_MAX_DURATION_SECONDS=int(os.getenv("CONVERSATION_MAX_DURATION_SECONDS", "604800")),
+    CONVERSATION_SWEEP_INTERVAL_SECONDS=int(os.getenv("CONVERSATION_SWEEP_INTERVAL_SECONDS", "300")),
+    CONVERSATION_EVENTS_TOPIC=os.getenv("CONVERSATION_EVENTS_TOPIC", "conversation.events"),
+    CONVERSATION_EVENTS_TOPIC_PARTITIONS=int(os.getenv("CONVERSATION_EVENTS_TOPIC_PARTITIONS", "6")),
+    MESSAGE_RETENTION_DAYS=int(os.getenv("MESSAGE_RETENTION_DAYS", "183")),
+
+    CLICKHOUSE_URL=os.getenv("CLICKHOUSE_URL", "http://clickhouse:8123"),
+    CLICKHOUSE_DATABASE=os.getenv("CLICKHOUSE_DATABASE", "flowsdone"),
+    CLICKHOUSE_APP_USER=os.getenv("CLICKHOUSE_APP_USER", "flowsdone_app"),
+    CLICKHOUSE_APP_PASSWORD=os.getenv("CLICKHOUSE_APP_PASSWORD"),
+
+    LANGFUSE_BASE_URL=os.getenv("LANGFUSE_BASE_URL", "http://langfuse-web:3000"),
+    LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY") or None,
+    LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY") or None,
+    LLM_USAGE_SYNC_INTERVAL_SECONDS=int(os.getenv("LLM_USAGE_SYNC_INTERVAL_SECONDS", "300")),
 
     ENABLE_RABBITMQ=_bool(os.getenv("ENABLE_RABBITMQ"), False),
     RABBITMQ_URL=os.getenv("RABBITMQ_URL"),

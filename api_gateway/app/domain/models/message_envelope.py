@@ -26,6 +26,11 @@ class MessageMeta(BaseModel):
         external_conversation_key (Optional[str]): Id of the recipient
             on the external platform (remoteJid, psid, chat_id, etc.),
             if applicable.
+        llm_session_id (Optional[str]): Id Langflow uses as its
+            session_id (conversation memory, and the Langfuse session
+            its traces are grouped under) - the Conversation id for
+            channels going through Switchboard. Falls back to
+            `conversation_id` when unset (webchat, older producers).
     """
 
     message_id: str
@@ -35,6 +40,15 @@ class MessageMeta(BaseModel):
     workflow_id: Optional[str] = None
     channel_connection_id: Optional[str] = None
     external_conversation_key: Optional[str] = None
+    llm_session_id: Optional[str] = None
+
+    def effective_llm_session_id(self) -> Optional[str]:
+        """Return the id to use as Langflow's session_id.
+
+        Returns:
+            Optional[str]: `llm_session_id` if set, else `conversation_id`.
+        """
+        return self.llm_session_id or self.conversation_id
 
 
 class MessageEnvelope(BaseModel):

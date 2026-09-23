@@ -262,9 +262,15 @@ services:
     image: ${CLICKHOUSE_IMAGE}
     container_name: ${CONTAINER_PREFIX}_clickhouse
     env_file: .env
+    environment:
+      # Contraseña del usuario de la plataforma (users.d/flowsdone_app.xml la
+      # lee de aquí). Obligatoria: sin ella el usuario quedaría sin contraseña,
+      # así que docker compose se niega a arrancar.
+      CLICKHOUSE_APP_PASSWORD: ${CLICKHOUSE_APP_PASSWORD:?Falta CLICKHOUSE_APP_PASSWORD en .env (openssl rand -hex 24)}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
+      - ./scripts/clickhouse/users.d/flowsdone_app.xml:/etc/clickhouse-server/users.d/flowsdone_app.xml:ro
     ports:
       - "${CLICKHOUSE_HTTP_PORT}:8123"
       - "${CLICKHOUSE_TCP_PORT}:9000"
@@ -711,6 +717,74 @@ services:
       - flowsdone-net
     mem_limit: ${KAFKA_VOICE_WORKER_MEM_LIMIT}
     cpus: ${KAFKA_VOICE_WORKER_CPUS}
+
+  # Conversations: archives every recorded message (topic
+  # conversation.events) into ClickHouse and closes conversations idle
+  # past CONVERSATION_INACTIVITY_SECONDS. ClickHouse's database/user/
+  # tables are created by scripts/clickhouse/init-clickhouse.sh (run by
+  # the deploy, before this worker starts).
+  kafka_conversations_worker:
+    <<: *common
+    build:
+      context: .
+      dockerfile: dockers/Dockerfile.worker
+    command: python -m workers.kafka.conversations.main
+    env_file: .env
+    environment:
+      OTEL_ENABLED: ${OTEL_ENABLED}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: fd-kafka-conversations-worker
+      CLICKHOUSE_URL: http://clickhouse:8123
+    healthcheck:
+      # The worker touches this file every 30s while its event loop runs.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/conversations-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - flowsdone-net
+    mem_limit: ${KAFKA_CONVERSATIONS_WORKER_MEM_LIMIT:-256m}
+    cpus: ${KAFKA_CONVERSATIONS_WORKER_CPUS:-0.5}
+
+  # Usage/billing periodic jobs: imports LLM token usage from Langfuse
+  # into ClickHouse (attributed per conversation/tenant) and closes the
+  # monthly usage statements. Stateless and idempotent - one replica.
+  usage_worker:
+    <<: *common
+    build:
+      context: .
+      dockerfile: dockers/Dockerfile.worker
+    command: python -m workers.usage.main
+    env_file: .env
+    environment:
+      OTEL_ENABLED: ${OTEL_ENABLED}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: fd-usage-worker
+      CLICKHOUSE_URL: http://clickhouse:8123
+    healthcheck:
+      # The worker touches this file every 30s while its event loop runs.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/usage-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - flowsdone-net
+    mem_limit: ${USAGE_WORKER_MEM_LIMIT:-256m}
+    cpus: ${USAGE_WORKER_CPUS:-0.25}
 
   # ------------------------------------------------------------------
   # WORKERS — RABBITMQ
