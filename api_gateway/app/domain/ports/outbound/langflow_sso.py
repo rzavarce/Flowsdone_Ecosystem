@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 from uuid import UUID
 
 from app.domain.models.langflow_account import LangflowAccount
@@ -24,6 +24,23 @@ class LangflowTokens:
 
     access_token: str
     refresh_token: str
+
+
+@dataclass(frozen=True)
+class LangflowFlowSummary:
+    """A flow as listed in a Langflow folder.
+
+    Attributes:
+        id (str): Flow id (what an agent's `langflow_flow_id` points to).
+        name (str): Flow name.
+        description (Optional[str]): Flow description.
+        updated_at (Optional[str]): Last change, ISO-8601 as Langflow sends it.
+    """
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 class LangflowAccountRepositoryPort(Protocol):
@@ -144,6 +161,22 @@ class LangflowAdminPort(Protocol):
 
         Returns:
             str: The new folder id.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
+
+    async def list_flows(self, access_token: str, folder_id: str) -> List[LangflowFlowSummary]:
+        """Flows (not components) in one of the logged-in user's folders.
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): The folder.
+
+        Returns:
+            List[LangflowFlowSummary]: The flows, by name.
 
         Raises:
             LangflowSessionError: If Langflow rejects the request.

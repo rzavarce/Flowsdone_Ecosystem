@@ -93,6 +93,7 @@ from app.domain.ports.outbound.email import EmailSendError, EmailSenderPort  # n
 from app.domain.ports.outbound.langflow_sso import (  # noqa: F401
     LangflowAccountRepositoryPort,
     LangflowAdminPort,
+    LangflowFlowSummary,
     LangflowSessionError,
     LangflowTokens,
     SsoTicketStorePort,

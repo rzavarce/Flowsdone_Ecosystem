@@ -12,6 +12,8 @@ const api = (over: Partial<AdminApi> = {}): AdminApi => ({ ...createMockAdminApi
 const LANGFLOW_URL = 'https://agents.example.test/langflow-sso?ticket=abc'
 const selectTenant = (id: string) => userEvent.selectOptions(screen.getByRole('combobox', { name: 'Tenant activo' }), id)
 const session = (url = LANGFLOW_URL) => vi.fn().mockResolvedValue({ url })
+/** The editor lives in its own tab (the "Agents" list opens first). */
+const toEditor = async () => userEvent.click(await screen.findByRole('tab', { name: 'Editor de Langflow' }))
 
 async function open(role: Role, adminApi: AdminApi = api()) {
   renderApp('/agents', fakeAuthApi(makeUser(role)), adminApi)
@@ -27,6 +29,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
       const createLangflowSession = session()
       await open(role, api({ createLangflowSession }))
       await selectTenant('t1')
+      await toEditor()
       expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
       expect(createLangflowSession).toHaveBeenCalledWith('t1', undefined)
     },
@@ -35,6 +38,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
   it('botmaster (un solo tenant asignado): se auto-selecciona, sin selector que elegir', async () => {
     const createLangflowSession = session()
     await open('botmaster', api({ createLangflowSession }))
+    await toEditor()
     expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
     expect(createLangflowSession).toHaveBeenCalledWith('t1', undefined)
     expect(screen.queryByRole('combobox', { name: 'Tenant activo' })).not.toBeInTheDocument()
@@ -43,6 +47,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
   it('el botón de pantalla completa entra y sale, y cambia de icono y de etiqueta', async () => {
     await open('admin', api({ createLangflowSession: session() }))
     await selectTenant('t1')
+    await toEditor()
     await screen.findByTitle('Editor de agentes (Langflow)')
     const container = screen.getByTitle('Editor de agentes (Langflow)').parentElement as HTMLElement
 
@@ -71,6 +76,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
       .mockResolvedValueOnce({ url: 'https://agents.example.test/langflow-sso?ticket=dos' })
     await open('admin', api({ createLangflowSession }))
     await selectTenant('t1')
+    await toEditor()
     expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', expect.stringContaining('ticket=uno'))
     await selectTenant('t2')
     await waitFor(() =>
@@ -83,6 +89,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
     const createLangflowSession = vi.fn().mockRejectedValueOnce(new ApiError(502, 'langflow unavailable')).mockResolvedValue({ url: LANGFLOW_URL })
     await open('admin', api({ createLangflowSession }))
     await selectTenant('t1')
+    await toEditor()
     expect(await screen.findByText(/No se pudo abrir Langflow: langflow unavailable/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     expect(await screen.findByTitle('Editor de agentes (Langflow)')).toBeInTheDocument()
@@ -91,6 +98,7 @@ describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)
   it('sin Langflow real (modo maqueta) muestra el lienzo de ejemplo', async () => {
     await open('admin')
     await selectTenant('t1')
+    await toEditor()
     expect(await screen.findByText(/se embeberá Langflow/)).toBeInTheDocument()
   })
 })

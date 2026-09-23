@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/core/auth/useAuth'
 import type {
   ChannelAppProvider,
+  CreateAgentInput,
+  UpdateAgentInput,
   CreateChannelConnectionInput,
   CreateProjectInput,
   CreateTenantInput,
@@ -24,6 +26,7 @@ export const adminKeys = {
   apps: ['channel-apps'] as const,
   users: ['users'] as const,
   langflowSession: ['langflow-session'] as const,
+  langflowFlows: ['langflow-flows'] as const,
 }
 
 /** Visible tenants with all of their data (slug, status…). */
@@ -184,6 +187,45 @@ export function useDeleteProject() {
 export function useAgents() {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.agents, queryFn: () => api.listAgents() })
+}
+
+/** Flows in a project's Langflow folder, each with the agent registered for it (if any). */
+export function useProjectFlows(projectId?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.langflowFlows, projectId],
+    queryFn: () => api.listLangflowFlows(projectId as string),
+    enabled: Boolean(projectId),
+  })
+}
+
+/** Refreshes agents and the flows' "already registered" marks after a change. */
+function invalidateAgents(qc: ReturnType<typeof useQueryClient>) {
+  return Promise.all([adminKeys.agents, adminKeys.langflowFlows].map((queryKey) => qc.invalidateQueries({ queryKey })))
+}
+
+/** Registers a flow of a project's Langflow folder as an agent. */
+export function useCreateAgent() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (input: CreateAgentInput) => api.createAgent(input), onSuccess: () => invalidateAgents(qc) })
+}
+
+/** Edits, suspends/reactivates or makes an agent the project's default one. */
+export function useUpdateAgent() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateAgentInput }) => api.updateAgent(id, patch),
+    onSuccess: () => invalidateAgents(qc),
+  })
+}
+
+/** Deletes an agent with no channels connected. */
+export function useDeleteAgent() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (id: string) => api.deleteAgent(id), onSuccess: () => invalidateAgents(qc) })
 }
 
 /** Channel connections visible to the current profile. */

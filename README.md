@@ -377,6 +377,23 @@ curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
 
 Filtros disponibles: `GET /internal/admin/projects?tenant_id=...`, `GET /internal/admin/agents?project_id=...`, `GET /internal/admin/workflows?project_id=...`, `GET /internal/admin/channel-connections?project_id=...`.
 
+### Registrar agentes desde la consola (PWA → Agentes)
+
+El flujo de trabajo normal no necesita curl:
+
+1. **Pestaña *Editor de Langflow*:** importa (o crea) el flujo **dentro de la carpeta del proyecto**. Cada tenant tiene su usuario de Langflow y una carpeta por proyecto.
+2. **Pestaña *Agentes* → *Registrar agente*:** eliges el proyecto y el flujo de una lista con los flujos de esa carpeta (`GET /internal/admin/langflow/flows?project_id=`). Los que ya están registrados aparecen deshabilitados.
+
+**Reglas** (en `ManageAgentsUseCase`):
+
+| Regla | Detalle |
+|---|---|
+| El flujo tiene que estar en la carpeta del proyecto | Solo para usuarios de la consola. Si no está, responde `400`. Así nadie apunta un agente a un flujo de otro tenant, ni a un `flow_id` inexistente que fallaría en cada mensaje. Las llamadas con `X-Admin-Api-Key` (scripts, el agente de onboarding de la sección 21) pueden registrar cualquier `flow_id`, como antes |
+| Un solo agente predeterminado por proyecto | El primer agente de un proyecto siempre es el predeterminado |
+| No se borra un agente con canales conectados | Responde `409`. Hay que mover los canales a otro agente o borrarlos antes. Antes daba un `500` por la clave foránea `RESTRICT` |
+| Suspender un agente (`status: suspended`) | Sus canales dejan de responder, porque el enrutado solo atiende agentes `active` |
+
+
 ---
 
 ## 9. Webhooks por canal

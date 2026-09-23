@@ -34,6 +34,7 @@ from app.application.use_cases.billing import (
     PlanPricingInsightUseCase,
 )
 from app.application.use_cases.conversation_queries import GetConversationDetailUseCase
+from app.application.use_cases.manage_agents import ManageAgentsUseCase, ProjectFlow
 from api_gateway.tests.support.fakes import (
     FakeAccountTokenStore,
     FakeConversationRepository,
@@ -191,6 +192,11 @@ class World:
         self.plans.subscriptions = self.subscriptions
         self.statements = FakeStatementRepo()
         self.quota_gate = QuotaGate(subscriptions=self.subscriptions, plans=self.plans, counters=FakeQuotaCounter())
+        # Flows in each project's Langflow folder (what the console may register as agents).
+        self.langflow_flows: Dict[UUID, List[str]] = {
+            self.project_a.id: ["f", "fa", "f2"],
+            self.project_b.id: ["f", "fb"],
+        }
 
     @classmethod
     def build(cls) -> "World":
@@ -232,6 +238,25 @@ class World:
                 tenant_repo=self.tenants, user_repo=self.users, provision_user=provision_user
             ),
             **self.billing_state(),
+            **self.agents_state(),
+        )
+
+    def agents_state(self) -> Dict[str, Any]:
+        """`app.state` entries for the agents and Langflow flows endpoints."""
+        world = self
+
+        class _Flows:
+            async def execute(self, project_id):
+                agents = {a.langflow_flow_id: a.id for a in await world.agents.list_by_project(project_id)}
+                return [ProjectFlow(id=f, name=f.upper(), description=None, agent_id=agents.get(f))
+                        for f in world.langflow_flows.get(project_id, [])]
+
+        flows = _Flows()
+        return dict(
+            list_project_flows_use_case=flows,
+            manage_agents_use_case=ManageAgentsUseCase(
+                agent_repo=self.agents, channel_connection_repo=self.connections, flows=flows
+            ),
         )
 
     def billing_state(self) -> Dict[str, Any]:

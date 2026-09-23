@@ -3,7 +3,10 @@ import type {
   ChannelApp,
   ChannelAppProvider,
   ChannelConnection,
+  CreateAgentInput,
   CreateChannelConnectionInput,
+  LangflowFlow,
+  UpdateAgentInput,
   CreateProjectInput,
   CreateTenantInput,
   CreateUserInput,
@@ -64,6 +67,16 @@ export interface AdminApi {
 
   /** Visible agents, optionally scoped to a project. */
   listAgents(projectId?: string): Promise<Agent[]>
+  /**
+   * Registers a flow of the project's Langflow folder as an agent. Fails with
+   * 400 if the flow is not in that folder, 409 if the name is taken.
+   */
+  createAgent(input: CreateAgentInput): Promise<Agent>
+  updateAgent(id: string, patch: UpdateAgentInput): Promise<Agent>
+  /** Fails with 409 while channels are still connected to it. */
+  deleteAgent(id: string): Promise<void>
+  /** Flows in a project's Langflow folder (provisions the tenant's Langflow if needed). */
+  listLangflowFlows(projectId: string): Promise<LangflowFlow[]>
 
   /** Visible channel connections, optionally scoped to a project. */
   listChannelConnections(projectId?: string): Promise<ChannelConnection[]>

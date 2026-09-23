@@ -3,6 +3,7 @@ import type { AdminApi } from './AdminApi'
 import { createMockBilling } from './mockBilling'
 import type {
   Agent,
+  LangflowFlow,
   ChannelApp,
   ChannelAppProvider,
   ChannelConnection,
@@ -107,6 +108,35 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     created_at: NOW,
     updated_at: NOW,
   })
+
+  /**
+   * Flows in each project's Langflow folder: the ones its agents run, plus
+   * two not registered yet (as if just imported in the editor).
+   */
+  const extraFlows = new Map<string, { id: string; name: string }[]>()
+  const flowsOf = (projectId: string): LangflowFlow[] => {
+    if (!extraFlows.has(projectId)) {
+      extraFlows.set(projectId, [
+        { id: `${projectId}-flow-asistente`, name: 'Asistente de ventas' },
+        { id: `${projectId}-flow-faq`, name: 'Preguntas frecuentes' },
+      ])
+    }
+    const own = agents
+      .filter((a) => a.project_id === projectId)
+      .map((a) => ({ id: a.langflow_flow_id, name: `Flujo de ${a.name}` }))
+    const byId = new Map([...own, ...extraFlows.get(projectId)!].map((f) => [f.id, f]))
+    return [...byId.values()]
+      .map((f) => ({
+        ...f,
+        description: null,
+        agent_id: agents.find((a) => a.project_id === projectId && a.langflow_flow_id === f.id)?.id ?? null,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+  /** Like the gateway: at most one default agent per project. */
+  const makeOnlyDefault = (agent: Agent) => {
+    for (const other of agents) if (other.project_id === agent.project_id && other.id !== agent.id) other.is_default = false
+  }
 
   const need = <T>(item: T | undefined, what: string): T => {
     if (!item) throw new ApiError(404, `${what} not found`)
@@ -218,6 +248,51 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     async listAgents(projectId) {
       await wait(latencyMs)
       return clone(agents.filter((a) => !projectId || a.project_id === projectId))
+    },
+    async createAgent(input) {
+      await wait(latencyMs)
+      need(projects.find((p) => p.id === input.project_id), 'project')
+      if (!flowsOf(input.project_id).some((f) => f.id === input.langflow_flow_id)) {
+        throw new ApiError(400, "flow not found in the project's Langflow folder")
+      }
+      if (agents.some((a) => a.project_id === input.project_id && a.name === input.name)) throw new ApiError(409, 'already exists')
+      const first = !agents.some((a) => a.project_id === input.project_id)
+      const agent: Agent = {
+        id: `a-${++seq}`,
+        project_id: input.project_id,
+        name: input.name,
+        langflow_flow_id: input.langflow_flow_id,
+        is_default: first || Boolean(input.is_default),
+        status: 'active',
+      }
+      agents.push(agent)
+      if (agent.is_default) makeOnlyDefault(agent)
+      return clone(agent)
+    },
+    async updateAgent(id, patch) {
+      await wait(latencyMs)
+      const agent = need(agents.find((a) => a.id === id), 'agent')
+      if (patch.langflow_flow_id && patch.langflow_flow_id !== agent.langflow_flow_id &&
+          !flowsOf(agent.project_id).some((f) => f.id === patch.langflow_flow_id)) {
+        throw new ApiError(400, "flow not found in the project's Langflow folder")
+      }
+      if (patch.name && agents.some((a) => a.id !== id && a.project_id === agent.project_id && a.name === patch.name)) {
+        throw new ApiError(409, 'already exists')
+      }
+      Object.assign(agent, patch)
+      if (patch.is_default) makeOnlyDefault(agent)
+      return clone(agent)
+    },
+    async deleteAgent(id) {
+      await wait(latencyMs)
+      need(agents.find((a) => a.id === id), 'agent')
+      if (connections.some((c) => c.agent_id === id)) throw new ApiError(409, 'agent has channels')
+      removeWhere(agents, (a) => a.id !== id)
+    },
+    async listLangflowFlows(projectId) {
+      await wait(latencyMs)
+      need(projects.find((p) => p.id === projectId), 'project')
+      return clone(flowsOf(projectId))
     },
 
     async listChannelConnections(projectId) {

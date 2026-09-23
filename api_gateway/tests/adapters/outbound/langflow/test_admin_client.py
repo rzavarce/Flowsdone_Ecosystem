@@ -115,3 +115,44 @@ async def test_list_and_create_projects_use_the_users_own_token():
     assert await client.create_project("tok", "Soporte") == "f2"
     assert all(r.headers["authorization"] == "Bearer tok" for r in seen)
     assert all("x-api-key" not in r.headers for r in seen)
+
+
+async def test_list_flows_keeps_only_flows_of_that_folder_by_name():
+    import httpx
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["params"] = dict(request.url.params)
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(200, json=[
+            {"id": "b", "name": "beta", "folder_id": "F1", "is_component": False},
+            {"id": "a", "name": "Alpha", "folder_id": "F1", "is_component": False, "description": "d"},
+            {"id": "c", "name": "Componente", "folder_id": "F1", "is_component": True},
+            {"id": "x", "name": "Otra carpeta", "folder_id": "F2", "is_component": False},
+        ])
+
+    client = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(handler)))
+
+    flows = await client.list_flows("tok", "F1")
+
+    assert [(f.id, f.name) for f in flows] == [("a", "Alpha"), ("b", "beta")]
+    assert flows[0].description == "d"
+    assert seen["params"]["folder_id"] == "F1" and seen["params"]["header_flows"] == "true"
+    assert seen["auth"] == "Bearer tok"
+
+
+async def test_list_flows_rejected():
+    import httpx
+    import pytest
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+    from app.domain.ports.outbound import LangflowSessionError
+
+    client = LangflowAdminClient(
+        httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(lambda r: httpx.Response(403)))
+    )
+    with pytest.raises(LangflowSessionError):
+        await client.list_flows("tok", "F1")

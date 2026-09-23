@@ -583,3 +583,21 @@ class LangflowSessionOut(BaseModel):
     """
 
     url: str
+
+
+class LangflowFlowOut(BaseModel):
+    """A flow in a project's Langflow folder (GET /langflow/flows).
+
+    Attributes:
+        id (str): Langflow flow id.
+        name (str): Flow name.
+        description (Optional[str]): Flow description.
+        agent_id (Optional[UUID]): The agent already registered for it in
+            the project, if any.
+    """
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    agent_id: Optional[UUID] = None
+
