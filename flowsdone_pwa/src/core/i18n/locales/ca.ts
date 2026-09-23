@@ -557,6 +557,14 @@ export const ca: Messages<typeof es> = {
   tenants: {
     new: 'Tenant nou',
     search: 'Cercar tenant',
+    clientAccount: {
+      title: 'Compte del client',
+      description: "Accés del client a la consola: els seus panells, el seu consum i les dades de la seva empresa.",
+      loading: 'Carregant el compte del client',
+      none: 'Aquest tenant no té compte de client.',
+      lastLogin: 'Darrer accés: {{date}}',
+      neverLogged: 'Encara no ha entrat a la consola.',
+    },
     searchPlaceholder: 'Nom o identificador',
     noMatches: 'Cap tenant coincideix amb la cerca.',
     descriptionAll: 'Organitzacions clients i els seus projectes.',
@@ -756,7 +764,7 @@ export const ca: Messages<typeof es> = {
       status: 'Estat',
       allStatuses: 'Tots els estats',
     },
-    scopedTo: 'Usuaris de {{name}}. Tria "Tots els tenants" a dalt per veure també els administradors.',
+    scopedTo: 'Usuaris de {{name}}. Tria "Tots els tenants" a dalt per veure també els administradors. El compte del client és a la fitxa del tenant, a Tenants.',
     noMatches: { title: 'Cap usuari coincideix', description: 'Prova amb un altre nom, rol o estat, o amb un altre tenant.' },
     description: 'Administradors, gestors de tenant, botmasters i consultors de la plataforma.',
     loading: 'Carregant els usuaris',

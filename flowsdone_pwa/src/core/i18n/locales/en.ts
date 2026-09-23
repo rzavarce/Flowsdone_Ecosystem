@@ -557,6 +557,14 @@ export const en: Messages<typeof es> = {
   tenants: {
     new: 'New tenant',
     search: 'Search tenants',
+    clientAccount: {
+      title: 'Client account',
+      description: 'The client\'s console access: their dashboards, usage and company data.',
+      loading: 'Loading the client account',
+      none: 'This tenant has no client account.',
+      lastLogin: 'Last login: {{date}}',
+      neverLogged: 'Has not signed in to the console yet.',
+    },
     searchPlaceholder: 'Name or identifier',
     noMatches: 'No tenant matches the search.',
     descriptionAll: 'Client organizations and their projects.',
@@ -756,7 +764,7 @@ export const en: Messages<typeof es> = {
       status: 'Status',
       allStatuses: 'All statuses',
     },
-    scopedTo: 'Users of {{name}}. Pick "All tenants" at the top to also see administrators.',
+    scopedTo: 'Users of {{name}}. Pick "All tenants" at the top to also see administrators. The client account is in the tenant\'s detail, under Tenants.',
     noMatches: { title: 'No users match', description: 'Try another name, role or status, or another tenant.' },
     description: 'Platform administrators, tenant managers, botmasters and consultants.',
     loading: 'Loading users',

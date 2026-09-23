@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { useOnboarding } from '@/core/admin/hooks'
 import { describeError } from '@/core/http/describeError'
 import { OnboardingChecklist } from './OnboardingChecklist'
+import { ResendClientActivation } from './ResendClientActivation'
 import { useTranslation } from 'react-i18next'
 
 /**
@@ -41,7 +42,10 @@ export function OnboardingCard({ tenantId, canResume }: { tenantId: string; canR
         ) : status.isError ? (
           <Alert tone="danger">{describeError(status.error)}</Alert>
         ) : (
-          <OnboardingChecklist checks={status.data.checks} />
+          <OnboardingChecklist
+            checks={status.data.checks}
+            actions={canResume ? { client_account: <ResendClientActivation tenantId={tenantId} /> } : {}}
+          />
         )}
       </div>
     </Card>

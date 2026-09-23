@@ -14,6 +14,7 @@ import { AgentStep } from './AgentStep'
 import { CompanyStep } from './CompanyStep'
 import { OnboardingChecklist } from './OnboardingChecklist'
 import { PlanStep } from './PlanStep'
+import { ResendClientActivation } from './ResendClientActivation'
 import { ProjectStep } from './ProjectStep'
 import { StepFrame } from './StepFrame'
 import { useTranslation } from 'react-i18next'
@@ -140,7 +141,7 @@ export function OnboardingPage() {
           ) : status.isError ? (
             <Alert tone="danger">{describeError(status.error)}</Alert>
           ) : (
-            <OnboardingChecklist checks={status.data.checks} />
+            <OnboardingChecklist checks={status.data.checks} actions={{ client_account: <ResendClientActivation tenantId={tenantId} /> }} />
           )}
         </StepFrame>
       )}
