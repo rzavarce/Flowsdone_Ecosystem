@@ -4,8 +4,8 @@ import { ALL_TENANTS } from '@/core/tenant/TenantContext'
 import { useTenant } from '@/core/tenant/useTenant'
 
 /**
- * Selector del tenant activo. Con una sola opción (cliente, gestor de un
- * único tenant) se muestra como etiqueta fija para dar contexto.
+ * Active tenant selector. With a single option (a client, or a manager of
+ * only one tenant) it's rendered as a fixed label to give context instead.
  */
 export function TenantSwitcher() {
   const { tenants, canSelectAll, selectedId, current, select } = useTenant()

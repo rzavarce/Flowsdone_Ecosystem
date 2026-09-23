@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 
-/** Vista para rutas inexistentes. */
+/** View for routes that don't exist. */
 export function NotFoundPage() {
   return (
     <>

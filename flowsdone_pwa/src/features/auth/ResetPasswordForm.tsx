@@ -7,19 +7,19 @@ import { AuthError } from '@/core/auth/AuthApi'
 import { homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 
-/** Mismo mínimo que exige el backend (MIN_PASSWORD_LENGTH en create_user.py). */
+/** Same minimum the backend enforces (MIN_PASSWORD_LENGTH in create_user.py). */
 const MIN_PASSWORD_LENGTH = 10
 
-/** Props de {@link ResetPasswordForm}. */
+/** Props for {@link ResetPasswordForm}. */
 export interface ResetPasswordFormProps {
-  /** Token del link de recuperación, tomado de la URL. */
+  /** Password reset link token, taken from the URL. */
   token: string
 }
 
 /**
- * Formulario para fijar la contraseña nueva. Sin `PublicOnly` en la ruta
- * (ver `router.tsx`), así que la redirección tras el éxito la hace este
- * componente a mano, igual que `ActivateAccountForm`.
+ * Form to set the new password. The route has no `PublicOnly` guard (see
+ * `router.tsx`), so this component handles the post-success redirect by
+ * hand, same as `ActivateAccountForm`.
  */
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const { resetPassword } = useAuth()

@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 
-/** Vista 403: el usuario está autenticado pero su perfil no incluye esta sección. */
+/** 403 view: the user is authenticated but their role doesn't include this section. */
 export function ForbiddenPage() {
   const { user } = useAuth()
   return (

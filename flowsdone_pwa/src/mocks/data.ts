@@ -1,22 +1,25 @@
 /**
- * Datos de ejemplo de la maqueta. Se reemplazan por llamadas al gateway
- * cuando se conecte la API; las interfaces son la forma que esperan las vistas.
+ * Sample data for the mockup. Gets replaced with gateway calls once the API
+ * is wired up; the interfaces are the shape the views expect.
  */
 import type { BadgeTone } from '@/components/ui/Badge'
 
+/** A single dashboard stat tile (value + trend). */
 export interface Stat {
   id: string
   label: string
   value: string
-  /** Variación respecto al periodo anterior, en %. */
+  /** Change from the previous period, in %. */
   delta: number
 }
 
+/** One point on the activity chart. */
 export interface ActivityPoint {
   label: string
   value: number
 }
 
+/** Row shown in the recent-conversations list. */
 export interface ConversationSummary {
   id: string
   contact: string
@@ -26,6 +29,7 @@ export interface ConversationSummary {
   status: { label: string; tone: BadgeTone }
 }
 
+/** Stat tiles shown on the dashboard. */
 export const STATS: readonly Stat[] = [
   { id: 'conversations', label: 'Conversaciones hoy', value: '1.284', delta: 12.4 },
   { id: 'messages', label: 'Mensajes procesados', value: '18.902', delta: 8.1 },
@@ -33,6 +37,7 @@ export const STATS: readonly Stat[] = [
   { id: 'resolution', label: 'Resueltas por IA', value: '87 %', delta: 3.5 },
 ]
 
+/** Weekly activity series for the dashboard chart. */
 export const ACTIVITY: readonly ActivityPoint[] = [
   { label: 'Lun', value: 820 },
   { label: 'Mar', value: 940 },
@@ -43,6 +48,7 @@ export const ACTIVITY: readonly ActivityPoint[] = [
   { label: 'Dom', value: 1284 },
 ]
 
+/** Most recent conversations shown on the dashboard. */
 export const RECENT_CONVERSATIONS: readonly ConversationSummary[] = [
   { id: 'c1', contact: 'Valentina Rojas', channel: 'WhatsApp', preview: '¿Pueden confirmarme la hora de la cita?', time: 'hace 2 min', status: { label: 'IA', tone: 'primary' } },
   { id: 'c2', contact: 'Carlos Méndez', channel: 'Webchat', preview: 'Necesito cambiar el plan contratado.', time: 'hace 9 min', status: { label: 'Escalada', tone: 'warning' } },

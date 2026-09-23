@@ -1,15 +1,15 @@
 import { cn } from '@/lib/cn'
 
-/** Props de {@link Spinner}. */
+/** Props for {@link Spinner}. */
 export interface SpinnerProps {
-  /** Texto para lectores de pantalla. */
+  /** Text for screen readers. */
   label: string
-  /** Ocupa toda la pantalla y centra el indicador. */
+  /** Fills the whole screen and centers the indicator. */
   fullScreen?: boolean
   className?: string
 }
 
-/** Indicador de carga accesible (`role="status"`). */
+/** Accessible loading indicator (`role="status"`). */
 export function Spinner({ label, fullScreen, className }: SpinnerProps) {
   return (
     <div role="status" className={cn('flex items-center justify-center', fullScreen && 'min-h-dvh', className)}>

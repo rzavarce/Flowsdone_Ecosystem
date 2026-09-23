@@ -1,18 +1,18 @@
 import { cloneElement, useId, type ReactElement, type SelectHTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
-/** Props de {@link Field}. */
+/** Props for {@link Field}. */
 export interface FieldProps {
   label: string
-  /** Ayuda breve bajo el control. */
+  /** Brief help text below the control. */
   hint?: string
-  /** Error de validación; se anuncia a lectores de pantalla. */
+  /** Validation error; announced to screen readers. */
   error?: string
-  /** El control (Input, Select…). Recibe `id` y `aria-describedby` automáticamente. */
+  /** The control (Input, Select…). Receives `id` and `aria-describedby` automatically. */
   children: ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>
 }
 
-/** Etiqueta + control + ayuda/error, con los atributos ARIA conectados. */
+/** Label + control + hint/error, with the ARIA attributes wired up. */
 export function Field({ label, hint, error, children }: FieldProps) {
   const id = useId()
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
@@ -37,7 +37,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
   )
 }
 
-/** `<select>` nativo con el estilo de los campos de la consola (accesible y móvil-friendly). */
+/** Native `<select>` styled like the console's fields (accessible and mobile-friendly). */
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select

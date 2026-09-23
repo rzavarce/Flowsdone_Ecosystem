@@ -5,17 +5,17 @@ import { Card } from '@/components/ui/Card'
 import type { ChannelConnection } from '@/core/admin/types'
 import { CHANNEL_TYPES, maskExternalId } from './channelTypes'
 
-/** Props de {@link ConnectionCard}. */
+/** Props for {@link ConnectionCard}. */
 export interface ConnectionCardProps {
   connection: ChannelConnection
-  /** Contexto a mostrar bajo el nombre (tenant/proyecto). */
+  /** Context to show under the name (tenant/project). */
   projectLabel: string
   agentName: string
   onEdit: (connection: ChannelConnection) => void
   onDelete: (connection: ChannelConnection) => void
 }
 
-/** Tarjeta de un canal conectado: identidad, estado, proyecto/agente y acciones. */
+/** Card for a connected channel: identity, status, project/agent and actions. */
 export function ConnectionCard({ connection, projectLabel, agentName, onEdit, onDelete }: ConnectionCardProps) {
   const config = CHANNEL_TYPES[connection.channel_type]
   const Icon = config.icon

@@ -3,9 +3,9 @@ import type { AdminApi } from './AdminApi'
 import { AdminApiContext } from './AdminApiContext'
 
 /**
- * Accede al adaptador de la API admin.
+ * Accesses the admin API adapter.
  *
- * @throws Error si se usa fuera de `<AdminApiProvider>`.
+ * @throws Error if used outside `<AdminApiProvider>`.
  */
 export function useAdminApi(): AdminApi {
   const api = useContext(AdminApiContext)

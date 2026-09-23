@@ -1,10 +1,10 @@
 import { ApiError } from './apiFetch'
 
 /**
- * Traduce un error del gateway a un mensaje accionable para la persona usuaria.
+ * Translates a gateway error into an actionable message for the user.
  *
- * @param error - Lo lanzado por una consulta o mutación.
- * @returns Texto en español; para errores desconocidos, el mensaje original.
+ * @param error - Whatever a query or mutation threw.
+ * @returns Spanish-language copy; for unknown errors, the original message.
  */
 export function describeError(error: unknown): string {
   if (!(error instanceof ApiError)) return error instanceof Error ? error.message : 'Ocurrió un error inesperado.'

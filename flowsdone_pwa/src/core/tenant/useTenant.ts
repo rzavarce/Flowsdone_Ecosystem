@@ -2,9 +2,9 @@ import { useContext } from 'react'
 import { TenantContext, type TenantContextValue } from './TenantContext'
 
 /**
- * Accede al tenant activo.
+ * Accesses the active tenant.
  *
- * @throws Error si se usa fuera de `<TenantProvider>`.
+ * @throws Error if used outside `<TenantProvider>`.
  */
 export function useTenant(): TenantContextValue {
   const ctx = useContext(TenantContext)

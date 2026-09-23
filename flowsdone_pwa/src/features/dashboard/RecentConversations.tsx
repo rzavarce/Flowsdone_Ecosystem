@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Card, CardHeader } from '@/components/ui/Card'
 import type { ConversationSummary } from '@/mocks/data'
 
-/** Lista de las últimas conversaciones con su canal y estado. */
+/** List of the latest conversations with their channel and status. */
 export function RecentConversations({
   items,
   className,

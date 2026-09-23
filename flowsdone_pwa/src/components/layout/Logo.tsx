@@ -2,13 +2,13 @@ import { useId } from 'react'
 import { useTheme } from '@/core/theme/useTheme'
 
 /**
- * Logo de Flowsdone, vectorial. La geometría replica `public/brand/flowsdone-logo.svg`
- * (fuente de verdad del diseño); acá se pinta con una paleta según el fondo para
- * que el texto no desaparezca sobre superficies claras.
+ * Flowsdone logo, vector-based. The geometry mirrors `public/brand/flowsdone-logo.svg`
+ * (the design's source of truth); it's painted here with a palette chosen by
+ * background so the text doesn't disappear on light surfaces.
  *
- * - `icon`: isotipo cuadrado (sidebar contraída, barra móvil).
- * - `wordmark`: isotipo + "Flowsdone".
- * - `full`: wordmark + lema "INTELLIGENCE IN MOTION".
+ * - `icon`: square isotype (collapsed sidebar, mobile bar).
+ * - `wordmark`: isotype + "Flowsdone".
+ * - `full`: wordmark + "INTELLIGENCE IN MOTION" tagline.
  */
 export type LogoVariant = 'icon' | 'wordmark' | 'full'
 
@@ -16,14 +16,14 @@ interface Palette {
   text: string
   done: string
   slogan: string
-  /** Paradas del degradado del trazo: 0 %, 55 %, 85 %, 100 %. */
+  /** Stroke gradient stops: 0%, 55%, 85%, 100%. */
   line: [string, string, string, string]
   nodeStart: string
   nodeEnd: string
   glow: boolean
 }
 
-/** Sobre fondos oscuros: colores de marca originales, con resplandor neón. */
+/** On dark backgrounds: original brand colors, with a neon glow. */
 const ON_DARK: Palette = {
   text: '#F2FBF7',
   done: '#3EFF8B',
@@ -34,7 +34,7 @@ const ON_DARK: Palette = {
   glow: true,
 }
 
-/** Sobre fondos claros: variantes más oscuras (contraste calculado) y sin resplandor. */
+/** On light backgrounds: darker variants (contrast-calculated) and no glow. */
 const ON_LIGHT: Palette = {
   text: '#04141F',
   done: '#0A8F48',
@@ -48,25 +48,25 @@ const ON_LIGHT: Palette = {
 const WAVE = 'M 8 32 C 16 16, 32 16, 44 28 C 54 38, 64 36, 72 26 L 84 38 L 108 4'
 const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
-/** Recortes (viewBox) de cada variante sobre el lienzo original de 490x110. */
+/** Crops (viewBox) for each variant over the original 490x110 canvas. */
 const VIEWBOX: Record<Exclude<LogoVariant, 'icon'>, string> = {
   wordmark: '26 24 350 50',
   full: '26 24 350 60',
 }
 
-/** Props de {@link Logo}. */
+/** Props for {@link Logo}. */
 export interface LogoProps {
   variant?: LogoVariant
   /**
-   * `auto` sigue el modo de color de la app; `onDark` fuerza la paleta para
-   * fondos oscuros fijos (p. ej. el panel de marca del login).
+   * `auto` follows the app's color mode; `onDark` forces the palette for
+   * fixed dark backgrounds (e.g. the login page's brand panel).
    */
   tone?: 'auto' | 'onDark'
-  /** Definir la altura, p. ej. `h-8 w-auto` (o `size-9` para `icon`). */
+  /** Set the height, e.g. `h-8 w-auto` (or `size-9` for `icon`). */
   className?: string
 }
 
-/** Logo de Flowsdone con nombre accesible (`role="img"`). */
+/** Flowsdone logo with an accessible name (`role="img"`). */
 export function Logo({ variant = 'wordmark', tone = 'auto', className }: LogoProps) {
   const { resolvedMode } = useTheme()
   const uid = useId().replace(/:/g, '')

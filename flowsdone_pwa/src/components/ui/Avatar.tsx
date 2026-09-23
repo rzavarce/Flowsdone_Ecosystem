@@ -1,13 +1,13 @@
 import { cn } from '@/lib/cn'
 import { initials } from '@/lib/initials'
 
-/** Props de {@link Avatar}. */
+/** Props for {@link Avatar}. */
 export interface AvatarProps {
   name: string
   className?: string
 }
 
-/** Círculo con las iniciales sobre el gradiente de marca del template activo. */
+/** Circle with initials over the active template's brand gradient. */
 export function Avatar({ name, className }: AvatarProps) {
   return (
     <span

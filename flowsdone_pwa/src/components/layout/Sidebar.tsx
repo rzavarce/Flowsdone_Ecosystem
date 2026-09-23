@@ -5,13 +5,13 @@ import { cn } from '@/lib/cn'
 import { Logo } from './Logo'
 import { useNavItems } from './useNavItems'
 
-/** Props de {@link Sidebar}. */
+/** Props for {@link Sidebar}. */
 export interface SidebarProps {
   collapsed: boolean
   onToggle: () => void
 }
 
-/** Navegación lateral de escritorio (>= lg); colapsable a solo iconos. */
+/** Desktop side navigation (>= lg); collapsible down to icons only. */
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const items = useNavItems()
   return (

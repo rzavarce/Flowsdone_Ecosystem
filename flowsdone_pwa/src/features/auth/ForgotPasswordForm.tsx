@@ -8,9 +8,10 @@ import { AuthError } from '@/core/auth/AuthApi'
 import { useAuth } from '@/core/auth/useAuth'
 
 /**
- * Formulario de "olvidé mi contraseña". Tras enviar, muestra siempre el
- * mismo mensaje de éxito, exista o no la cuenta - el backend nunca revela
- * cuáles emails están registrados, y la UI sigue ese mismo principio.
+ * "Forgot my password" form. After submitting, it always shows the same
+ * success message, whether or not the account exists - the backend never
+ * reveals which emails are registered, and the UI follows that same
+ * principle.
  */
 export function ForgotPasswordForm() {
   const { requestPasswordReset } = useAuth()

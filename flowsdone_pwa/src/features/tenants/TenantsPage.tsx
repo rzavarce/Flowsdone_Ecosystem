@@ -21,13 +21,13 @@ import { TenantDialog } from './TenantDialog'
 import { TenantList } from './TenantList'
 import { summarize, useTenantsView } from './useTenantsView'
 
-/** Diálogo abierto: tenant nuevo/editado, proyecto nuevo/editado, o ninguno. */
+/** Open dialog: new/edited tenant, new/edited project, or none. */
 type Dialogs =
   | { kind: 'tenant'; tenant: TenantRecord | null }
   | { kind: 'project'; project: Project | null }
   | null
 
-/** Confirmación pendiente de una acción destructiva o disruptiva. */
+/** Confirmation pending for a destructive or disruptive action. */
 type Pending =
   | { kind: 'delete-tenant'; tenant: TenantRecord }
   | { kind: 'suspend-tenant'; tenant: TenantRecord }
@@ -36,13 +36,13 @@ type Pending =
   | null
 
 /**
- * Tenants y sus proyectos, en una sola pantalla: la lista a la izquierda y el
- * detalle (estado, acciones y proyectos) a la derecha.
+ * Tenants and their projects, in a single screen: the list on the left and
+ * the detail (status, actions and projects) on the right.
  *
- * - Admin: crea, edita, suspende y borra tenants, y gestiona sus proyectos.
- * - Gestor: solo ve sus tenants y gestiona sus proyectos.
- * - Suspender corta el enrutado de los canales sin borrar nada; borrar es en
- *   cascada (proyectos, agentes y canales) y pide escribir el slug.
+ * - Admin: creates, edits, suspends and deletes tenants, and manages their projects.
+ * - Manager: only sees their own tenants and manages their projects.
+ * - Suspending cuts off channel routing without deleting anything; deleting
+ *   cascades (projects, agents and channels) and requires typing the slug.
  */
 export function TenantsPage() {
   const view = useTenantsView()
@@ -75,7 +75,7 @@ export function TenantsPage() {
     }
   }
 
-  /** Abre una confirmación de borrado con los recuentos recién pedidos (nunca los de la caché). */
+  /** Opens a deletion confirmation with freshly fetched counts (never the cached ones). */
   async function confirmDeletion(next: NonNullable<Pending>) {
     await view.refreshContents().catch(() => {})
     setPending(next)

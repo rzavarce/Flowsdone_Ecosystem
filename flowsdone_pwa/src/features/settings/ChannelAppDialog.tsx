@@ -8,10 +8,10 @@ import { useUpsertChannelApp } from '@/core/admin/hooks'
 import { describeError } from '@/core/http/describeError'
 import type { ChannelAppConfig } from './channelApps'
 
-/** Props de {@link ChannelAppDialog}. */
+/** Props for {@link ChannelAppDialog}. */
 export interface ChannelAppDialogProps {
   app: ChannelAppConfig
-  /** Si ya tiene credenciales, guardar las REEMPLAZA (y se avisa). */
+  /** If it already has credentials, saving REPLACES them (and the user is warned). */
   configured: boolean
   onClose: () => void
 }
@@ -19,11 +19,11 @@ export interface ChannelAppDialogProps {
 const FORM_ID = 'channel-app-form'
 
 /**
- * Configura las credenciales compartidas de un proveedor.
+ * Configures a provider's shared credentials.
  *
- * El gateway nunca devuelve los secretos guardados, así que al editar hay que
- * volver a escribirlos todos: `PUT` reemplaza el conjunto completo (salvo el
- * token de verificación de Meta, que se conserva si no se envía uno nuevo).
+ * The gateway never returns saved secrets, so editing means rewriting all of
+ * them: `PUT` replaces the whole set (except Meta's webhook verification
+ * token, which is kept if a new one isn't sent).
  */
 export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogProps) {
   const save = useUpsertChannelApp()

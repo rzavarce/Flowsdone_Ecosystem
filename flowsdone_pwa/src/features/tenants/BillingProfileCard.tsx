@@ -8,13 +8,13 @@ import { useTenantBilling } from '@/core/admin/hooks'
 import { describeError } from '@/core/http/describeError'
 import { BillingProfileDialog } from './BillingProfileDialog'
 
-/** Props de {@link BillingProfileCard}. */
+/** Props for {@link BillingProfileCard}. */
 export interface BillingProfileCardProps {
   tenantId: string
   tenantName: string
 }
 
-/** Un dato del perfil, o nada si está vacío. */
+/** A single profile field, or nothing if it's empty. */
 function Row({ label, value }: { label: string; value: string | null }) {
   if (!value) return null
   return (
@@ -26,9 +26,9 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 /**
- * Resumen del perfil de facturación del tenant seleccionado, con edición
- * (admin/tenant_manager - ver POLICY["tenant_billing"] en el gateway). Un
- * `client` ve estos mismos datos, solo lectura, en "Mi empresa"
+ * Summary of the selected tenant's billing profile, with editing
+ * (admin/tenant_manager - see POLICY["tenant_billing"] in the gateway). A
+ * `client` sees this same data, read-only, in "My company"
  * (`features/company/CompanyPage.tsx`).
  */
 export function BillingProfileCard({ tenantId, tenantName }: BillingProfileCardProps) {

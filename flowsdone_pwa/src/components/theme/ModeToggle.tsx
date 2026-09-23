@@ -7,7 +7,7 @@ const NEXT: Record<ColorMode, ColorMode> = { light: 'dark', dark: 'system', syst
 const LABEL: Record<ColorMode, string> = { light: 'claro', dark: 'oscuro', system: 'del sistema' }
 const ICON = { light: Sun, dark: Moon, system: Monitor }
 
-/** Botón de la barra superior que rota entre claro -> oscuro -> sistema. */
+/** Top bar button that cycles through light -> dark -> system. */
 export function ModeToggle() {
   const { mode, setMode } = useTheme()
   const Icon = ICON[mode]

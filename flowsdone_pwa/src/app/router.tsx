@@ -20,15 +20,17 @@ import { UsersPage } from '@/features/users/UsersPage'
 import { DashboardRoute } from './DashboardRoute'
 import { RootRedirect } from './RootRedirect'
 
+/** Wraps `element` behind a single required permission. */
 const guarded = (permission: Permission, element: ReactNode) => (
   <RequirePermission anyOf={[permission]}>{element}</RequirePermission>
 )
 
 /**
- * Rutas: `/` redirige (login o inicio del perfil); `/login` y `/forgot-password`
- * son públicas (redirigen si ya hay sesión); `/activate-account/:token` y
- * `/reset-password/:token` son públicas SIN redirigir (ver comentario abajo);
- * el resto exige sesión y, según la sección, un permiso.
+ * Routes: `/` redirects (to login or the profile's home page); `/login` and
+ * `/forgot-password` are public (they redirect away if there's already a
+ * session); `/activate-account/:token` and `/reset-password/:token` are
+ * public WITHOUT redirecting (see comment below); everything else requires
+ * a session and, depending on the section, a permission.
  */
 export const routes = [
   { path: '/', element: <RootRedirect /> },
@@ -76,4 +78,5 @@ export const routes = [
   },
 ]
 
+/** The browser router built from `routes`, used by `App`. */
 export const router = createBrowserRouter(routes)

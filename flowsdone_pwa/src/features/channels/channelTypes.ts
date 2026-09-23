@@ -1,7 +1,7 @@
 import { AtSign, MessageCircle, MessagesSquare, Music2, PhoneCall, Send, Share2, type LucideIcon } from 'lucide-react'
 import type { ChannelType } from '@/core/admin/types'
 
-/** Un dato secreto propio de la conexión (se envía en `credentials`). */
+/** A secret value specific to the connection (sent inside `credentials`). */
 export interface CredentialField {
   key: string
   label: string
@@ -9,21 +9,26 @@ export interface CredentialField {
   required?: boolean
 }
 
-/** Qué necesita cada canal para conectarse; verificado contra los webhooks/senders del gateway. */
+/** What each channel needs to connect; checked against the gateway's webhooks/senders. */
 export interface ChannelTypeConfig {
   type: ChannelType
   label: string
   icon: LucideIcon
-  /** Nombre del identificador único del canal (`external_id`). */
+  /** Name of the channel's unique identifier (`external_id`). */
   externalIdLabel: string
   externalIdHint: string
   externalIdPlaceholder: string
-  /** Credenciales por conexión (vacío si el canal no necesita ninguna). */
+  /** Per-connection credentials (empty if the channel doesn't need any). */
   credentials: CredentialField[]
-  /** Nota sobre lo que el gateway hace automáticamente al guardar. */
+  /** Note about what the gateway does automatically on save. */
   note?: string
 }
 
+/**
+ * Per-channel-type configuration: label, icon, what identifies a connection
+ * and which credentials it requires. Drives both the connection form's
+ * fields and the display copy across the Channels screen.
+ */
 export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
   whatsapp_evolution: {
     type: 'whatsapp_evolution',
@@ -97,19 +102,19 @@ export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
   },
 }
 
-/** Tipos en el orden en que se ofrecen al crear un canal. */
+/** Types in the order they're offered when creating a channel. */
 export const CHANNEL_TYPE_LIST: readonly ChannelTypeConfig[] = Object.values(CHANNEL_TYPES)
 
 /**
- * Oculta lo sensible del identificador de un canal para mostrarlo en pantalla.
+ * Masks the sensitive part of a channel's identifier before showing it on screen.
  *
- * El `external_id` de Telegram ES el token del bot (un secreto), y el gateway
- * lo devuelve tal cual; la UI nunca debería pintarlo completo.
+ * Telegram's `external_id` IS the bot token (a secret), and the gateway
+ * returns it as-is; the UI should never render it in full.
  *
- * @param type - Tipo de canal.
- * @param externalId - Identificador tal como lo devuelve el gateway.
- * @returns El identificador, con el token de Telegram enmascarado (también si no
- *   sigue el formato `<id>:<secreto>`, para no depender de que los datos sean ideales).
+ * @param type - Channel type.
+ * @param externalId - Identifier exactly as returned by the gateway.
+ * @returns The identifier, with the Telegram token masked (even if it doesn't
+ *   follow the `<id>:<secret>` format, so this doesn't depend on the data being ideal).
  */
 export function maskExternalId(type: ChannelType, externalId: string): string {
   if (type !== 'telegram') return externalId

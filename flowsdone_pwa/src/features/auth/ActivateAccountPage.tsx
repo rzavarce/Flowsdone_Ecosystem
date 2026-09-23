@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { ActivateAccountForm } from './ActivateAccountForm'
 import { AuthLayout } from './AuthLayout'
 
-/** Pantalla pública: crear la contraseña y activar la cuenta desde el link del email. */
+/** Public screen: set a password and activate the account from the email link. */
 export function ActivateAccountPage() {
   const { token = '' } = useParams<{ token: string }>()
   return (

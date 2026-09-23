@@ -1,5 +1,5 @@
 /**
- * Formatea una variación porcentual con signo y coma decimal.
+ * Formats a percentage delta with a sign and a decimal comma.
  *
  * @example formatDelta(12.4) // '+12,4 %'
  */

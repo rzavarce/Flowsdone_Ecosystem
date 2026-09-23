@@ -1,14 +1,14 @@
 import type { LucideIcon } from 'lucide-react'
 import { Card } from './Card'
 
-/** Props de {@link EmptyState}. */
+/** Props for {@link EmptyState}. */
 export interface EmptyStateProps {
   icon: LucideIcon
   title: string
   description: string
 }
 
-/** Panel de "próximamente"/sin datos para secciones aún no implementadas. */
+/** "Coming soon"/no-data panel for sections not yet implemented. */
 export function EmptyState({ icon: Icon, title, description }: EmptyStateProps) {
   return (
     <Card className="flex flex-col items-center px-6 py-16 text-center">

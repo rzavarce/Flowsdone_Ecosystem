@@ -1,7 +1,7 @@
 import { AuthLayout } from './AuthLayout'
 import { LoginForm } from './LoginForm'
 
-/** Pantalla pública de acceso: panel de marca (solo escritorio) + formulario. */
+/** Public login screen: brand panel (desktop only) + form. */
 export function LoginPage() {
   return (
     <AuthLayout title="Inicia sesión" description="Ingresa con tu cuenta de Flowsdone.">

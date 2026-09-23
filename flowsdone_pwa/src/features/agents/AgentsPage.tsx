@@ -3,19 +3,19 @@ import { useTenant } from '@/core/tenant/useTenant'
 import { LangflowEmbed } from './LangflowEmbed'
 
 /**
- * Agentes: el editor de Langflow embebido, para cualquier staff que pueda
- * editar agentes (`admin`, `tenant_manager`, `botmaster` - la ruta ya exige
- * `agents:edit` en `router.tsx`, así que quien llega acá siempre lo tiene).
- * Se abre como el usuario del tenant elegido en el selector (solo ve los
- * agentes de ese tenant).
+ * Agents: the embedded Langflow editor, for any staff allowed to edit agents
+ * (`admin`, `tenant_manager`, `botmaster` - the route already requires
+ * `agents:edit` in `router.tsx`, so anyone who reaches this page already has
+ * it). Opens as the user of the tenant chosen in the selector (only sees
+ * that tenant's agents).
  *
- * El editor tiene un límite de seguridad conocido, no de esta pantalla: quien
- * edita puede añadir un componente con código Python que corre en el
- * contenedor de Langflow, y desde ahí alcanza variables de entorno
- * compartidas (`GATEWAY_ADMIN_API_KEY`, credenciales de Langfuse/Weaviate) y
- * la red interna - la separación por usuario/carpeta en Langflow es de
- * vista, no de seguridad. Aceptado a sabiendas para `tenant_manager`/`botmaster`
- * (personal de Flowsdone, no de clientes) - ver `POLICY["langflow"]` en el gateway.
+ * The editor has a known security boundary, not specific to this screen:
+ * whoever edits can add a component with Python code that runs inside the
+ * Langflow container, and from there reaches shared environment variables
+ * (`GATEWAY_ADMIN_API_KEY`, Langfuse/Weaviate credentials) and the internal
+ * network - the per-user/folder separation in Langflow is cosmetic, not a
+ * security boundary. Accepted knowingly for `tenant_manager`/`botmaster`
+ * (Flowsdone staff, not clients) - see `POLICY["langflow"]` in the gateway.
  */
 export function AgentsPage() {
   const { current } = useTenant()

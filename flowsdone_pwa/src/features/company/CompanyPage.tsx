@@ -7,7 +7,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { useCompany } from '@/core/company/useCompany'
 import { describeError } from '@/core/http/describeError'
 
-/** Un dato de la empresa, o nada si está vacío. */
+/** A single company field, or nothing if it's empty. */
 function Row({ label, value }: { label: string; value: string | null }) {
   if (!value) return null
   return (
@@ -19,9 +19,9 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 /**
- * "Mi empresa": datos de facturación del propio tenant, solo lectura (`client`).
- * Los edita un admin/tenant_manager desde Tenants (`BillingProfileCard`); esta
- * pantalla nunca pasa por el admin API, va por `GET /me/billing-profile`.
+ * "My company": the own tenant's billing data, read-only (`client`). It's
+ * edited by an admin/tenant_manager from Tenants (`BillingProfileCard`);
+ * this screen never goes through the admin API, it uses `GET /me/billing-profile`.
  */
 export function CompanyPage() {
   const company = useCompany()

@@ -2,8 +2,8 @@ import { AuthError, type AuthApi } from './AuthApi'
 import { ROLES, type Role, type Tenant, type User } from './types'
 
 /**
- * Adaptador contra el gateway real (api_gateway, `/auth/*`, servido bajo `/api`
- * por nginx en el contenedor o por el proxy de Vite en desarrollo). Contrato:
+ * Adapter against the real gateway (api_gateway, `/auth/*`, served under `/api`
+ * by nginx in the container or by the Vite proxy in development). Contract:
  *
  * - `POST {base}/auth/login`            body `{email, password}` -> 200 `User` | 401 | 429
  * - `GET  {base}/auth/me`                -> 200 `User` | 401
@@ -12,17 +12,17 @@ import { ROLES, type Role, type Tenant, type User } from './types'
  * - `POST {base}/auth/forgot-password`   body `{email}`           -> 202 | 429
  * - `POST {base}/auth/reset-password`    body `{token, password}` -> 200 `User` | 400
  *
- * La sesión viaja en una cookie httpOnly (`credentials: 'include'`): el
- * frontend nunca ve ni guarda el token, lo que lo deja fuera del alcance de XSS.
- * Lo mismo aplica al token de activación/reset: solo viaja en la URL del link
- * (nunca en una cookie ni en localStorage) y el servidor lo consume una sola vez.
+ * The session travels in an httpOnly cookie (`credentials: 'include'`): the
+ * frontend never sees or stores the token, which keeps it out of XSS's reach.
+ * The same applies to the activation/reset token: it only ever travels in the
+ * link's URL (never in a cookie or localStorage) and the server consumes it once.
  */
 
 const UNAVAILABLE = 'No se pudo contactar con el servidor. Inténtalo de nuevo.'
 const RATE_LIMITED = 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
 const INVALID_TOKEN_FALLBACK = 'El enlace no es válido o ya venció. Pide uno nuevo.'
 
-/** Extrae el `detail` de un cuerpo de error de FastAPI, si lo hay. */
+/** Extracts the `detail` field from a FastAPI error body, if present. */
 async function detailOf(res: Response): Promise<string | undefined> {
   try {
     const body = (await res.json()) as { detail?: unknown }
@@ -32,17 +32,18 @@ async function detailOf(res: Response): Promise<string | undefined> {
   }
 }
 
+/** Type guard checking whether a value has the shape of a {@link Tenant}. */
 function isTenant(value: unknown): value is Tenant {
   const t = value as Tenant
   return !!t && typeof t.id === 'string' && typeof t.name === 'string'
 }
 
 /**
- * Valida la forma de un `User` recibido del servidor.
+ * Validates the shape of a `User` received from the server.
  *
- * @param data - JSON sin confiar.
- * @returns El usuario tipado.
- * @throws AuthError `unavailable` si la respuesta no tiene la forma esperada.
+ * @param data - Untrusted JSON.
+ * @returns The typed user.
+ * @throws AuthError `unavailable` if the response doesn't have the expected shape.
  */
 export function parseUser(data: unknown): User {
   const u = data as Partial<User> | null
@@ -60,7 +61,7 @@ export function parseUser(data: unknown): User {
   return u as User
 }
 
-/** Crea el adaptador HTTP. `fetchFn` es inyectable para tests. */
+/** Creates the HTTP adapter. `fetchFn` is injectable for tests. */
 export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...args) => fetch(...args)): AuthApi {
   // X-Requested-With: el gateway lo exige en toda petición que cambia datos y va con
   // cookie (defensa CSRF); un origen ajeno no puede enviarlo sin permiso CORS.

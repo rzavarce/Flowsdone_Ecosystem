@@ -9,8 +9,8 @@ import { TenantSwitcher } from './TenantSwitcher'
 import { UserMenu } from './UserMenu'
 
 /**
- * Barra superior: logo (solo móvil), búsqueda (solo perfiles que operan
- * conversaciones), tenant activo, modo de color, avisos y menú de usuario.
+ * Top bar: logo (mobile only), search (only for profiles that operate
+ * conversations), active tenant, color mode, notifications and user menu.
  */
 export function Topbar() {
   const { user } = useAuth()

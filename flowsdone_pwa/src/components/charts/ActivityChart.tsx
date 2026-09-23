@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn'
 import type { ActivityPoint } from '@/mocks/data'
 import { H, W, linePath, toPoints } from './chartGeometry'
 
-/** Gráfico de área simple (SVG, sin librería) con los colores del template. */
+/** Simple area chart (SVG, no library) using the template's colors. */
 export function ActivityChart({ data, className }: { data: readonly ActivityPoint[]; className?: string }) {
   const points = toPoints(data.map((d) => d.value))
   const line = linePath(points)

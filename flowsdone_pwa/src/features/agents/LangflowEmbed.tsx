@@ -8,32 +8,33 @@ import { Spinner } from '@/components/ui/Spinner'
 import { useLangflowSession } from '@/core/admin/hooks'
 import { cn } from '@/lib/cn'
 
-/** Props de {@link LangflowEmbed}. */
+/** Props for {@link LangflowEmbed}. */
 export interface LangflowEmbedProps {
-  /** Tenant cuyos agentes se muestran; sin él (p. ej. "Todos los tenants") se pide elegir uno. */
+  /** Tenant whose agents are shown; without it (e.g. "All tenants") the user is asked to pick one. */
   tenantId?: string
-  /** Nombre del tenant, para los textos. */
+  /** Tenant name, for display text. */
   tenantName?: string
 }
 
 /**
- * Editor de agentes de Langflow embebido en un iframe, ya con la sesión iniciada.
+ * Langflow agent editor embedded in an iframe, with the session already established.
  *
- * Cada tenant tiene su propio usuario en Langflow (con una carpeta por proyecto), así
- * que al cambiar de tenant en el selector solo se ven los agentes de ese tenant. El
- * gateway prepara ese usuario y devuelve una URL de un solo uso; el navegador nunca ve
- * la contraseña de Langflow. Como el ticket se consume al cargar, el iframe se
- * monta con `key={tenantId}`: cada tenant carga con su propio ticket.
+ * Each tenant has its own Langflow user (with a folder per project), so switching
+ * tenants in the selector only shows that tenant's agents. The gateway provisions
+ * that user and returns a single-use URL; the browser never sees the Langflow
+ * password. Since the ticket is consumed on load, the iframe is mounted with
+ * `key={tenantId}`: each tenant loads with its own ticket.
  *
- * Langflow debe poder ser enmarcado por el dominio de la PWA y compartir sitio con él
- * (subdominios hermanos), para que sus cookies de sesión viajen dentro del iframe.
+ * Langflow must be frameable from the PWA's domain and share a site with it
+ * (sibling subdomains), so its session cookies travel inside the iframe.
  *
- * El botón de pantalla completa usa la Fullscreen API del navegador sobre el
- * contenedor (no solo el iframe) y va superpuesto en la esquina inferior
- * derecha: la superior la ocupa el botón de usuario propio de Langflow.
+ * The fullscreen button uses the browser's Fullscreen API on the container
+ * (not just the iframe) and is overlaid in the bottom-right corner: the top
+ * corner is taken by Langflow's own user button.
  *
- * Llena todo el alto disponible de la página (`h-full`): `AgentsPage` le da
- * ese alto real con un `flex-1` propio, en vez de calcularlo aquí a ojo.
+ * Fills the page's full available height (`h-full`): `AgentsPage` gives it
+ * that real height via its own `flex-1`, rather than this component
+ * estimating it.
  */
 export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
   const session = useLangflowSession(tenantId)

@@ -12,11 +12,11 @@ import type {
 } from './types'
 
 /**
- * Adaptador de MAQUETA: datos en memoria coherentes con los tenants del
- * adaptador mock de autenticación, sin backend. Replica las reglas del
- * gateway que la UI necesita ver (duplicados, agente del mismo proyecto, token
- * de verificación de Meta autogenerado). No aplica alcance por tenant: la UI
- * ya filtra por el tenant activo.
+ * MOCK adapter: in-memory data consistent with the auth mock adapter's
+ * tenants, with no backend. Replicates the gateway rules the UI needs to see
+ * (duplicates, agent belonging to the same project, auto-generated Meta
+ * verification token). Doesn't enforce tenant scope: the UI already filters
+ * by the active tenant.
  */
 
 const NOW = '2026-09-01T10:00:00Z'
@@ -55,13 +55,14 @@ const USERS: UserRecord[] = [
   { id: 'u-client', email: 'cliente@flowsdone.dev', name: 'Carla Cliente', role: 'client', status: 'active', tenant_ids: ['t-vital'], last_login_at: NOW, created_at: NOW, updated_at: NOW },
 ]
 
+/** Simulates network latency by resolving after the given delay. */
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-/** Opciones de {@link createMockAdminApi}. */
+/** Options for {@link createMockAdminApi}. */
 export interface MockAdminOptions {
-  /** Latencia simulada por llamada, en ms. */
+  /** Simulated latency per call, in ms. */
   latencyMs?: number
-  /** Datos de partida propios (los tests los alinean con sus tenants); por defecto, los de demostración. */
+  /** Custom seed data (tests align it with their own tenants); defaults to the demo data. */
   seed?: {
     tenants?: TenantRecord[]
     projects?: Project[]
@@ -71,7 +72,7 @@ export interface MockAdminOptions {
   }
 }
 
-/** Crea el adaptador mock; cada instancia parte de datos limpios. */
+/** Creates the mock adapter; each instance starts from fresh data. */
 export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOptions = {}): AdminApi {
   const tenants = (seed.tenants ?? TENANTS).map((t) => ({ ...t }))
   const projects = (seed.projects ?? PROJECTS).map((p) => ({ ...p }))
@@ -118,7 +119,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     const kept = list.filter(keep)
     list.splice(0, list.length, ...kept)
   }
-  /** Como ON DELETE CASCADE de la base: un proyecto arrastra sus agentes y canales. */
+  /** Like ON DELETE CASCADE in the database: a project takes its agents and channels down with it. */
   const cascadeProject = (projectId: string) => {
     removeWhere(connections, (c) => c.project_id !== projectId)
     removeWhere(agents, (a) => a.project_id !== projectId)

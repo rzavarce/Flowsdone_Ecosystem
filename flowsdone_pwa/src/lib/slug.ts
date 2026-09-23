@@ -1,5 +1,5 @@
 /**
- * Convierte un nombre en un slug (minúsculas, sin acentos, con guiones).
+ * Converts a name into a slug (lowercase, no accents, hyphen-separated).
  *
  * @example slugify('Atención al paciente') // 'atencion-al-paciente'
  */

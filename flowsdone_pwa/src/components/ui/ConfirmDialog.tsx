@@ -4,22 +4,22 @@ import { Dialog } from './Dialog'
 import { Field } from './Field'
 import { Input } from './Input'
 
-/** Props de {@link ConfirmDialog}. */
+/** Props for {@link ConfirmDialog}. */
 export interface ConfirmDialogProps {
   open: boolean
   title: string
-  /** Consecuencias de la acción, en lenguaje claro. */
+  /** Consequences of the action, in plain language. */
   description: string
   confirmLabel: string
-  /** Mientras la acción está en curso: deshabilita los botones. */
+  /** While the action is in progress: disables the buttons. */
   pending?: boolean
-  /** Mensaje de error si la acción falló. */
+  /** Error message if the action failed. */
   error?: string | null
-  /** Detalle adicional (p. ej. qué se borrará en cascada). */
+  /** Extra detail (e.g. what gets deleted along with it). */
   children?: ReactNode
   /**
-   * Si se indica, la persona debe escribir exactamente este texto para poder
-   * confirmar (para acciones muy destructivas, como borrar un tenant).
+   * If set, the user must type this exact text before they can confirm
+   * (for highly destructive actions, like deleting a tenant).
    */
   requireText?: string
   onConfirm: () => void
@@ -27,14 +27,15 @@ export interface ConfirmDialogProps {
 }
 
 /**
- * Confirmación de una acción destructiva. El foco inicial cae en Cancelar (la
- * opción segura). Se monta solo mientras está abierta, así lo escrito para
- * confirmar nunca se arrastra de una apertura a la siguiente.
+ * Confirmation for a destructive action. Initial focus lands on Cancel (the
+ * safe option). It only mounts while open, so anything typed to confirm
+ * never carries over from one opening to the next.
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
   return props.open ? <ConfirmDialogOpen {...props} /> : null
 }
 
+/** Renders the actual dialog contents; mounted only while {@link ConfirmDialog} is open. */
 function ConfirmDialogOpen({
   title,
   description,

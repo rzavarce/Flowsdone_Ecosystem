@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card'
 import { formatDelta } from '@/lib/format'
 import type { Stat } from '@/mocks/data'
 
-/** Tarjeta KPI: valor grande y tendencia frente al periodo anterior. */
+/** KPI card: large value plus trend against the previous period. */
 export function StatCard({ stat }: { stat: Stat }) {
   const up = stat.delta >= 0
   const Trend = up ? TrendingUp : TrendingDown

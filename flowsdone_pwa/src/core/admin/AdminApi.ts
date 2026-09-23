@@ -20,70 +20,70 @@ import type {
 } from './types'
 
 /**
- * Puerto de la API de administración. La UI solo conoce esta interfaz; hay un
- * adaptador HTTP (gateway real) y uno mock (desarrollo/maquetas).
+ * Port for the admin API. The UI only knows this interface; there is an HTTP
+ * adapter (the real gateway) and a mock one (development/demos).
  *
- * Todo lo que devuelve ya viene filtrado por lo que el perfil puede ver: el
- * gateway aplica el rol y el alcance por tenant (lo ajeno responde 404).
+ * Everything it returns is already filtered by what the profile is allowed to
+ * see: the gateway enforces role and tenant scope (anything outside it gets a 404).
  */
 export interface AdminApi {
-  /** Tenants visibles (todos para un admin; solo los propios para el resto). */
+  /** Visible tenants (all of them for an admin; only their own for anyone else). */
   listTenants(): Promise<TenantRecord[]>
-  /** Solo admin. */
+  /** Admin only. */
   createTenant(input: CreateTenantInput): Promise<TenantRecord>
-  /** Solo admin. `status: 'suspended'` corta el enrutado de todos sus canales. */
+  /** Admin only. `status: 'suspended'` cuts off routing for all of its channels. */
   updateTenant(id: string, patch: UpdateTenantInput): Promise<TenantRecord>
-  /** Solo admin. Borra EN CASCADA sus proyectos, agentes y canales. */
+  /** Admin only. Cascade-deletes its projects, agents and channels. */
   deleteTenant(id: string): Promise<void>
 
   /**
-   * Perfil de facturación del tenant (admin/tenant_manager). Devuelve uno
-   * vacío (todos los campos `null`) si nunca se cargó nada - nunca 404.
+   * The tenant's billing profile (admin/tenant_manager). Returns an empty one
+   * (all fields `null`) if nothing was ever saved - never a 404.
    */
   getTenantBilling(tenantId: string): Promise<TenantBillingProfile>
   updateTenantBilling(tenantId: string, patch: UpdateTenantBillingInput): Promise<TenantBillingProfile>
 
-  /** Proyectos visibles, opcionalmente de un tenant. */
+  /** Visible projects, optionally scoped to a tenant. */
   listProjects(tenantId?: string): Promise<Project[]>
   createProject(input: CreateProjectInput): Promise<Project>
   updateProject(id: string, patch: UpdateProjectInput): Promise<Project>
-  /** Borra EN CASCADA sus agentes y canales. */
+  /** Cascade-deletes its agents and channels. */
   deleteProject(id: string): Promise<void>
 
-  /** Agentes visibles, opcionalmente de un proyecto. */
+  /** Visible agents, optionally scoped to a project. */
   listAgents(projectId?: string): Promise<Agent[]>
 
-  /** Conexiones de canal visibles, opcionalmente de un proyecto. */
+  /** Visible channel connections, optionally scoped to a project. */
   listChannelConnections(projectId?: string): Promise<ChannelConnection[]>
   createChannelConnection(input: CreateChannelConnectionInput): Promise<ChannelConnection>
   updateChannelConnection(id: string, patch: UpdateChannelConnectionInput): Promise<ChannelConnection>
   deleteChannelConnection(id: string): Promise<void>
 
-  /** Apps compartidas de los proveedores (solo admin). */
+  /** Providers' shared apps (admin only). */
   listChannelApps(): Promise<ChannelApp[]>
-  /** Crea o REEMPLAZA las credenciales de un proveedor (solo admin). */
+  /** Creates or REPLACES a provider's credentials (admin only). */
   upsertChannelApp(provider: ChannelAppProvider, credentials: Record<string, string>): Promise<ChannelApp>
   deleteChannelApp(provider: ChannelAppProvider): Promise<void>
-  /** Revela las credenciales en claro de un proveedor (solo admin). Úsese con cuidado. */
+  /** Reveals a provider's credentials in plaintext (admin only). Use with care. */
   revealChannelAppCredentials(provider: ChannelAppProvider): Promise<Record<string, unknown>>
 
   /**
-   * Solo admin. Prepara el Langflow del tenant (su usuario y una carpeta por proyecto)
-   * y devuelve la URL de inicio de sesión única para el iframe. Con `projectId` abre
-   * la carpeta de ese proyecto; sin él, la del primero.
+   * Admin only. Provisions the tenant's Langflow (its user and one folder per
+   * project) and returns the single-sign-on URL for the iframe. With
+   * `projectId` it opens that project's folder; without it, the first one's.
    */
   createLangflowSession(tenantId: string, projectId?: string): Promise<LangflowSession>
 
   /**
-   * Usuarios de consola (solo admin). Incluye los `client` de cada tenant -
-   * la pantalla de Usuarios los filtra, se gestionan desde Tenants.
+   * Console users (admin only). Includes each tenant's `client` account - the
+   * Users screen filters them out, since they're managed from Tenants.
    */
   listUsers(): Promise<UserRecord[]>
-  /** Sin password: queda `pending` y se le manda el email de activación. */
+  /** No password: stays `pending` and gets sent the activation email. */
   createUser(input: CreateUserInput): Promise<UserRecord>
   updateUser(id: string, patch: UpdateUserInput): Promise<UserRecord>
-  /** Cierra todas sus sesiones activas. */
+  /** Closes all of the user's active sessions. */
   deleteUser(id: string): Promise<void>
-  /** Reenvía el email de activación (solo si sigue `pending`). */
+  /** Resends the activation email (only while still `pending`). */
   resendUserActivation(id: string): Promise<void>
 }

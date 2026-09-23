@@ -1,18 +1,18 @@
 /**
- * Cliente HTTP compartido para hablar con el gateway (`/api/...`).
+ * Shared HTTP client for talking to the gateway (`/api/...`).
  *
- * - Envía la cookie de sesión (`credentials: 'include'`).
- * - Añade `X-Requested-With: fd-console`, que el gateway exige en toda
- *   petición que cambia datos y va con cookie (defensa CSRF): un origen ajeno
- *   no puede enviar esa cabecera sin permiso CORS.
- * - Traduce las respuestas de error a {@link ApiError}, con el `detail` del
- *   gateway como mensaje.
+ * - Sends the session cookie (`credentials: 'include'`).
+ * - Adds `X-Requested-With: fd-console`, which the gateway requires on every
+ *   data-changing request sent with a cookie (CSRF defense): a foreign origin
+ *   can't send that header without CORS permission.
+ * - Translates error responses into {@link ApiError}, using the gateway's
+ *   `detail` as the message.
  */
 
-/** Cabeceras que el gateway exige para aceptar escrituras con cookie. */
+/** Headers the gateway requires to accept cookie-authenticated writes. */
 export const CSRF_HEADERS = { 'X-Requested-With': 'fd-console' } as const
 
-/** Error devuelto por el gateway (o de red si `status` es 0). */
+/** Error returned by the gateway (or a network error if `status` is 0). */
 export class ApiError extends Error {
   readonly status: number
 
@@ -23,23 +23,23 @@ export class ApiError extends Error {
   }
 }
 
-/** Opciones de {@link apiFetch}. */
+/** Options for {@link apiFetch}. */
 export interface ApiFetchOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-  /** Cuerpo JSON. */
+  /** JSON body. */
   body?: unknown
-  /** `fetch` inyectable para tests. */
+  /** Injectable `fetch` for tests. */
   fetchFn?: typeof fetch
-  /** Base de la API; por defecto `/api`. */
+  /** API base; defaults to `/api`. */
   baseUrl?: string
 }
 
 /**
- * Extrae un mensaje legible de una respuesta de error de FastAPI.
+ * Extracts a readable message from a FastAPI error response.
  *
- * @param res - Respuesta con estado de error.
- * @returns El `detail` si es texto; un resumen si es la lista de validación
- *   (422); o un mensaje genérico con el código.
+ * @param res - Response with an error status.
+ * @returns The `detail` if it's text; a summary if it's the validation list
+ *   (422); or a generic message with the status code.
  */
 async function errorMessage(res: Response): Promise<string> {
   try {
@@ -57,13 +57,13 @@ async function errorMessage(res: Response): Promise<string> {
 }
 
 /**
- * Llama al gateway y devuelve el JSON tipado (o `undefined` en un 204).
+ * Calls the gateway and returns the typed JSON (or `undefined` on a 204).
  *
- * @param path - Ruta bajo la base, con `/` inicial (p. ej. `/admin/projects`).
- * @param options - Método, cuerpo y dependencias inyectables.
- * @returns El cuerpo JSON de la respuesta.
- * @throws ApiError con el estado y el mensaje del gateway; `status` 0 si no
- *   hubo conexión.
+ * @param path - Path under the base, with a leading `/` (e.g. `/admin/projects`).
+ * @param options - Method, body and injectable dependencies.
+ * @returns The response's JSON body.
+ * @throws ApiError with the gateway's status and message; `status` 0 if
+ *   there was no connection.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
   const { method = 'GET', body, fetchFn = (...a) => fetch(...a), baseUrl = '/api' } = options

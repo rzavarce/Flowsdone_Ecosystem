@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { ROLE_META } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 
-/** Avatar de la barra superior con desplegable: datos del usuario y cierre de sesión. */
+/** Top bar avatar with dropdown: user info and sign out. */
 export function UserMenu() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)

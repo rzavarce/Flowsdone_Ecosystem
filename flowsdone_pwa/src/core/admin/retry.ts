@@ -1,12 +1,12 @@
 import { ApiError } from '@/core/http/apiFetch'
 
 /**
- * Política de reintentos de las consultas.
+ * Retry policy for queries.
  *
- * @param failureCount - Intentos fallidos hasta ahora.
- * @param error - El error del último intento.
- * @returns `false` para errores del cliente (4xx: no se arreglan solos); `true`
- *   para los de red o 5xx, hasta 2 reintentos.
+ * @param failureCount - Failed attempts so far.
+ * @param error - The error from the last attempt.
+ * @returns `false` for client errors (4xx: they won't fix themselves); `true`
+ *   for network or 5xx errors, up to 2 retries.
  */
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false

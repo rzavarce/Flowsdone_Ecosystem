@@ -5,8 +5,8 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
 /**
- * Estructura común de las vistas autenticadas: sidebar (escritorio), barra
- * superior, contenido (`<Outlet />`) y pestañas inferiores (móvil).
+ * Common shell for authenticated views: sidebar (desktop), top bar,
+ * content (`<Outlet />`) and bottom tabs (mobile).
  */
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)

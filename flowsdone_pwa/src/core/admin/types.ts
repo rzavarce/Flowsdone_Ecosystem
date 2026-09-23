@@ -1,8 +1,8 @@
-/** Tipos de la API admin del gateway (`/internal/admin/*`) tal como los usa la consola. */
+/** Types for the gateway's admin API (`/internal/admin/*`) as used by the console. */
 
 import type { Role } from '@/core/auth/types'
 
-/** Canales soportados por el gateway. */
+/** Channels supported by the gateway. */
 export type ChannelType =
   | 'facebook'
   | 'instagram'
@@ -12,13 +12,13 @@ export type ChannelType =
   | 'tiktok'
   | 'voice'
 
-/** Proveedores con una app compartida para toda la plataforma. */
+/** Providers with one app shared across the whole platform. */
 export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio'
 
-/** Estado de ciclo de vida de tenants y proyectos. `suspended` corta el enrutado de sus canales sin borrar datos. */
+/** Lifecycle status of tenants and projects. `suspended` cuts off routing for their channels without deleting data. */
 export type LifecycleStatus = 'active' | 'suspended'
 
-/** Un tenant tal como lo devuelve la API admin (el de la sesión, `core/auth`, solo trae id y nombre). */
+/** A tenant as returned by the admin API (the session's, in `core/auth`, only carries id and name). */
 export interface TenantRecord {
   id: string
   name: string
@@ -28,24 +28,25 @@ export interface TenantRecord {
   updated_at: string
 }
 
+/** Input for creating a tenant. Always provisions its `client` account alongside it. */
 export interface CreateTenantInput {
   name: string
   slug: string
-  /** Email del `client` que se crea junto al tenant (pending, activa por email). */
+  /** Email of the `client` account created alongside the tenant (pending, activated by email). */
   client_email: string
-  /** Nombre para mostrar de ese `client`. */
+  /** Display name for that `client` account. */
   client_name: string
 }
 
-/** Campos editables de un tenant; los omitidos no cambian. */
+/** Editable fields of a tenant; omitted ones stay unchanged. */
 export interface UpdateTenantInput {
   name?: string
   slug?: string
   status?: LifecycleStatus
 }
 
-/** Datos de facturación de un tenant (1:1) - pura captura de datos, sin motor
- * de cobro detrás. Todo opcional: se completa gradualmente. */
+/** A tenant's billing data (1:1) - pure data capture, with no billing engine
+ * behind it. Everything is optional: it gets filled in gradually. */
 export interface TenantBillingProfile {
   id: string
   tenant_id: string
@@ -68,18 +69,19 @@ export interface TenantBillingProfile {
   updated_at: string
 }
 
-/** Campos editables del perfil de facturación; los omitidos no cambian. */
+/** Editable fields of the billing profile; omitted ones stay unchanged. */
 export type UpdateTenantBillingInput = Partial<
   Omit<TenantBillingProfile, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
 >
 
-/** Campos editables de un proyecto; los omitidos no cambian. */
+/** Editable fields of a project; omitted ones stay unchanged. */
 export interface UpdateProjectInput {
   name?: string
   slug?: string
   status?: LifecycleStatus
 }
 
+/** A project as returned by the admin API; belongs to a single tenant. */
 export interface Project {
   id: string
   tenant_id: string
@@ -88,6 +90,7 @@ export interface Project {
   status: string
 }
 
+/** An agent as returned by the admin API; wraps a Langflow flow within a project. */
 export interface Agent {
   id: string
   project_id: string
@@ -97,7 +100,7 @@ export interface Agent {
   status: string
 }
 
-/** Un canal conectado de un cliente. Las credenciales nunca vuelven en claro. */
+/** A client's connected channel. Credentials never come back in plaintext. */
 export interface ChannelConnection {
   id: string
   project_id: string
@@ -112,7 +115,7 @@ export interface ChannelConnection {
   updated_at: string
 }
 
-/** Credenciales compartidas de un proveedor; solo se sabe si están configuradas. */
+/** A provider's shared credentials; only whether they're configured is known here. */
 export interface ChannelApp {
   id: string
   provider: ChannelAppProvider
@@ -123,12 +126,14 @@ export interface ChannelApp {
   updated_at: string
 }
 
+/** Input for creating a project under a tenant. */
 export interface CreateProjectInput {
   tenant_id: string
   name: string
   slug: string
 }
 
+/** Input for creating a channel connection under a project and agent. */
 export interface CreateChannelConnectionInput {
   project_id: string
   agent_id: string
@@ -138,20 +143,20 @@ export interface CreateChannelConnectionInput {
   credentials?: Record<string, string>
 }
 
-/** Campos editables de una conexión; los omitidos no cambian. */
+/** Editable fields of a connection; omitted ones stay unchanged. */
 export interface UpdateChannelConnectionInput {
   agent_id?: string
   display_name?: string | null
-  /** Si se envía REEMPLAZA las credenciales actuales. */
+  /** When sent, REPLACES the current credentials. */
   credentials?: Record<string, string>
   status?: string
 }
 
-/** Estado de una cuenta de consola. `pending`: creada, esperando que active
- * su cuenta por el link que le llegó por email - no puede loguear todavía. */
+/** Status of a console account. `pending`: created, waiting for the user to
+ * activate it via the link sent by email - can't log in yet. */
 export type UserAccountStatus = 'pending' | 'active' | 'disabled'
 
-/** Un usuario de consola tal como lo devuelve la API admin. Nunca trae el hash. */
+/** A console user as returned by the admin API. Never carries the password hash. */
 export interface UserRecord {
   id: string
   email: string
@@ -164,8 +169,8 @@ export interface UserRecord {
   updated_at: string
 }
 
-/** Alta de un usuario. Sin password: se crea `pending` y activa por email
- * (ver `ProvisionUserUseCase` en el backend). */
+/** Input for creating a user. No password: created `pending` and activated by
+ * email (see `ProvisionUserUseCase` on the backend). */
 export interface CreateUserInput {
   email: string
   name: string
@@ -173,7 +178,7 @@ export interface CreateUserInput {
   tenant_ids: string[]
 }
 
-/** Campos editables de un usuario; los omitidos no cambian. */
+/** Editable fields of a user; omitted ones stay unchanged. */
 export interface UpdateUserInput {
   name?: string
   role?: Role
@@ -181,12 +186,12 @@ export interface UpdateUserInput {
   tenant_ids?: string[]
 }
 
-/** Sesión para abrir Langflow como el usuario de un tenant. */
+/** A session for opening Langflow as a tenant's user. */
 export interface LangflowSession {
   /**
-   * URL del gateway que se carga en el iframe. Lleva un ticket de un solo uso que
-   * caduca en segundos: hay que pedir una nueva cada vez que se monta el editor.
-   * Vacía en el adaptador mock (no hay Langflow real).
+   * Gateway URL loaded into the iframe. Carries a single-use ticket that
+   * expires within seconds: a new one must be requested every time the
+   * editor is mounted. Empty in the mock adapter (no real Langflow).
    */
   url: string
 }

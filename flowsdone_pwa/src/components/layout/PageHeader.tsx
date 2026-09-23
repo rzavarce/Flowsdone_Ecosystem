@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
 
-/** Props de {@link PageHeader}. */
+/** Props for {@link PageHeader}. */
 export interface PageHeaderProps {
   title: string
   description?: string
-  /** Acciones alineadas a la derecha (botones de la página). */
+  /** Right-aligned actions (page buttons). */
   actions?: ReactNode
 }
 
-/** Título de página con descripción y acciones; único `<h1>` de cada vista. */
+/** Page title with description and actions; the sole `<h1>` on each view. */
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">

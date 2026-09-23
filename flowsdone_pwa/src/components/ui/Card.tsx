@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
-/** Contenedor con borde y sombra suave; base de los paneles del dashboard. */
+/** Container with a border and soft shadow; the base for dashboard panels. */
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
@@ -11,15 +11,15 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   )
 }
 
-/** Props de {@link CardHeader}. */
+/** Props for {@link CardHeader}. */
 export interface CardHeaderProps {
   title: string
   description?: string
-  /** Contenido alineado a la derecha (filtros, acciones). */
+  /** Right-aligned content (filters, actions). */
   action?: ReactNode
 }
 
-/** Cabecera estándar de una Card: título, subtítulo opcional y acción. */
+/** Standard Card header: title, optional subtitle, and action. */
 export function CardHeader({ title, description, action }: CardHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-4 p-5 pb-0">

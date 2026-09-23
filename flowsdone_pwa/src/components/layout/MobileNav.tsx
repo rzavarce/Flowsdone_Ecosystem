@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { useNavItems } from './useNavItems'
 
-/** Barra de pestañas inferior para móvil (< lg), pensada para la PWA instalada. */
+/** Bottom tab bar for mobile (< lg), designed for the installed PWA. */
 export function MobileNav() {
   const items = useNavItems()
   return (

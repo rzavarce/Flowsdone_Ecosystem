@@ -7,20 +7,21 @@ import { AuthError } from '@/core/auth/AuthApi'
 import { homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 
-/** Mismo mínimo que exige el backend (MIN_PASSWORD_LENGTH en create_user.py). */
+/** Same minimum the backend enforces (MIN_PASSWORD_LENGTH in create_user.py). */
 const MIN_PASSWORD_LENGTH = 10
 
-/** Props de {@link ActivateAccountForm}. */
+/** Props for {@link ActivateAccountForm}. */
 export interface ActivateAccountFormProps {
-  /** Token del link de activación, tomado de la URL. */
+  /** Activation link token, taken from the URL. */
   token: string
 }
 
 /**
- * Formulario para crear la contraseña y activar la cuenta. Sin `PublicOnly`
- * en la ruta (ver `router.tsx`: el link debe funcionar aunque este navegador
- * ya tenga otra sesión abierta), así que la redirección tras activar la hace
- * este componente a mano, a la pantalla de inicio de la cuenta recién activada.
+ * Form to set a password and activate the account. The route has no
+ * `PublicOnly` guard (see `router.tsx`: the link must work even if this
+ * browser already has another session open), so this component handles the
+ * post-activation redirect by hand, to the home screen of the newly
+ * activated account.
  */
 export function ActivateAccountForm({ token }: ActivateAccountFormProps) {
   const { activateAccount } = useAuth()

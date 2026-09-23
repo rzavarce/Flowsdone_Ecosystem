@@ -13,9 +13,9 @@ import { describeError } from '@/core/http/describeError'
 import { NewProjectForm } from './NewProjectForm'
 import type { ChannelsView } from './useChannelsView'
 
-/** Props de {@link ConnectionDialog}. */
+/** Props for {@link ConnectionDialog}. */
 export interface ConnectionDialogProps {
-  /** `null` = crear un canal nuevo; una conexión = editarla. */
+  /** `null` = create a new channel; a connection = edit it. */
   connection: ChannelConnection | null
   view: ChannelsView
   onClose: () => void
@@ -24,13 +24,14 @@ export interface ConnectionDialogProps {
 const FORM_ID = 'connection-form'
 
 /**
- * Formulario para conectar un canal nuevo o editar uno existente.
+ * Form to connect a new channel or edit an existing one.
  *
- * Al **crear** se elige proyecto, tipo, agente (del mismo proyecto) e
- * identificador, más las credenciales que el tipo requiera. Al **editar** solo
- * cambian agente, nombre, estado y (opcionalmente) las credenciales: el
- * gateway no permite mover un canal de proyecto ni cambiar su identificador.
- * Se monta solo mientras está abierto, así que cada apertura parte limpia.
+ * When **creating**, the user picks project, type, agent (from that same
+ * project) and identifier, plus whatever credentials the type requires. When
+ * **editing**, only agent, name, status and (optionally) credentials can
+ * change: the gateway doesn't allow moving a channel to another project or
+ * changing its identifier. It's only mounted while open, so each opening
+ * starts from a clean state.
  */
 export function ConnectionDialog({ connection, view, onClose }: ConnectionDialogProps) {
   const editing = connection !== null

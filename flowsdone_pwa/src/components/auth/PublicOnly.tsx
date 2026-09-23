@@ -5,8 +5,9 @@ import { useAuth } from '@/core/auth/useAuth'
 import { Spinner } from '@/components/ui/Spinner'
 
 /**
- * Para pantallas públicas (login): si ya hay sesión, reenvía al destino que
- * se intentó abrir o, si no lo hay, a la página de inicio del perfil.
+ * For public screens (login): if a session already exists, redirects to the
+ * destination that was originally requested, or to the profile's home page
+ * if there wasn't one.
  */
 export function PublicOnly({ children }: { children: ReactNode }) {
   const { status, user } = useAuth()

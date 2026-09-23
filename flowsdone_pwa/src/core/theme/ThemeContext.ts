@@ -1,7 +1,7 @@
 import { createContext } from 'react'
 import type { ColorMode, ResolvedMode, ThemeId } from './themes'
 
-/** Valor expuesto por {@link ThemeProvider}. */
+/** Value exposed by {@link ThemeProvider}. */
 export interface ThemeContextValue {
   theme: ThemeId
   mode: ColorMode
@@ -10,4 +10,5 @@ export interface ThemeContextValue {
   setMode: (mode: ColorMode) => void
 }
 
+/** React context carrying the current {@link ThemeContextValue}; `null` outside `<ThemeProvider>`. */
 export const ThemeContext = createContext<ThemeContextValue | null>(null)

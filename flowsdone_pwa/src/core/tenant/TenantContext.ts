@@ -1,20 +1,21 @@
 import { createContext } from 'react'
 import type { Tenant } from '@/core/auth/types'
 
-/** Valor que representa "todos los tenants" (solo administradores). */
+/** Value representing "all tenants" (admins only). */
 export const ALL_TENANTS = 'all'
 
-/** Valor expuesto por {@link TenantProvider}. */
+/** Value exposed by {@link TenantProvider}. */
 export interface TenantContextValue {
-  /** Tenants seleccionables por el usuario actual. */
+  /** Tenants the current user can select. */
   tenants: Tenant[]
-  /** Si se ofrece la opción "Todos los tenants". */
+  /** Whether the "All tenants" option is offered. */
   canSelectAll: boolean
-  /** Tenant activo; `null` significa todos. */
+  /** Active tenant; `null` means all of them. */
   current: Tenant | null
-  /** Id seleccionado (`ALL_TENANTS` o un id de tenant). */
+  /** Selected id (`ALL_TENANTS` or a tenant id). */
   selectedId: string
   select: (id: string) => void
 }
 
+/** React context carrying the current {@link TenantContextValue}; `null` outside `<TenantProvider>`. */
 export const TenantContext = createContext<TenantContextValue | null>(null)

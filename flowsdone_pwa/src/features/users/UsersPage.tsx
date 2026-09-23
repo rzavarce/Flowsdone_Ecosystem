@@ -12,13 +12,13 @@ import { describeError } from '@/core/http/describeError'
 import { UserDialog } from './UserDialog'
 import { UserList } from './UserList'
 
-/** Diálogo abierto: usuario nuevo/editado, o ninguno. */
+/** Open dialog: new/edited user, or none. */
 type Dialog = { user: UserRecord | null } | null
 
 /**
- * Usuarios de consola: alta, edición y borrado de `admin`, `tenant_manager`
- * y `botmaster` (solo admin). Los `client` no aparecen aquí - se crean y se
- * ven junto a su tenant, en la pantalla Tenants.
+ * Console users: create, edit and delete `admin`, `tenant_manager` and
+ * `botmaster` (admin only). `client` users don't appear here - they're
+ * created and viewed alongside their tenant, in the Tenants screen.
  */
 export function UsersPage() {
   const users = useUsers()

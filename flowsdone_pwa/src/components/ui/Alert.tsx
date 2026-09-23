@@ -10,21 +10,21 @@ const STYLES: Record<Tone, { box: string; icon: typeof Info; dismiss: string }> 
   info: { box: 'bg-accent text-primary-ink', icon: Info, dismiss: 'hover:bg-black/5' },
 }
 
-/** Props de {@link Alert}. */
+/** Props for {@link Alert}. */
 export interface AlertProps {
   tone?: Tone
   children: ReactNode
   className?: string
   /**
-   * Aviso puntual que se puede quitar sin más (p. ej. "se reenvió el email").
-   * Omitir cuando el mensaje refleja un estado que sigue roto (la lista no
-   * cargó, un campo sigue inválido): quitarlo ahí no arregla nada y esconde
-   * información útil.
+   * One-off notice that can just be dismissed (e.g. "the email was resent").
+   * Omit it when the message reflects a state that's still broken (the list
+   * failed to load, a field is still invalid): dismissing it there fixes
+   * nothing and hides useful information.
    */
   onDismiss?: () => void
 }
 
-/** Mensaje destacado. `danger` se anuncia como alerta; el resto como aviso de estado. */
+/** Highlighted message. `danger` is announced as an alert; the rest as a status notice. */
 export function Alert({ tone = 'info', children, className, onDismiss }: AlertProps) {
   const { box, icon: Icon, dismiss } = STYLES[tone]
   return (

@@ -2,9 +2,9 @@ import { useContext } from 'react'
 import { ThemeContext, type ThemeContextValue } from './ThemeContext'
 
 /**
- * Accede al tema activo y a sus setters.
+ * Accesses the active theme and its setters.
  *
- * @throws Error si se usa fuera de `<ThemeProvider>`.
+ * @throws Error if used outside `<ThemeProvider>`.
  */
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext)

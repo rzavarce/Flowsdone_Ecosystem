@@ -9,8 +9,8 @@ import { useAuth } from '@/core/auth/useAuth'
 import { DemoAccounts } from './DemoAccounts'
 
 /**
- * Formulario de acceso. Al autenticar, `PublicOnly` (que envuelve la ruta)
- * se encarga de redirigir; acá solo se gestiona el envío y el error.
+ * Login form. Once authenticated, `PublicOnly` (which wraps the route)
+ * handles the redirect; this component only manages submission and errors.
  */
 export function LoginForm() {
   const { login } = useAuth()

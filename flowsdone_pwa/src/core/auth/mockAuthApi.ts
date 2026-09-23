@@ -2,8 +2,8 @@ import { AuthError, type AuthApi } from './AuthApi'
 import type { Role, Tenant, User } from './types'
 
 /**
- * Adaptador de MAQUETA: cuentas de demostración en memoria, sin backend.
- * Nunca debe usarse en producción; ver `createAuthApi`.
+ * MOCK adapter: in-memory demo accounts, with no backend.
+ * Must never be used in production; see `createAuthApi`.
  */
 
 const TENANTS: Tenant[] = [
@@ -22,27 +22,30 @@ const USERS: User[] = [
   { id: 'u-client', name: 'Carla Cliente', email: 'cliente@flowsdone.dev', role: 'client', tenants: TENANTS.slice(0, 1) },
 ]
 
-/** Cuentas que la pantalla de login ofrece para rellenar el formulario. */
+/** Accounts the login screen offers to auto-fill the form. */
 export const DEMO_ACCOUNTS: readonly { email: string; password: string; role: Role; name: string }[] = USERS.map(
   (u) => ({ email: u.email, password: DEMO_PASSWORD, role: u.role, name: u.name }),
 )
 
+/** Storage key under which the mock session (a user id) is remembered. */
 export const MOCK_SESSION_KEY = 'fd-mock-session'
 
-/** Tokens de maqueta para probar `/activate-account/:token` y `/reset-password/:token`
- * en modo mock sin backend; cualquier otro valor se rechaza como inválido/vencido. */
+/** Demo tokens for exercising `/activate-account/:token` and `/reset-password/:token`
+ * in mock mode with no backend; any other value is rejected as invalid/expired. */
 export const DEMO_ACTIVATION_TOKEN = 'demo-activate-token'
+/** Demo token for exercising `/reset-password/:token` in mock mode; see {@link DEMO_ACTIVATION_TOKEN}. */
 export const DEMO_RESET_TOKEN = 'demo-reset-token'
 const INVALID_TOKEN = 'El enlace no es válido o ya venció. Pide uno nuevo.'
 
-/** Opciones de {@link createMockAuthApi}. */
+/** Options for {@link createMockAuthApi}. */
 export interface MockAuthOptions {
-  /** Latencia simulada por llamada, en ms. */
+  /** Simulated latency per call, in ms. */
   latencyMs?: number
-  /** Storage donde se recuerda la sesión (guarda solo el id de usuario). */
+  /** Storage where the session is remembered (stores only the user id). */
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
 }
 
+/** Resolves the default session storage, falling back to `null` if `localStorage` is unavailable. */
 function defaultStorage(): MockAuthOptions['storage'] {
   try {
     return window.localStorage
@@ -51,7 +54,7 @@ function defaultStorage(): MockAuthOptions['storage'] {
   }
 }
 
-/** Crea el adaptador mock. */
+/** Creates the mock adapter. */
 export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() }: MockAuthOptions = {}): AuthApi {
   const wait = () => new Promise<void>((resolve) => setTimeout(resolve, latencyMs))
   const remember = (fn: () => void) => {

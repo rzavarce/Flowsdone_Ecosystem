@@ -1,5 +1,5 @@
 /**
- * Devuelve hasta dos iniciales de un nombre.
+ * Returns up to two initials from a name.
  *
  * @example initials('Ana María Pérez') // 'AM'
  */

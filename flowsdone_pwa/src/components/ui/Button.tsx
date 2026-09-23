@@ -18,13 +18,13 @@ const SIZES: Record<Size, string> = {
   icon: 'size-10',
 }
 
-/** Props de {@link Button}. */
+/** Props for {@link Button}. */
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
 }
 
-/** Botón base. Para los de solo icono usar `size="icon"` y un `aria-label`. */
+/** Base button. For icon-only buttons, use `size="icon"` plus an `aria-label`. */
 export function Button({ variant = 'primary', size = 'md', className, type = 'button', ...props }: ButtonProps) {
   return (
     <button
