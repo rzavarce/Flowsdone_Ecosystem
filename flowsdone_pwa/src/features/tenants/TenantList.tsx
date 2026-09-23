@@ -1,7 +1,10 @@
 import { Building2 } from 'lucide-react'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { cn } from '@/lib/cn'
+import { matchesQuery } from '@/lib/search'
 import { summarize, type TenantEntry } from './useTenantsView'
 import { useTranslation } from 'react-i18next'
 
@@ -12,13 +15,28 @@ export interface TenantListProps {
   onSelect: (id: string) => void
 }
 
-/** List of tenants (single selection) with their status and what each one contains. */
+/**
+ * List of tenants (single selection) with their status and what each one
+ * contains, with a search box over name and slug.
+ */
 export function TenantList({ entries, selectedId, onSelect }: TenantListProps) {
   const { t } = useTranslation()
+  const [query, setQuery] = useState('')
+  const shown = entries.filter(({ tenant }) => matchesQuery(query, tenant.name, tenant.slug))
   return (
-    <Card className="overflow-hidden">
+    <Card className="self-start overflow-hidden">
+      <div className="border-b border-border p-3">
+        <Input
+          type="search"
+          aria-label={t('tenants.search')}
+          placeholder={t('tenants.searchPlaceholder')}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
+      {shown.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted">{t('tenants.noMatches')}</p>}
       <ul aria-label={t('nav.tenants')} className="divide-y divide-border">
-        {entries.map(({ tenant, projects, agents, channels }) => {
+        {shown.map(({ tenant, projects, agents, channels }) => {
           const selected = tenant.id === selectedId
           return (
             <li key={tenant.id}>

@@ -1,12 +1,50 @@
 import { Building2 } from 'lucide-react'
+import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
-import { Card } from '@/components/ui/Card'
+import { Card, CardHeader } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Select } from '@/components/ui/Field'
 import { Spinner } from '@/components/ui/Spinner'
-import { useCompany } from '@/core/company/useCompany'
+import { useCompany, useMyUsage } from '@/core/company/useCompany'
 import { describeError } from '@/core/http/describeError'
+import { StatementView } from '@/features/billing/StatementView'
+import { currentPeriod, formatPeriod, recentPeriods } from '@/lib/money'
 import { useTranslation } from 'react-i18next'
+
+/** The own tenant's usage and charges per month (never Flowsdone's costs). */
+function MyUsageCard() {
+  const { t } = useTranslation()
+  const [period, setPeriod] = useState(currentPeriod())
+  const usage = useMyUsage(period)
+  if (usage.data === null) return null
+  return (
+    <Card className="max-w-xl">
+      <CardHeader
+        title={t('usage.title')}
+        description={t('usage.description')}
+        action={
+          <Select aria-label={t('usage.period')} value={period} onChange={(e) => setPeriod(e.target.value)} className="h-9 w-auto">
+            {recentPeriods(6).map((p) => (
+              <option key={p} value={p}>
+                {formatPeriod(p)}
+              </option>
+            ))}
+          </Select>
+        }
+      />
+      <div className="p-5 pt-4">
+        {usage.isPending ? (
+          <Spinner label={t('usage.loading')} />
+        ) : usage.isError ? (
+          <Alert tone="danger">{describeError(usage.error)}</Alert>
+        ) : (
+          <StatementView statement={usage.data} />
+        )}
+      </div>
+    </Card>
+  )
+}
 
 /** A single company field, or nothing if it's empty. */
 function Row({ label, value }: { label: string; value: string | null }) {
@@ -20,7 +58,8 @@ function Row({ label, value }: { label: string; value: string | null }) {
 }
 
 /**
- * "My company": the own tenant's billing data, read-only (`client`). It's
+ * "My company": the own tenant's billing data and monthly usage, read-only
+ * (`client`). Usage comes from `GET /me/usage`. The billing data is
  * edited by an admin/tenant_manager from Tenants (`BillingProfileCard`);
  * this screen never goes through the admin API, it uses `GET /me/billing-profile`.
  */
@@ -47,7 +86,7 @@ export function CompanyPage() {
           description={t('company.empty.description')}
         />
       ) : (
-        <Card className="max-w-xl p-5">
+        <Card className="mb-6 max-w-xl p-5">
           <Row label={t('billing.fields.legal_name')} value={company.data.legal_name} />
           <Row label={t('billing.fields.tax_id')} value={company.data.tax_id} />
           <Row label={t('billing.fields.billing_email')} value={company.data.billing_email} />
@@ -60,6 +99,7 @@ export function CompanyPage() {
           <Row label={t('billing.fields.currency')} value={company.data.currency} />
         </Card>
       )}
+      <MyUsageCard />
     </>
   )
 }

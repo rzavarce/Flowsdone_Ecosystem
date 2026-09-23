@@ -17,6 +17,18 @@ import type {
   UpdateUserInput,
   UserRecord,
   LangflowSession,
+  Conversation,
+  ConversationDetail,
+  ConversationFilters,
+  CostRate,
+  CostRateInput,
+  Plan,
+  PlanInput,
+  PricingInsight,
+  Statement,
+  Subscription,
+  SubscriptionInput,
+  UnratedMeter,
 } from './types'
 
 /**
@@ -92,4 +104,36 @@ export interface AdminApi {
   removeUserAvatar(id: string): Promise<UserRecord>
   /** URL to display a user's photo, or `null` if they have none. */
   userAvatarUrl(user: UserRecord): string | null
+
+  /** Conversations of the visible tenants, most recent activity first (staff). */
+  listConversations(filters?: ConversationFilters): Promise<Conversation[]>
+  /** A conversation with its transcript and usage; cost only for admins. */
+  getConversation(id: string): Promise<ConversationDetail>
+
+  /** Commercial plans (admin only). */
+  listPlans(): Promise<Plan[]>
+  createPlan(input: PlanInput & { code: string; name: string }): Promise<Plan>
+  updatePlan(id: string, patch: PlanInput): Promise<Plan>
+  /** Fails with 409 while a tenant is subscribed (deactivate it instead). */
+  deletePlan(id: string): Promise<void>
+  /** Average cost per message per channel and the suggested overage price (admin only). */
+  getPlanPricingInsight(id: string, days?: number): Promise<PricingInsight>
+
+  /** The cost catalog, every version (admin only). */
+  listCostRates(): Promise<CostRate[]>
+  createCostRate(input: CostRateInput): Promise<CostRate>
+  deleteCostRate(id: string): Promise<void>
+  /** Meters used recently with no rate (admin only). */
+  listUnratedMeters(days?: number): Promise<UnratedMeter[]>
+
+  /** A tenant's subscription, or `null` if it has none (admin/tenant_manager). */
+  getSubscription(tenantId: string): Promise<Subscription | null>
+  /** Admin only. */
+  putSubscription(tenantId: string, input: SubscriptionInput): Promise<Subscription>
+  /** Admin only. */
+  deleteSubscription(tenantId: string): Promise<void>
+  /** A tenant's month (current if `period` is omitted): frozen if closed, live otherwise. */
+  getStatement(tenantId: string, period?: string): Promise<Statement>
+  /** A tenant's closed months, newest first. */
+  listStatements(tenantId: string): Promise<Statement[]>
 }

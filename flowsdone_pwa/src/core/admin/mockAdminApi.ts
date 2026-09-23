@@ -1,5 +1,6 @@
 import { ApiError } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
+import { createMockBilling } from './mockBilling'
 import type {
   Agent,
   ChannelApp,
@@ -129,6 +130,8 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
   }
 
   return {
+    // Conversaciones y facturación: módulo aparte, sobre los mismos datos vivos.
+    ...createMockBilling({ latencyMs, tenants, projects, connections }),
     async listTenants() {
       await wait(latencyMs)
       return clone(tenants)

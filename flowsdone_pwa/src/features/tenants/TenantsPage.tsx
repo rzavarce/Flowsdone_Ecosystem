@@ -16,6 +16,8 @@ import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
 import { BillingProfileCard } from './BillingProfileCard'
+import { SubscriptionCard } from './SubscriptionCard'
+import { UsageCard } from './UsageCard'
 import { ProjectDialog } from './ProjectDialog'
 import { ProjectsCard } from './ProjectsCard'
 import { TenantDialog } from './TenantDialog'
@@ -223,7 +225,14 @@ export function TenantsPage() {
             }}
           />
 
-          {canManageBilling && <BillingProfileCard tenantId={tenant.id} tenantName={tenant.name} />}
+          {canManageBilling && (
+            <>
+              {/* Asignar/cambiar el plan: solo admin (POLICY["billing"] write en el gateway). */}
+              <SubscriptionCard tenantId={tenant.id} tenantName={tenant.name} canEdit={can(user, 'platform:manage')} />
+              <UsageCard tenantId={tenant.id} />
+              <BillingProfileCard tenantId={tenant.id} tenantName={tenant.name} />
+            </>
+          )}
         </div>
       </div>
 
