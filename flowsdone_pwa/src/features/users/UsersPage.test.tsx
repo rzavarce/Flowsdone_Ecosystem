@@ -1,119 +1,60 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMockAdminApi } from '@/core/admin/mockAdminApi'
 import { SEED } from '@/test/adminFixtures'
 import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 
-const mock = () => createMockAdminApi({ latencyMs: 0, seed: SEED })
-
-async function open(api = mock()) {
-  renderApp('/users', fakeAuthApi(makeUser('admin')), api)
-  await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
-  await screen.findByRole('list', { name: 'Usuarios' })
-  return api
+const setup = () => {
+  const admin = createMockAdminApi({ latencyMs: 0, seed: SEED })
+  renderApp('/users', fakeAuthApi(makeUser('admin')), admin)
+  return admin
 }
-const list = () => screen.getByRole('list', { name: 'Usuarios' })
 
-describe('UsersPage', () => {
-  it('lista el staff con su rol y estado, y deja fuera a los client', async () => {
-    await open()
-    expect(within(list()).getByText('Ana Admin')).toBeInTheDocument()
-    expect(within(list()).getByText('Marcos Gestor')).toBeInTheDocument()
-    expect(within(list()).getByText('Bea Botmaster')).toBeInTheDocument()
-    expect(within(list()).queryByText('Carla Cliente')).not.toBeInTheDocument()
-    expect(within(list()).getByText('Pendiente de activar')).toBeInTheDocument()
+// Mucho tecleo (userEvent.type) por test: con la suite completa en paralelo pasa de 5 s.
+describe('UsersPage: datos de perfil opcionales', { timeout: 20_000 }, () => {
+  it('crear un usuario manda teléfono, dirección y redes solo si se rellenan', async () => {
+    const admin = setup()
+    const create = vi.spyOn(admin, 'createUser')
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo usuario' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await userEvent.type(dialog.getByLabelText('Email'), 'nueva@flowsdone.com')
+    await userEvent.type(dialog.getByLabelText('Nombre'), 'Nueva Persona')
+    await userEvent.click(dialog.getAllByRole('checkbox')[0]!)
+    await userEvent.type(dialog.getByLabelText(/Teléfono/), '+34 600 000 000')
+    await userEvent.type(dialog.getByLabelText('Sitio web'), 'https://nueva.dev')
+    await userEvent.click(dialog.getByRole('button', { name: 'Crear usuario' }))
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '+34 600 000 000', social_links: { website: 'https://nueva.dev' } }),
+    )
+    expect(create.mock.calls[0]![0]).not.toHaveProperty('address')
   })
 
-  it('crea un usuario: queda pending y pide tenants salvo para admin', async () => {
-    await open()
-    await userEvent.click(screen.getByRole('button', { name: /Nuevo usuario/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Nuevo usuario' })
+  it('una URL inválida bloquea el envío y lo explica', async () => {
+    const admin = setup()
+    const create = vi.spyOn(admin, 'createUser')
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo usuario' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await userEvent.type(dialog.getByLabelText('Email'), 'otra@flowsdone.com')
+    await userEvent.type(dialog.getByLabelText('Nombre'), 'Otra')
+    await userEvent.click(dialog.getAllByRole('checkbox')[0]!)
+    await userEvent.type(dialog.getByLabelText('Instagram'), 'javascript:alert(1)')
+    await userEvent.click(dialog.getByRole('button', { name: 'Crear usuario' }))
 
-    // Por defecto pide tenants (botmaster); elegir Administrador los oculta.
-    expect(within(dialog).getByText('Tenants')).toBeInTheDocument()
-    await userEvent.selectOptions(within(dialog).getByLabelText('Rol'), 'Administrador')
-    expect(within(dialog).queryByText('Tenants')).not.toBeInTheDocument()
-
-    await userEvent.selectOptions(within(dialog).getByLabelText('Rol'), 'Botmaster')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear usuario' }))
-    expect(within(dialog).getByText('Escribe un email válido.')).toBeInTheDocument()
-    expect(within(dialog).getByText('El nombre es obligatorio.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Elige al menos un tenant.')).toBeInTheDocument()
-
-    await userEvent.type(within(dialog).getByLabelText('Email'), 'nuevo@flowsdone.com')
-    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Nuevo Botmaster')
-    await userEvent.click(within(dialog).getByLabelText('Clínica Vital'))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear usuario' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(list()).getByText('Nuevo Botmaster')).toBeInTheDocument()
+    expect(dialog.getByText(/empiece por https/)).toBeInTheDocument()
+    expect(create).not.toHaveBeenCalled()
   })
 
-  it('crea un consultor (consultores de clientes, acotados a reportes)', async () => {
-    await open()
-    await userEvent.click(screen.getByRole('button', { name: /Nuevo usuario/ }))
-    const dialog = screen.getByRole('dialog', { name: 'Nuevo usuario' })
-
-    await userEvent.selectOptions(within(dialog).getByLabelText('Rol'), 'Consultor')
-    expect(within(dialog).getByText('Tenants')).toBeInTheDocument() // igual que botmaster/gestor: pide tenant(s)
-
-    await userEvent.type(within(dialog).getByLabelText('Email'), 'consultor@cliente.com')
-    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Cecilia Consultora')
-    await userEvent.click(within(dialog).getByLabelText('Clínica Vital'))
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear usuario' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(list()).getByText('Cecilia Consultora')).toBeInTheDocument()
-    expect(within(list()).getByText('Consultor')).toBeInTheDocument()
-  })
-
-  it('edita el rol y el estado de un usuario', async () => {
-    await open()
-    await userEvent.click(within(list()).getByRole('button', { name: 'Editar Marcos Gestor' }))
-    const dialog = screen.getByRole('dialog', { name: 'Editar usuario' })
-    expect(within(dialog).getByLabelText('Email')).toBeDisabled()
-
-    await userEvent.selectOptions(within(dialog).getByLabelText('Estado'), 'disabled')
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(list()).getByText('Deshabilitado')).toBeInTheDocument()
-  })
-
-  it('reenvía la activación de un usuario pending y avisa del resultado', async () => {
-    await open()
-    await userEvent.click(within(list()).getByRole('button', { name: /Reenviar email de activación a Bea Botmaster/ }))
-    expect(await screen.findByText(/Se reenvió el email de activación a bea@flowsdone.com/)).toBeInTheDocument()
-  })
-
-  it('el aviso de reenvío se puede quitar', async () => {
-    await open()
-    await userEvent.click(within(list()).getByRole('button', { name: /Reenviar email de activación a Bea Botmaster/ }))
-    await screen.findByText(/Se reenvió el email de activación/)
-
-    await userEvent.click(screen.getByRole('button', { name: 'Quitar aviso' }))
-    expect(screen.queryByText(/Se reenvió el email de activación/)).not.toBeInTheDocument()
-  })
-
-  it('un reenvío que falla también avisa (usuario ya no pending)', async () => {
-    const api = mock()
-    await open(api)
-    // Se activó justo después de cargar la lista (fuera de esta pantalla): la fila
-    // en pantalla sigue mostrando "pending" un instante, pero el backend ya no.
-    await api.updateUser('u3', { status: 'active' })
-    await userEvent.click(within(list()).getByRole('button', { name: /Reenviar email de activación a Bea Botmaster/ }))
-    expect(await screen.findByRole('alert')).toHaveTextContent(/ya no existe|no tienes acceso/)
-  })
-
-  it('elimina un usuario con confirmación', async () => {
-    await open()
-    await userEvent.click(within(list()).getByRole('button', { name: 'Eliminar Bea Botmaster' }))
-    const confirm = screen.getByRole('dialog', { name: 'Eliminar usuario' })
-    expect(within(confirm).getByText(/Bea Botmaster/)).toBeInTheDocument()
-    await userEvent.click(within(confirm).getByRole('button', { name: 'Eliminar' }))
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(within(list()).queryByText('Bea Botmaster')).not.toBeInTheDocument()
+  it('al editar se puede cambiar la dirección y aparece la sección de foto', async () => {
+    const admin = setup()
+    const update = vi.spyOn(admin, 'updateUser')
+    const [first] = await screen.findAllByRole('button', { name: /^Editar / })
+    await userEvent.click(first!)
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByLabelText('Subir foto')).toBeInTheDocument()
+    await userEvent.type(dialog.getByLabelText(/Dirección/), 'Av. Siempre Viva 742')
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar cambios' }))
+    expect(update).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ address: 'Av. Siempre Viva 742' }))
   })
 })

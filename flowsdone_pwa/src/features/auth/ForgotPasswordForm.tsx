@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AuthError } from '@/core/auth/AuthApi'
 import { useAuth } from '@/core/auth/useAuth'
+import { Trans, useTranslation } from 'react-i18next'
 
 /**
  * "Forgot my password" form. After submitting, it always shows the same
@@ -14,6 +15,7 @@ import { useAuth } from '@/core/auth/useAuth'
  * principle.
  */
 export function ForgotPasswordForm() {
+  const { t } = useTranslation()
   const { requestPasswordReset } = useAuth()
   const ids = { email: useId(), error: useId() }
   const [email, setEmail] = useState('')
@@ -29,7 +31,7 @@ export function ForgotPasswordForm() {
       await requestPasswordReset(email.trim())
       setSent(true)
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : 'Ocurrió un error inesperado.')
+      setError(err instanceof AuthError ? err.message : t('common.unexpectedError'))
     } finally {
       setPending(false)
     }
@@ -39,10 +41,10 @@ export function ForgotPasswordForm() {
     return (
       <div className="space-y-5">
         <Alert tone="success" onDismiss={() => setSent(false)}>
-          Si <strong>{email.trim()}</strong> tiene una cuenta, te llegará un enlace para restablecer la contraseña.
+          <Trans i18nKey="auth.forgot.sent" values={{ email: email.trim() }} components={{ strong: <strong /> }} />
         </Alert>
         <Link to="/login" className="block text-center text-sm font-medium text-primary-ink hover:underline">
-          Volver a iniciar sesión
+          {t('auth.backToLogin')}
         </Link>
       </div>
     )
@@ -52,7 +54,7 @@ export function ForgotPasswordForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-5" aria-describedby={error ? ids.error : undefined}>
       <div className="space-y-1.5">
         <label htmlFor={ids.email} className="text-sm font-medium">
-          Correo electrónico
+          {t('auth.email')}
         </label>
         <Input
           id={ids.email}
@@ -61,23 +63,23 @@ export function ForgotPasswordForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="tu@empresa.com"
+          placeholder={t('auth.emailPlaceholder')}
         />
       </div>
 
       {error && (
-        <p id={ids.error} role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p id={ids.error} role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
 
       <Button type="submit" disabled={pending || !email.trim()} className="w-full">
         {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
-        {pending ? 'Enviando…' : 'Enviar enlace de recuperación'}
+        {pending ? t('auth.forgot.submitting') : t('auth.forgot.submit')}
       </Button>
 
       <Link to="/login" className="block text-center text-sm font-medium text-primary-ink hover:underline">
-        Volver a iniciar sesión
+        {t('auth.backToLogin')}
       </Link>
     </form>
   )

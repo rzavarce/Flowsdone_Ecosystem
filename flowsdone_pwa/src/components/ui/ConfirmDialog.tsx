@@ -3,6 +3,7 @@ import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { Field } from './Field'
 import { Input } from './Input'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link ConfirmDialog}. */
 export interface ConfirmDialogProps {
@@ -47,6 +48,7 @@ function ConfirmDialogOpen({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const [typed, setTyped] = useState('')
   const armed = requireText === undefined || typed === requireText
 
@@ -59,10 +61,10 @@ function ConfirmDialogOpen({
       footer={
         <>
           <Button variant="secondary" onClick={onCancel} disabled={pending} autoFocus>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button variant="danger" onClick={onConfirm} disabled={pending || !armed}>
-            {pending ? 'Procesando…' : confirmLabel}
+            {pending ? t('common.processing') : confirmLabel}
           </Button>
         </>
       }
@@ -70,16 +72,16 @@ function ConfirmDialogOpen({
       <div className="space-y-4">
         {children}
         {requireText !== undefined && (
-          <Field label={`Escribe "${requireText}" para confirmar`}>
+          <Field label={t('common.typeToConfirm', { text: requireText })}>
             <Input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" spellCheck={false} />
           </Field>
         )}
         {error ? (
-          <p role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
           </p>
         ) : (
-          <p className="text-sm text-muted">Esta acción no se puede deshacer.</p>
+          <p className="text-sm text-muted">{t('common.irreversible')}</p>
         )}
       </div>
     </Dialog>

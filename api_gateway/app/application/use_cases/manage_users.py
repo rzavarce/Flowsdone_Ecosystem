@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from app.application.use_cases.create_user import MIN_PASSWORD_LENGTH
+from app.application.use_cases.manage_profile import normalize_profile_fields
 from app.domain.models.user import USER_ROLES, User
 from app.domain.ports.outbound import (
     AuthSessionRepositoryPort,
@@ -63,6 +64,9 @@ class UpdateUserUseCase:
         status: Optional[str] = None,
         tenant_ids: Optional[List[UUID]] = None,
         password: Optional[str] = None,
+        phone: Optional[str] = None,
+        address: Optional[str] = None,
+        social_links: Optional[Dict[str, str]] = None,
     ) -> Optional[User]:
         """Update a user.
 
@@ -75,6 +79,9 @@ class UpdateUserUseCase:
             status (Optional[str]): `active` or `disabled`.
             tenant_ids (Optional[List[UUID]]): New memberships (replaces all).
             password (Optional[str]): New plaintext password.
+            phone (Optional[str]): Optional phone (empty string clears it).
+            address (Optional[str]): Optional address (empty string clears it).
+            social_links (Optional[Dict[str, str]]): Replaces all the links.
 
         Returns:
             Optional[User]: The updated user, or None if it does not exist.
@@ -96,6 +103,7 @@ class UpdateUserUseCase:
             raise ValueError(f"status must be one of: {', '.join(_STATUSES)}")
         if password is not None and len(password) < MIN_PASSWORD_LENGTH:
             raise ValueError(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+        profile = normalize_profile_fields(phone=phone, address=address, social_links=social_links)
 
         if actor_id is not None and actor_id == user_id:
             if status == "disabled" or (role is not None and role != "admin"):
@@ -124,6 +132,7 @@ class UpdateUserUseCase:
             status=status,
             tenant_ids=tenant_ids,
             password_hash=password_hash,
+            **profile,
         )
 
         # Only close sessions when access really changed: re-sending the same

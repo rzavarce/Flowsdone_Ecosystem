@@ -143,6 +143,17 @@ export function useDeleteUser() {
   })
 }
 
+/** Sets (`image`) or removes (`null`) a user's photo. */
+export function useUserAvatar() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, image }: { id: string; image: Blob | null }) =>
+      image ? api.uploadUserAvatar(id, image) : api.removeUserAvatar(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+  })
+}
+
 /** Resends the activation email for a user that's still `pending`. */
 export function useResendUserActivation() {
   const api = useAdminApi()

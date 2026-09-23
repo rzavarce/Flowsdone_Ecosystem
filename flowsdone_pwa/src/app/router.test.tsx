@@ -147,6 +147,19 @@ describe('AppShell', () => {
     expect(screen.getByRole('button', { name: 'Expandir menú' })).toBeInTheDocument()
   })
 
+  it('Ctrl+K enfoca la búsqueda', async () => {
+    renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
+    await h1('Dashboard')
+    await userEvent.keyboard('{Control>}k{/Control}')
+    expect(screen.getByRole('searchbox', { name: 'Buscar' })).toHaveFocus()
+  })
+
+  it('el menú de usuario muestra el rol y permite cerrar sesión', async () => {
+    renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
+    await userEvent.click(await screen.findByRole('button', { name: 'Menú de usuario' }))
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
+  })
+
   it('el selector de modo rota system -> light -> dark', async () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
     await userEvent.click(await screen.findByRole('button', { name: /Modo del sistema/ }))

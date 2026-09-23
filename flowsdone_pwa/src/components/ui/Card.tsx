@@ -22,9 +22,9 @@ export interface CardHeaderProps {
 /** Standard Card header: title, optional subtitle, and action. */
 export function CardHeader({ title, description, action }: CardHeaderProps) {
   return (
-    <div className="flex items-start justify-between gap-4 p-5 pb-0">
+    <div className="flex items-start justify-between gap-4 px-5 pt-5 sm:px-6">
       <div className="min-w-0">
-        <h3 className="truncate text-base font-semibold">{title}</h3>
+        <h3 className="truncate text-lg font-semibold">{title}</h3>
         {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
       </div>
       {action}

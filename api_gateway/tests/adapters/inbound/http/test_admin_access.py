@@ -469,3 +469,54 @@ async def test_the_same_slug_is_fine_in_a_different_tenant(world):
         resp = await _call(c, "POST", "/projects", token=token,
                            json={"tenant_id": str(world.tenant_b.id), "name": "Otro", "slug": "pa"})
     assert resp.status_code == 201
+
+
+# ------------------------------------------------------ user profile & photo
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+
+
+async def test_admin_creates_a_user_with_optional_profile_fields(world):
+    token = await world.token("admin")
+    async with world.client() as c:
+        created = await _call(c, "POST", "/users", token=token, json=_new_user(
+            world, phone="600 111 222", address="Calle 1", social_links={"website": "https://n.dev"},
+        ))
+        plain = await _call(c, "POST", "/users", token=token, json=_new_user(world, email="plain@x.com"))
+        bad = await _call(c, "POST", "/users", token=token, json=_new_user(
+            world, email="bad@x.com", social_links={"website": "nope"},
+        ))
+    assert created.status_code == 201
+    assert created.json()["phone"] == "600 111 222"
+    assert created.json()["social_links"] == {"website": "https://n.dev"}
+    assert plain.status_code == 201 and plain.json()["phone"] is None
+    # Validated before creating: no half-created user left behind.
+    assert bad.status_code == 400
+    assert not any(u.email == "bad@x.com" for u in world.users.users.values())
+
+
+async def test_admin_edits_profile_fields_and_photo_of_a_user(world):
+    token = await world.token("admin")
+    target = world.by_role["client"]
+    async with world.client() as c:
+        patched = await _call(c, "PATCH", f"/users/{target.id}", token=token, json={"address": "Av. 2"})
+        headers = {**cookie(token), **CSRF, "Content-Type": "image/png"}
+        put = await c.put(f"{BASE}/users/{target.id}/avatar", headers=headers, content=PNG)
+        got = await c.get(f"{BASE}/users/{target.id}/avatar", headers=cookie(token))
+        removed = await _call(c, "DELETE", f"/users/{target.id}/avatar", token=token)
+        ghost = await c.put(f"{BASE}/users/{uuid4()}/avatar", headers=headers, content=PNG)
+    assert patched.json()["address"] == "Av. 2"
+    assert put.status_code == 200 and put.json()["avatar_updated_at"]
+    assert got.status_code == 200 and got.content == PNG
+    assert removed.status_code == 200 and removed.json()["avatar_updated_at"] is None
+    assert ghost.status_code == 404
+
+
+async def test_only_admins_touch_other_users_photos(world):
+    target = world.by_role["client"]
+    for role in ("tenant_manager", "botmaster", "client"):
+        token = await world.token(role)
+        async with world.client() as c:
+            headers = {**cookie(token), **CSRF}
+            assert (await c.put(f"{BASE}/users/{target.id}/avatar", headers=headers, content=PNG)).status_code == 403
+            assert (await c.get(f"{BASE}/users/{target.id}/avatar", headers=cookie(token))).status_code == 403

@@ -1,13 +1,15 @@
 import { Bot, LineChart, ShieldCheck } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Logo } from '@/components/layout/Logo'
+import { LanguageSelect } from '@/components/layout/LanguageMenu'
 import { ModeToggle } from '@/components/theme/ModeToggle'
+import { useTranslation } from 'react-i18next'
 
 const HIGHLIGHTS = [
-  { icon: Bot, text: 'Agentes de IA conectados a todos tus canales.' },
-  { icon: LineChart, text: 'Indicadores y conversaciones en tiempo real.' },
-  { icon: ShieldCheck, text: 'Acceso segmentado por perfil y por tenant.' },
-]
+  { icon: Bot, key: 'agents' },
+  { icon: LineChart, key: 'realtime' },
+  { icon: ShieldCheck, key: 'access' },
+] as const
 
 /** Props for {@link AuthLayout}. */
 export interface AuthLayoutProps {
@@ -21,50 +23,66 @@ export interface AuthLayoutProps {
 
 /**
  * Shared layout for the public authentication screens (login, account
- * activation, forgot/reset password): a brand panel (desktop only) plus a
- * centered form. Extracted from `LoginPage`, which used it first - same
- * design reused for the three newer screens.
+ * activation, forgot/reset password), TailAdmin style: a centered form on
+ * the left plus a brand panel with a decorative grid on the right (desktop
+ * only). The panel paints with the active template's `--primary-2`.
  */
 export function AuthLayout({ title, description, children }: AuthLayoutProps) {
+  const { t } = useTranslation()
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      <aside
-        className="relative hidden flex-col justify-between overflow-hidden p-12 text-[#F2FBF7] lg:flex"
-        style={{ backgroundImage: 'linear-gradient(160deg, #04141f 0%, #04141f 35%, var(--primary-2) 140%)' }}
-      >
-        <Logo variant="full" tone="onDark" className="h-14 w-auto self-start" />
+    <div className="grid min-h-dvh bg-surface lg:grid-cols-2">
+      <main className="pt-safe pb-safe relative flex items-center justify-center px-6 py-10 sm:px-8">
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <LanguageSelect />
+          <ModeToggle className="lg:hidden" />
+        </div>
+        <div className="w-full max-w-md">
+          <Logo variant="wordmark" className="mb-8 h-9 w-auto lg:hidden" />
+          <h1 className="mb-2 text-3xl font-semibold sm:text-4xl">{title}</h1>
+          <p className="mb-8 text-sm text-muted">{description}</p>
+          {children}
+        </div>
+      </main>
 
-        <div>
-          <h2 className="max-w-md text-4xl font-bold tracking-tight">Tu plataforma de IA generativa, en un solo lugar.</h2>
-          <ul className="mt-8 space-y-4">
-            {HIGHLIGHTS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-center gap-3">
-                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#19B4E6]">
+      <aside className="relative hidden items-center justify-center overflow-hidden bg-primary-2 p-12 text-white lg:flex dark:bg-surface-muted">
+        {/* Cuadrícula decorativa (esquinas), como el GridShape de TailAdmin. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 right-0 size-[28rem] opacity-60 [mask-image:radial-gradient(circle_at_top_right,black,transparent_70%)]"
+          style={GRID}
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 left-0 size-[28rem] rotate-180 opacity-60 [mask-image:radial-gradient(circle_at_top_right,black,transparent_70%)]"
+          style={GRID}
+        />
+
+        <div className="relative flex max-w-sm flex-col items-center text-center">
+          <Logo variant="full" tone="onDark" className="h-14 w-auto" />
+          <p className="mt-6 text-white/70">{t('auth.brand.tagline')}</p>
+          <ul className="mt-10 space-y-4 text-left text-sm text-white/85">
+            {HIGHLIGHTS.map(({ icon: Icon, key }) => (
+              <li key={key} className="flex items-center gap-3">
+                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/10">
                   <Icon className="size-5" aria-hidden="true" />
                 </span>
-                {text}
+                {t(`auth.brand.highlights.${key}`)}
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="text-sm opacity-70">© Flowsdone</p>
-        {/* Halos decorativos en los colores de la marca */}
-        <span className="pointer-events-none absolute -right-24 -bottom-24 size-96 rounded-full bg-[#19B4E6]/15 blur-2xl" aria-hidden="true" />
-        <span className="pointer-events-none absolute -top-24 right-16 size-64 rounded-full bg-[#3EFF8B]/10 blur-3xl" aria-hidden="true" />
+        <div className="absolute right-6 bottom-6">
+          <ModeToggle className="rounded-full bg-white/10 text-white hover:bg-white/20 hover:text-white" />
+        </div>
       </aside>
-
-      <main className="pt-safe pb-safe relative flex items-center justify-center px-4 py-10 sm:px-8">
-        <div className="absolute top-4 right-4">
-          <ModeToggle />
-        </div>
-        <div className="w-full max-w-md">
-          <Logo variant="wordmark" className="mb-8 h-9 w-auto lg:hidden" />
-          <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-          <p className="mt-1 mb-8 text-muted">{description}</p>
-          {children}
-        </div>
-      </main>
     </div>
   )
+}
+
+/** Faint 40px grid lines for the brand panel's corners. */
+const GRID = {
+  backgroundImage:
+    'linear-gradient(rgb(255 255 255 / 0.08) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.08) 1px, transparent 1px)',
+  backgroundSize: '40px 40px',
 }

@@ -12,7 +12,7 @@ export interface EmptyStateProps {
 export function EmptyState({ icon: Icon, title, description }: EmptyStateProps) {
   return (
     <Card className="flex flex-col items-center px-6 py-16 text-center">
-      <span className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-primary-ink">
+      <span className="mb-4 inline-flex size-14 items-center justify-center rounded-xl bg-surface-muted text-foreground">
         <Icon className="size-7" aria-hidden="true" />
       </span>
       <h2 className="text-lg font-semibold">{title}</h2>

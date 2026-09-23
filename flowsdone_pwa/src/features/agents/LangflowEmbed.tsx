@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Spinner } from '@/components/ui/Spinner'
 import { useLangflowSession } from '@/core/admin/hooks'
 import { cn } from '@/lib/cn'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link LangflowEmbed}. */
 export interface LangflowEmbedProps {
@@ -37,6 +38,7 @@ export interface LangflowEmbedProps {
  * estimating it.
  */
 export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
+  const { t } = useTranslation()
   const session = useLangflowSession(tenantId)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -59,18 +61,18 @@ export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
     return (
       <EmptyState
         icon={Building2}
-        title="Elige un tenant"
-        description="Cada tenant tiene su propio espacio en Langflow. Selecciona uno en la barra superior para ver y editar sus agentes."
+        title={t('agents.pickTenant.title')}
+        description={t('agents.pickTenant.description')}
       />
     )
   }
-  if (session.isPending) return <Spinner label={`Abriendo Langflow de ${tenantName ?? 'este tenant'}`} className="py-20" />
+  if (session.isPending) return <Spinner label={t('agents.opening', { name: tenantName ?? t('agents.thisTenant') })} className="py-20" />
   if (session.isError) {
     return (
       <Alert tone="danger">
-        <p>No se pudo abrir Langflow: {session.error.message}</p>
+        <p>{t('agents.openError', { error: session.error.message })}</p>
         <Button variant="secondary" size="sm" className="mt-3" onClick={() => void session.refetch()}>
-          Reintentar
+          {t('common.retry')}
         </Button>
       </Alert>
     )
@@ -78,11 +80,11 @@ export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
   if (!session.data.url) {
     return (
       <Card className="flex h-full min-h-80 flex-col items-center justify-center border-dashed p-6 text-center">
-        <span className="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-accent text-primary-ink">
+        <span className="mb-4 inline-flex size-14 items-center justify-center rounded-xl bg-surface-muted text-foreground">
           <Bot className="size-7" aria-hidden="true" />
         </span>
-        <h2 className="text-lg font-semibold">Aquí se embeberá Langflow</h2>
-        <p className="mt-1 max-w-md text-sm text-muted">Modo maqueta: no hay un Langflow real conectado.</p>
+        <h2 className="text-lg font-semibold">{t('agents.mock.title')}</h2>
+        <p className="mt-1 max-w-md text-sm text-muted">{t('agents.mock.description')}</p>
       </Card>
     )
   }
@@ -91,8 +93,8 @@ export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
       <Button
         variant="secondary"
         size="icon"
-        aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Ver a pantalla completa'}
-        title={isFullscreen ? 'Salir de pantalla completa' : 'Ver a pantalla completa'}
+        aria-label={isFullscreen ? t('agents.exitFullscreen') : t('agents.fullscreen')}
+        title={isFullscreen ? t('agents.exitFullscreen') : t('agents.fullscreen')}
         onClick={toggleFullscreen}
         className="absolute bottom-3 right-3 z-10"
       >
@@ -100,7 +102,7 @@ export function LangflowEmbed({ tenantId, tenantName }: LangflowEmbedProps) {
       </Button>
       <iframe
         key={tenantId}
-        title="Editor de agentes (Langflow)"
+        title={t('agents.editorTitle')}
         src={session.data.url}
         // scripts + same-origin son necesarios para que Langflow funcione; el resto
         // se limita a lo que usa (formularios, descargas, ventanas de auth).

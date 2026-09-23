@@ -2,6 +2,7 @@ import { X } from 'lucide-react'
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './Button'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link Dialog}. */
 export interface DialogProps {
@@ -27,6 +28,7 @@ const FOCUSABLE =
  * - Rendered into a portal so no layout `overflow` can clip it.
  */
 export function Dialog({ open, onClose, title, description, children, footer }: DialogProps) {
+  const { t } = useTranslation()
   const titleId = useId()
   const descId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -71,7 +73,7 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-400/50 p-4 backdrop-blur-md sm:p-6 dark:bg-black/60"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -82,11 +84,11 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
         aria-describedby={description ? descId : undefined}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col rounded-card border border-border bg-surface shadow-2xl outline-none sm:max-h-[calc(100dvh-3rem)]"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col rounded-3xl border border-border bg-surface shadow-theme-xl outline-none sm:max-h-[calc(100dvh-3rem)]"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
+        <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-2 sm:px-8 sm:pt-8">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-semibold">
+            <h2 id={titleId} className="text-xl font-semibold sm:text-2xl">
               {title}
             </h2>
             {description && (
@@ -95,13 +97,19 @@ export function Dialog({ open, onClose, title, description, children, footer }: 
               </p>
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Cerrar" className="-mt-1 -mr-2 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label={t('common.close')}
+            className="-mt-1 -mr-2 shrink-0 rounded-full bg-surface-muted"
+          >
             <X className="size-5" aria-hidden="true" />
           </Button>
         </div>
-        <div className="overflow-y-auto px-6 py-6">{children}</div>
+        <div className="overflow-y-auto px-6 py-5 sm:px-8">{children}</div>
         {footer && (
-          <div className="flex flex-wrap justify-end gap-3 rounded-b-card border-t border-border bg-surface-muted/40 px-6 py-4">
+          <div className="flex flex-wrap justify-end gap-3 px-6 pt-2 pb-6 sm:px-8 sm:pb-8">
             {footer}
           </div>
         )}

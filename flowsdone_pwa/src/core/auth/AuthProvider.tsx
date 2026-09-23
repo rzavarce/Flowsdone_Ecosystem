@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import type { AuthApi } from './AuthApi'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthContext'
 import { createAuthApi } from './createAuthApi'
-import type { Credentials, User } from './types'
+import type { Credentials, ProfileUpdate, User } from './types'
 
 /** Props for {@link AuthProvider}. */
 export interface AuthProviderProps {
@@ -83,9 +83,32 @@ export function AuthProvider({ children, api }: AuthProviderProps) {
     [client],
   )
 
+  /** Runs a profile change and adopts the user the server returns. */
+  const applyProfile = useCallback(async (change: () => Promise<User>) => {
+    const user = await change()
+    setSession({ status: 'authenticated', user })
+    return user
+  }, [])
+  const updateProfile = useCallback((patch: ProfileUpdate) => applyProfile(() => client.updateProfile(patch)), [applyProfile, client])
+  const uploadAvatar = useCallback((image: Blob) => applyProfile(() => client.uploadAvatar(image)), [applyProfile, client])
+  const removeAvatar = useCallback(() => applyProfile(() => client.removeAvatar()), [applyProfile, client])
+
+  const avatarUrl = session.user ? client.avatarUrl(session.user) : null
   const value = useMemo<AuthContextValue>(
-    () => ({ ...session, login, logout, refreshUser, activateAccount, requestPasswordReset, resetPassword }),
-    [session, login, logout, refreshUser, activateAccount, requestPasswordReset, resetPassword],
+    () => ({
+      ...session,
+      login,
+      logout,
+      refreshUser,
+      activateAccount,
+      requestPasswordReset,
+      resetPassword,
+      updateProfile,
+      uploadAvatar,
+      removeAvatar,
+      avatarUrl,
+    }),
+    [session, login, logout, refreshUser, activateAccount, requestPasswordReset, resetPassword, updateProfile, uploadAvatar, removeAvatar, avatarUrl],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

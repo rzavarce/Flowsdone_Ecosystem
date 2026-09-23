@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_MODE, DEFAULT_THEME, THEME_STORAGE_KEY, readStoredTheme, resolveMode } from './themes'
+import html from '../../../index.html?raw'
+import { DEFAULT_MODE, DEFAULT_THEME, THEMES, THEME_STORAGE_KEY, readStoredTheme, resolveMode } from './themes'
 
 const storageWith = (value: string | null) => ({ getItem: () => value })
 
@@ -49,5 +50,24 @@ describe('readStoredTheme', () => {
 
   it('usa la clave esperada por el script anti-flash de index.html', () => {
     expect(THEME_STORAGE_KEY).toBe('fd-theme')
+  })
+
+  it('lee el preset admin (estilo TailAdmin)', () => {
+    const raw = JSON.stringify({ theme: 'admin', mode: 'light' })
+    expect(readStoredTheme(storageWith(raw))).toEqual({ theme: 'admin', mode: 'light' })
+  })
+})
+
+describe('catálogo de templates', () => {
+  it('admin es el template por defecto y encabeza el catálogo', () => {
+    expect(DEFAULT_THEME).toBe('admin')
+    expect(THEMES[0]?.id).toBe('admin')
+  })
+
+  it('el script anti-flash de index.html conoce los mismos ids y el mismo default', () => {
+    const list = /var themes = \[([^\]]*)\]/.exec(html)?.[1] ?? ''
+    const ids = [...list.matchAll(/'([^']+)'/g)].map((m) => m[1])
+    expect(ids).toEqual(THEMES.map((t) => t.id))
+    expect(html).toContain(`s.theme : '${DEFAULT_THEME}'`)
   })
 })

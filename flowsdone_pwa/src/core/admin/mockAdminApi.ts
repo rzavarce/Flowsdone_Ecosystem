@@ -79,6 +79,8 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
   const agents = (seed.agents ?? AGENTS).map((a) => ({ ...a }))
   const connections = (seed.connections ?? CONNECTIONS).map((c) => ({ ...c }))
   const users = (seed.users ?? USERS).map((u) => ({ ...u }))
+  /** Photos (object URLs) by user id: the mock has no server to serve them from. */
+  const avatars = new Map<string, string>()
   const apps = new Map<ChannelAppProvider, { app: ChannelApp; credentials: Record<string, unknown> }>()
   const billingProfiles = new Map<string, TenantBillingProfile>()
   let seq = 100
@@ -315,6 +317,9 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
         role: input.role,
         status: 'pending',
         tenant_ids: input.role === 'admin' ? [] : input.tenant_ids,
+        phone: input.phone?.trim() || null,
+        address: input.address?.trim() || null,
+        social_links: input.social_links ?? {},
         last_login_at: null,
         created_at: now,
         updated_at: now,
@@ -325,7 +330,11 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     async updateUser(id, patch) {
       await wait(latencyMs)
       const user = need(users.find((u) => u.id === id), 'user')
-      Object.assign(user, patch, { updated_at: new Date().toISOString() })
+      const { phone, address, ...rest } = patch
+      Object.assign(user, rest, { updated_at: new Date().toISOString() })
+      // Como el gateway: una cadena vacía borra el dato.
+      if (phone !== undefined) user.phone = phone.trim() || null
+      if (address !== undefined) user.address = address.trim() || null
       return clone(user)
     },
     async deleteUser(id) {
@@ -337,6 +346,23 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       const user = need(users.find((u) => u.id === id), 'user')
       if (user.status !== 'pending') throw new ApiError(404, 'user not found or not pending')
+    },
+    async uploadUserAvatar(id, image) {
+      await wait(latencyMs)
+      const user = need(users.find((u) => u.id === id), 'user')
+      avatars.set(id, URL.createObjectURL(image))
+      user.avatar_updated_at = new Date().toISOString()
+      return clone(user)
+    },
+    async removeUserAvatar(id) {
+      await wait(latencyMs)
+      const user = need(users.find((u) => u.id === id), 'user')
+      avatars.delete(id)
+      user.avatar_updated_at = null
+      return clone(user)
+    },
+    userAvatarUrl(user) {
+      return avatars.get(user.id) ?? null
     },
   }
 }

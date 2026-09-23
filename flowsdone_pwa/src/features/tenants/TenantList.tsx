@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { summarize, type TenantEntry } from './useTenantsView'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link TenantList}. */
 export interface TenantListProps {
@@ -13,9 +14,10 @@ export interface TenantListProps {
 
 /** List of tenants (single selection) with their status and what each one contains. */
 export function TenantList({ entries, selectedId, onSelect }: TenantListProps) {
+  const { t } = useTranslation()
   return (
     <Card className="overflow-hidden">
-      <ul aria-label="Tenants" className="divide-y divide-border">
+      <ul aria-label={t('nav.tenants')} className="divide-y divide-border">
         {entries.map(({ tenant, projects, agents, channels }) => {
           const selected = tenant.id === selectedId
           return (
@@ -26,7 +28,7 @@ export function TenantList({ entries, selectedId, onSelect }: TenantListProps) {
                 aria-current={selected ? 'true' : undefined}
                 className={cn(
                   'flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition',
-                  selected ? 'bg-accent' : 'hover:bg-surface-muted',
+                  selected ? 'bg-primary/10' : 'hover:bg-surface-muted',
                 )}
               >
                 <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-primary-ink">
@@ -35,7 +37,7 @@ export function TenantList({ entries, selectedId, onSelect }: TenantListProps) {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
                     <span className="truncate font-medium">{tenant.name}</span>
-                    {tenant.status !== 'active' && <Badge tone="warning">Suspendido</Badge>}
+                    {tenant.status !== 'active' && <Badge tone="warning">{t('common.suspended')}</Badge>}
                   </span>
                   <span className="block truncate font-mono text-xs text-muted">{tenant.slug}</span>
                   <span className="mt-1 block text-xs text-muted">{summarize({ projects: projects.length, agents, channels })}</span>

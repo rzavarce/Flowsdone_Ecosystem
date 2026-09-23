@@ -13,6 +13,7 @@ import type { Project, TenantRecord } from '@/core/admin/types'
 import { can } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 import { describeError } from '@/core/http/describeError'
+import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
 import { BillingProfileCard } from './BillingProfileCard'
 import { ProjectDialog } from './ProjectDialog'
@@ -20,6 +21,7 @@ import { ProjectsCard } from './ProjectsCard'
 import { TenantDialog } from './TenantDialog'
 import { TenantList } from './TenantList'
 import { summarize, useTenantsView } from './useTenantsView'
+import { Trans, useTranslation } from 'react-i18next'
 
 /** Open dialog: new/edited tenant, new/edited project, or none. */
 type Dialogs =
@@ -45,6 +47,7 @@ type Pending =
  *   cascades (projects, agents and channels) and requires typing the slug.
  */
 export function TenantsPage() {
+  const { t } = useTranslation()
   const view = useTenantsView()
   const { user } = useAuth()
   const { current } = useTenant()
@@ -100,13 +103,13 @@ export function TenantsPage() {
 
   const header = (
     <PageHeader
-      title="Tenants"
-      description={canManageTenants ? 'Organizaciones clientes y sus proyectos.' : 'Tus organizaciones y sus proyectos.'}
+      title={t('nav.tenants')}
+      description={canManageTenants ? t('tenants.descriptionAll') : t('tenants.descriptionOwn')}
       actions={
         canManageTenants && (
           <Button onClick={() => setDialog({ kind: 'tenant', tenant: null })} disabled={view.isLoading}>
             <Plus className="size-4" aria-hidden="true" />
-            Nuevo tenant
+            {t('tenants.new')}
           </Button>
         )
       }
@@ -117,7 +120,7 @@ export function TenantsPage() {
     return (
       <>
         {header}
-        <Spinner label="Cargando tenants" className="py-20" />
+        <Spinner label={t('tenants.loading')} className="py-20" />
       </>
     )
   }
@@ -126,9 +129,9 @@ export function TenantsPage() {
       <>
         {header}
         <Alert tone="danger">
-          <p>No se pudieron cargar los tenants: {describeError(view.error)}</p>
+          <p>{t('tenants.loadError', { error: describeError(view.error) })}</p>
           <Button variant="secondary" size="sm" className="mt-3" onClick={view.refetch}>
-            Reintentar
+            {t('common.retry')}
           </Button>
         </Alert>
       </>
@@ -140,8 +143,8 @@ export function TenantsPage() {
         {header}
         <EmptyState
           icon={Building2}
-          title="Aún no hay tenants"
-          description={canManageTenants ? 'Crea el primero para empezar a dar de alta proyectos y canales.' : 'Todavía no tienes tenants asignados. Pídeselo a un administrador.'}
+          title={t('tenants.empty.title')}
+          description={canManageTenants ? t('tenants.empty.descriptionAdmin') : t('tenants.empty.descriptionOther')}
         />
         {dialog?.kind === 'tenant' && <TenantDialog tenant={dialog.tenant} onClose={() => setDialog(null)} onSaved={(t) => setChoice(t.id)} />}
       </>
@@ -163,23 +166,23 @@ export function TenantsPage() {
               <div className="min-w-0">
                 <h2 className="flex items-center gap-2 text-xl font-semibold">
                   <span className="truncate">{tenant.name}</span>
-                  <Badge tone={suspended ? 'warning' : 'success'}>{suspended ? 'Suspendido' : 'Activo'}</Badge>
+                  <Badge tone={suspended ? 'warning' : 'success'}>{suspended ? t('common.suspended') : t('common.active')}</Badge>
                 </h2>
                 <p className="mt-0.5 font-mono text-xs text-muted">{tenant.slug}</p>
                 <p className="mt-2 text-sm text-muted">
-                  {summarize({ projects: selected.projects.length, agents: selected.agents, channels: selected.channels })} · creado el{' '}
-                  {new Date(tenant.created_at).toLocaleDateString('es')}
+                  {summarize({ projects: selected.projects.length, agents: selected.agents, channels: selected.channels })} ·{' '}
+                  {t('tenants.createdOn', { date: new Date(tenant.created_at).toLocaleDateString(currentLocale()) })}
                 </p>
               </div>
               {canManageTenants && (
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setDialog({ kind: 'tenant', tenant })} aria-label={`Editar ${tenant.name}`}>
+                  <Button variant="secondary" size="sm" onClick={() => setDialog({ kind: 'tenant', tenant })} aria-label={t('common.editItem', { name: tenant.name })}>
                     <Pencil className="size-4" aria-hidden="true" />
-                    Editar
+                    {t('common.edit')}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => toggleTenant(tenant)} aria-label={`${suspended ? 'Reactivar' : 'Suspender'} ${tenant.name}`}>
+                  <Button variant="secondary" size="sm" onClick={() => toggleTenant(tenant)} aria-label={t(suspended ? 'common.reactivateItem' : 'common.suspendItem', { name: tenant.name })}>
                     {suspended ? <Play className="size-4" aria-hidden="true" /> : <Pause className="size-4" aria-hidden="true" />}
-                    {suspended ? 'Reactivar' : 'Suspender'}
+                    {suspended ? t('common.reactivate') : t('common.suspend')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -188,18 +191,17 @@ export function TenantsPage() {
                       deleteTenant.reset()
                       void confirmDeletion({ kind: 'delete-tenant', tenant })
                     }}
-                    aria-label={`Eliminar ${tenant.name}`}
+                    aria-label={t('common.deleteItem', { name: tenant.name })}
                   >
                     <Trash2 className="size-4" aria-hidden="true" />
-                    Eliminar
+                    {t('common.delete')}
                   </Button>
                 </div>
               )}
             </div>
             {suspended && (
               <Alert tone="info" className="mt-4">
-                Este tenant está suspendido: <strong>sus canales no responden mensajes</strong>. Los datos se conservan y puedes
-                reactivarlo cuando quieras.
+                <Trans i18nKey="tenants.suspendedNotice" components={{ strong: <strong /> }} />
               </Alert>
             )}
             {(updateTenant.error || updateProject.error) && !pending && (
@@ -230,9 +232,9 @@ export function TenantsPage() {
 
       <ConfirmDialog
         open={pending?.kind === 'delete-tenant'}
-        title={pending?.kind === 'delete-tenant' ? `Eliminar ${pending.tenant.name}` : ''}
-        description="Se elimina el tenant y TODO lo que contiene."
-        confirmLabel="Eliminar tenant"
+        title={pending?.kind === 'delete-tenant' ? t('common.deleteItem', { name: pending.tenant.name }) : ''}
+        description={t('tenants.delete.description')}
+        confirmLabel={t('tenants.delete.confirm')}
         requireText={pending?.kind === 'delete-tenant' ? pending.tenant.slug : undefined}
         pending={deleteTenant.isPending}
         error={deleteTenant.error ? describeError(deleteTenant.error) : null}
@@ -240,16 +242,19 @@ export function TenantsPage() {
         onConfirm={() => pending?.kind === 'delete-tenant' && void run(() => deleteTenant.mutateAsync(pending.tenant.id), () => setChoice(null))}
       >
         <Alert tone="danger">
-          Se borrarán en cascada <strong>{summarize({ projects: selected.projects.length, agents: selected.agents, channels: selected.channels })}</strong>.
-          Los canales dejarán de responder de inmediato. Si solo quieres pausarlo, usa <strong>Suspender</strong>.
+          <Trans
+            i18nKey="tenants.delete.cascade"
+            values={{ summary: summarize({ projects: selected.projects.length, agents: selected.agents, channels: selected.channels }) }}
+            components={{ strong: <strong /> }}
+          />
         </Alert>
       </ConfirmDialog>
 
       <ConfirmDialog
         open={pending?.kind === 'suspend-tenant'}
-        title={pending?.kind === 'suspend-tenant' ? `Suspender ${pending.tenant.name}` : ''}
-        description="Los canales de este tenant dejarán de responder mensajes. No se borra nada y puedes reactivarlo."
-        confirmLabel="Suspender tenant"
+        title={pending?.kind === 'suspend-tenant' ? t('common.suspendItem', { name: pending.tenant.name }) : ''}
+        description={t('tenants.suspend.description')}
+        confirmLabel={t('tenants.suspend.confirm')}
         pending={updateTenant.isPending}
         error={updateTenant.error ? describeError(updateTenant.error) : null}
         onCancel={() => setPending(null)}
@@ -258,9 +263,9 @@ export function TenantsPage() {
 
       <ConfirmDialog
         open={pending?.kind === 'delete-project'}
-        title={pending?.kind === 'delete-project' ? `Eliminar ${pending.project.name}` : ''}
-        description="Se elimina el proyecto y lo que contiene."
-        confirmLabel="Eliminar proyecto"
+        title={pending?.kind === 'delete-project' ? t('common.deleteItem', { name: pending.project.name }) : ''}
+        description={t('tenants.projects.delete.description')}
+        confirmLabel={t('tenants.projects.delete.confirm')}
         requireText={
           pending?.kind === 'delete-project' && (view.projectCounts.get(pending.project.id)?.agents || view.projectCounts.get(pending.project.id)?.channels)
             ? pending.project.slug
@@ -275,7 +280,7 @@ export function TenantsPage() {
           const c = view.projectCounts.get(pending.project.id) ?? { agents: 0, channels: 0 }
           return c.agents || c.channels ? (
             <Alert tone="danger">
-              Se borrarán en cascada <strong>{summarize(c)}</strong>. Los canales dejarán de responder.
+              <Trans i18nKey="tenants.projects.delete.cascade" values={{ summary: summarize(c) }} components={{ strong: <strong /> }} />
             </Alert>
           ) : null
         })()}
@@ -283,9 +288,9 @@ export function TenantsPage() {
 
       <ConfirmDialog
         open={pending?.kind === 'suspend-project'}
-        title={pending?.kind === 'suspend-project' ? `Suspender ${pending.project.name}` : ''}
-        description="Los canales de este proyecto dejarán de responder mensajes. No se borra nada y puedes reactivarlo."
-        confirmLabel="Suspender proyecto"
+        title={pending?.kind === 'suspend-project' ? t('common.suspendItem', { name: pending.project.name }) : ''}
+        description={t('tenants.projects.suspend.description')}
+        confirmLabel={t('tenants.projects.suspend.confirm')}
         pending={updateProject.isPending}
         error={updateProject.error ? describeError(updateProject.error) : null}
         onCancel={() => setPending(null)}

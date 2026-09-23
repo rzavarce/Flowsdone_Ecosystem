@@ -12,6 +12,7 @@ import { CHANNEL_TYPE_LIST, CHANNEL_TYPES, maskExternalId } from './channelTypes
 import { describeError } from '@/core/http/describeError'
 import { NewProjectForm } from './NewProjectForm'
 import type { ChannelsView } from './useChannelsView'
+import { Trans, useTranslation } from 'react-i18next'
 
 /** Props for {@link ConnectionDialog}. */
 export interface ConnectionDialogProps {
@@ -34,6 +35,7 @@ const FORM_ID = 'connection-form'
  * starts from a clean state.
  */
 export function ConnectionDialog({ connection, view, onClose }: ConnectionDialogProps) {
+  const { t } = useTranslation()
   const editing = connection !== null
   const { current, tenants } = useTenant()
   const create = useCreateConnection()
@@ -66,11 +68,11 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
   const error = create.error ?? update.error
 
   const errors = {
-    project: !editing && !effectiveProjectId ? 'Elige un proyecto.' : '',
-    agent: !effectiveAgentId ? 'Elige un agente.' : '',
-    externalId: !editing && !externalId.trim() ? `${config.externalIdLabel} es obligatorio.` : '',
+    project: !editing && !effectiveProjectId ? t('channels.form.errors.project') : '',
+    agent: !effectiveAgentId ? t('channels.form.errors.agent') : '',
+    externalId: !editing && !externalId.trim() ? t('common.fieldRequired', { field: config.externalIdLabel }) : '',
     credentials: Object.fromEntries(
-      config.credentials.filter((f) => f.required && !editing && !credentials[f.key]?.trim()).map((f) => [f.key, `${f.label} es obligatorio.`]),
+      config.credentials.filter((f) => f.required && !editing && !credentials[f.key]?.trim()).map((f) => [f.key, t('common.fieldRequired', { field: f.label })]),
     ) as Record<string, string>,
   }
   const hasErrors = Boolean(errors.project || errors.agent || errors.externalId || Object.keys(errors.credentials).length)
@@ -113,20 +115,20 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
     <Dialog
       open
       onClose={pending ? () => {} : onClose}
-      title={editing ? 'Editar canal' : 'Conectar un canal'}
+      title={editing ? t('channels.form.editTitle') : t('channels.form.createTitle')}
       description={
         editing
           ? `${config.label} · ${maskExternalId(type, connection.external_id)}`
-          : 'Elige el proyecto, el canal y el agente que responderá por él.'
+          : t('channels.form.createDescription')
       }
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           {!noProjects && (
             <Button type="submit" form={FORM_ID} disabled={pending}>
-              {pending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Conectar canal'}
+              {pending ? t('common.saving') : editing ? t('common.saveChanges') : t('channels.form.submit')}
             </Button>
           )}
         </>
@@ -138,7 +140,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
         <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-5">
           {!editing && (
             <>
-              <Field label="Proyecto" error={submitted ? errors.project : undefined}>
+              <Field label={t('common.project')} error={submitted ? errors.project : undefined}>
                 <Select value={effectiveProjectId} onChange={(e) => setProjectId(e.target.value)}>
                   {view.projects.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -147,7 +149,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
                   ))}
                 </Select>
               </Field>
-              <Field label="Canal">
+              <Field label={t('channels.form.channel')}>
                 <Select value={channelType} onChange={(e) => setChannelType(e.target.value as ChannelType)}>
                   {CHANNEL_TYPE_LIST.map((c) => (
                     <option key={c.type} value={c.type}>
@@ -159,24 +161,23 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             </>
           )}
 
-          <Field label="Agente" error={submitted ? errors.agent : undefined}>
+          <Field label={t('common.agent')} error={submitted ? errors.agent : undefined}>
             <Select value={effectiveAgentId} onChange={(e) => setAgentId(e.target.value)} disabled={agentOptions.length === 0}>
-              {agentOptions.length === 0 && <option value="">Sin agentes</option>}
+              {agentOptions.length === 0 && <option value="">{t('channels.form.noAgents')}</option>}
               {agentOptions.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
-                  {a.is_default ? ' (por defecto)' : ''}
+                  {a.is_default ? ` ${t('channels.form.defaultAgent')}` : ''}
                 </option>
               ))}
             </Select>
           </Field>
           {agentOptions.length === 0 && (
             <Alert tone="info">
-              Este proyecto todavía no tiene agentes. Crea uno en{' '}
-              <Link to="/agents" className="font-medium underline">
-                Agentes
-              </Link>{' '}
-              para poder conectar un canal.
+              <Trans
+                i18nKey="channels.form.noAgentsHelp"
+                components={{ agentsLink: <Link to="/agents" className="font-medium underline" /> }}
+              />
             </Alert>
           )}
 
@@ -192,15 +193,15 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             </Field>
           )}
 
-          <Field label="Nombre para mostrar" hint="Opcional. Ayuda a distinguirlo en la lista.">
+          <Field label={t('channels.form.displayName')} hint={t('channels.form.displayNameHint')}>
             <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={config.label} />
           </Field>
 
           {editing && (
-            <Field label="Estado">
+            <Field label={t('common.status')}>
               <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="active">Activo</option>
-                <option value="inactive">Inactivo</option>
+                <option value="active">{t('common.active')}</option>
+                <option value="inactive">{t('common.inactive')}</option>
               </Select>
             </Field>
           )}
@@ -209,7 +210,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             <Field
               key={field.key}
               label={field.label}
-              hint={editing ? 'Déjalo vacío para conservar el actual. Si escribes uno, reemplaza al anterior.' : field.hint}
+              hint={editing ? t('channels.form.keepCredential') : field.hint}
               error={submitted ? errors.credentials[field.key] : undefined}
             >
               <Input

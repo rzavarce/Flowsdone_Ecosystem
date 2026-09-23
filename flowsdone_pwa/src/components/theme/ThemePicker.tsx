@@ -2,11 +2,12 @@ import { Check, Monitor, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/core/theme/useTheme'
 import { THEMES, type ColorMode } from '@/core/theme/themes'
+import { useTranslation } from 'react-i18next'
 
-const MODES: { id: ColorMode; label: string; icon: typeof Sun }[] = [
-  { id: 'light', label: 'Claro', icon: Sun },
-  { id: 'dark', label: 'Oscuro', icon: Moon },
-  { id: 'system', label: 'Sistema', icon: Monitor },
+const MODES: { id: ColorMode; icon: typeof Sun }[] = [
+  { id: 'light', icon: Sun },
+  { id: 'dark', icon: Moon },
+  { id: 'system', icon: Monitor },
 ]
 
 /**
@@ -15,16 +16,17 @@ const MODES: { id: ColorMode; label: string; icon: typeof Sun }[] = [
  * preset's colors regardless of which one is currently active.
  */
 export function ThemePicker() {
+  const { t } = useTranslation()
   const { theme, mode, setTheme, setMode } = useTheme()
 
   return (
     <div className="space-y-8">
       <section aria-labelledby="mode-title">
         <h3 id="mode-title" className="text-sm font-semibold">
-          Modo
+          {t('theme.mode')}
         </h3>
         <div role="radiogroup" aria-labelledby="mode-title" className="mt-3 inline-flex rounded-xl bg-surface-muted p-1">
-          {MODES.map(({ id, label, icon: Icon }) => (
+          {MODES.map(({ id, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -37,7 +39,7 @@ export function ThemePicker() {
               )}
             >
               <Icon className="size-4" aria-hidden="true" />
-              {label}
+              {t(`theme.modes.${id}`)}
             </button>
           ))}
         </div>
@@ -45,7 +47,7 @@ export function ThemePicker() {
 
       <section aria-labelledby="template-title">
         <h3 id="template-title" className="text-sm font-semibold">
-          Template
+          {t('theme.template')}
         </h3>
         <div role="radiogroup" aria-labelledby="template-title" className="mt-3 grid gap-4 sm:grid-cols-2">
           {THEMES.map((preset) => {
@@ -78,7 +80,7 @@ export function ThemePicker() {
                   {active && (
                     <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                       <Check className="size-3.5" aria-hidden="true" />
-                      <span className="sr-only">Activo</span>
+                      <span className="sr-only">{t('common.active')}</span>
                     </span>
                   )}
                 </span>

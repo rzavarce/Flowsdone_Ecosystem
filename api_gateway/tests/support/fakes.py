@@ -17,7 +17,7 @@ from app.domain.models.tenant_billing_profile import TenantBillingProfile
 from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.models.session import Session
 from app.domain.models.tenant import Tenant
-from app.domain.models.user import User, UserCredentials
+from app.domain.models.user import User, UserAvatar, UserCredentials
 from app.domain.ports.outbound import AlreadyExistsError, UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
 
@@ -660,11 +660,31 @@ class FakeUserRepo:
     async def list(self) -> List[User]:
         return list(self.users.values())
 
-    async def update(self, user_id, *, name=None, role=None, status=None, tenant_ids=None, password_hash=None):
+    async def update(
+        self,
+        user_id,
+        *,
+        name=None,
+        role=None,
+        status=None,
+        tenant_ids=None,
+        password_hash=None,
+        phone=None,
+        address=None,
+        social_links=None,
+    ):
         user = self.users.get(user_id)
         if user is None:
             return None
-        changes = {k: v for k, v in dict(name=name, role=role, status=status, tenant_ids=tenant_ids).items() if v is not None}
+        changes = {
+            k: v
+            for k, v in dict(
+                name=name, role=role, status=status, tenant_ids=tenant_ids, social_links=social_links
+            ).items()
+            if v is not None
+        }
+        # Same as the SQL repo: an empty string clears phone/address.
+        changes.update({k: v or None for k, v in dict(phone=phone, address=address).items() if v is not None})
         self.users[user_id] = user.model_copy(update=changes)
         if password_hash is not None:
             self.hashes[user_id] = password_hash
@@ -673,6 +693,34 @@ class FakeUserRepo:
     async def delete(self, user_id: UUID) -> bool:
         self.hashes.pop(user_id, None)
         return self.users.pop(user_id, None) is not None
+
+
+class FakeUserAvatarRepo:
+    """In-memory UserAvatarRepositoryPort, sharing a FakeUserRepo."""
+
+    def __init__(self, user_repo: "FakeUserRepo") -> None:
+        self._users = user_repo
+        self.avatars: Dict[UUID, UserAvatar] = {}
+
+    async def get(self, user_id: UUID) -> Optional[UserAvatar]:
+        return self.avatars.get(user_id)
+
+    async def put(self, user_id: UUID, *, content_type: str, data: bytes) -> Optional[User]:
+        user = self._users.users.get(user_id)
+        if user is None:
+            return None
+        now = datetime.now(timezone.utc)
+        self.avatars[user_id] = UserAvatar(content_type=content_type, data=data, updated_at=now)
+        self._users.users[user_id] = user.model_copy(update={"avatar_updated_at": now})
+        return self._users.users[user_id]
+
+    async def delete(self, user_id: UUID) -> Optional[User]:
+        user = self._users.users.get(user_id)
+        if user is None:
+            return None
+        self.avatars.pop(user_id, None)
+        self._users.users[user_id] = user.model_copy(update={"avatar_updated_at": None})
+        return self._users.users[user_id]
 
 
 class FakeAuthSessionRepo:

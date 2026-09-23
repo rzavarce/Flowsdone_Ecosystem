@@ -1,5 +1,6 @@
 import { AtSign, MessageCircle, MessagesSquare, Music2, PhoneCall, Send, Share2, type LucideIcon } from 'lucide-react'
 import type { ChannelType } from '@/core/admin/types'
+import { i18n } from '@/core/i18n/i18n'
 
 /** A secret value specific to the connection (sent inside `credentials`). */
 export interface CredentialField {
@@ -29,77 +30,61 @@ export interface ChannelTypeConfig {
  * and which credentials it requires. Drives both the connection form's
  * fields and the display copy across the Channels screen.
  */
+/** Translates a channel-type text when read (so it follows language changes). */
+const tr = (key: string) => i18n.t(`channels.types.${key}` as 'channels.types.telegram.label')
+
+/** Builds a channel type whose texts are getters over `channels.types.<type>.*`. */
+function channelType(
+  type: ChannelType,
+  icon: LucideIcon,
+  externalIdPlaceholder: string,
+  opts: { credentials?: string[]; note?: boolean; label?: string } = {},
+): ChannelTypeConfig {
+  return {
+    type,
+    icon,
+    externalIdPlaceholder,
+    get label() {
+      return opts.label ?? tr(`${type}.label`)
+    },
+    get externalIdLabel() {
+      return tr(`${type}.externalIdLabel`)
+    },
+    get externalIdHint() {
+      return tr(`${type}.externalIdHint`)
+    },
+    get note() {
+      return opts.note ? tr(`${type}.note`) : undefined
+    },
+    credentials: (opts.credentials ?? []).map((key) => ({
+      key,
+      required: true,
+      get label() {
+        return tr(`credentials.${key}.label`)
+      },
+      get hint() {
+        return tr(`credentials.${key}.hint`)
+      },
+    })),
+  }
+}
+
 export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
-  whatsapp_evolution: {
-    type: 'whatsapp_evolution',
-    label: 'WhatsApp',
-    icon: MessageCircle,
-    externalIdLabel: 'Nombre de la instancia',
-    externalIdHint: 'La instancia creada en Evolution API.',
-    externalIdPlaceholder: 'clinica-vital',
-    credentials: [],
-  },
-  telegram: {
-    type: 'telegram',
-    label: 'Telegram',
-    icon: Send,
-    externalIdLabel: 'Token del bot',
-    externalIdHint: 'Te lo entrega @BotFather al crear el bot.',
-    externalIdPlaceholder: '123456789:AA…',
-    credentials: [],
-    note: 'Al guardar, Flowsdone registra el webhook del bot en Telegram automáticamente.',
-  },
-  facebook: {
-    type: 'facebook',
+  whatsapp_evolution: channelType('whatsapp_evolution', MessageCircle, 'clinica-vital', { label: 'WhatsApp' }),
+  telegram: channelType('telegram', Send, '123456789:AA…', { label: 'Telegram', note: true }),
+  facebook: channelType('facebook', MessagesSquare, '102030405060708', {
     label: 'Facebook Messenger',
-    icon: MessagesSquare,
-    externalIdLabel: 'ID de la página',
-    externalIdHint: 'El ID numérico de la página de Facebook.',
-    externalIdPlaceholder: '102030405060708',
-    credentials: [
-      { key: 'page_access_token', label: 'Token de acceso de la página', hint: 'De la app de Meta, con permiso de mensajería.', required: true },
-    ],
-    note: 'Al guardar, Flowsdone suscribe la página a la app de Meta automáticamente.',
-  },
-  instagram: {
-    type: 'instagram',
+    credentials: ['page_access_token'],
+    note: true,
+  }),
+  instagram: channelType('instagram', AtSign, '17841400000000000', {
     label: 'Instagram',
-    icon: AtSign,
-    externalIdLabel: 'ID de la cuenta de Instagram Business',
-    externalIdHint: 'El ID de la cuenta profesional vinculada a la página.',
-    externalIdPlaceholder: '17841400000000000',
-    credentials: [
-      { key: 'page_access_token', label: 'Token de acceso de la página', hint: 'De la app de Meta, con permiso de mensajería.', required: true },
-    ],
-    note: 'Al guardar, Flowsdone suscribe la cuenta a la app de Meta automáticamente.',
-  },
-  twitter: {
-    type: 'twitter',
-    label: 'X (Twitter)',
-    icon: Share2,
-    externalIdLabel: 'ID de usuario de X',
-    externalIdHint: 'El ID numérico de la cuenta (for_user_id).',
-    externalIdPlaceholder: '1234567890',
-    credentials: [],
-  },
-  tiktok: {
-    type: 'tiktok',
-    label: 'TikTok',
-    icon: Music2,
-    externalIdLabel: 'open_id de TikTok',
-    externalIdHint: 'El identificador de la cuenta en TikTok.',
-    externalIdPlaceholder: 'act.example',
-    credentials: [],
-  },
-  voice: {
-    type: 'voice',
-    label: 'Voz (teléfono)',
-    icon: PhoneCall,
-    externalIdLabel: 'Número de teléfono',
-    externalIdHint: 'En formato internacional (E.164).',
-    externalIdPlaceholder: '+34911222333',
-    credentials: [],
-  },
+    credentials: ['page_access_token'],
+    note: true,
+  }),
+  twitter: channelType('twitter', Share2, '1234567890', { label: 'X (Twitter)' }),
+  tiktok: channelType('tiktok', Music2, 'act.example', { label: 'TikTok' }),
+  voice: channelType('voice', PhoneCall, '+34911222333'),
 }
 
 /** Types in the order they're offered when creating a channel. */

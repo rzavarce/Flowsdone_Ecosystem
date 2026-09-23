@@ -28,4 +28,8 @@ async def build_authenticated_user(user: User, tenant_repo: TenantRepositoryPort
         name=user.name,
         role=user.role,
         tenants=[TenantRef(id=t.id, name=t.name) for t in tenants],
+        phone=user.phone,
+        address=user.address,
+        social_links=user.social_links,
+        avatar_updated_at=user.avatar_updated_at,
     )

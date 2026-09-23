@@ -8,6 +8,7 @@ import { useCreateTenant, useUpdateTenant } from '@/core/admin/hooks'
 import type { TenantRecord } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { slugify } from '@/lib/slug'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link TenantDialog}. */
 export interface TenantDialogProps {
@@ -22,6 +23,7 @@ const FORM_ID = 'tenant-form'
 
 /** Create and edit a tenant (admin only). The slug is derived from the name until it's touched. */
 export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
+  const { t } = useTranslation()
   const editing = tenant !== null
   const create = useCreateTenant()
   const update = useUpdateTenant()
@@ -36,11 +38,11 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error
   const errors = {
-    name: name.trim() ? '' : 'El nombre es obligatorio.',
-    slug: effectiveSlug ? '' : 'El identificador es obligatorio.',
+    name: name.trim() ? '' : t('common.nameRequired'),
+    slug: effectiveSlug ? '' : t('common.slugRequired'),
     // Solo al crear: al editar no se toca el usuario `client` del tenant.
-    clientEmail: editing || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail.trim()) ? '' : 'Escribe un email válido.',
-    clientName: editing || clientName.trim() ? '' : 'El nombre del cliente es obligatorio.',
+    clientEmail: editing || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail.trim()) ? '' : t('common.validEmail'),
+    clientName: editing || clientName.trim() ? '' : t('tenants.form.clientNameRequired'),
   }
 
   async function submit(event: FormEvent) {
@@ -67,26 +69,26 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
     <Dialog
       open
       onClose={pending ? () => {} : onClose}
-      title={editing ? 'Editar tenant' : 'Nuevo tenant'}
-      description={editing ? tenant.name : 'Un tenant es una organización cliente: agrupa sus proyectos, agentes y canales.'}
+      title={editing ? t('tenants.form.editTitle') : t('tenants.new')}
+      description={editing ? tenant.name : t('tenants.form.createDescription')}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form={FORM_ID} disabled={pending}>
-            {pending ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear tenant'}
+            {pending ? t('common.saving') : editing ? t('common.saveChanges') : t('tenants.form.create')}
           </Button>
         </>
       }
     >
       <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-5">
-        <Field label="Nombre" error={submitted ? errors.name : undefined}>
+        <Field label={t('common.name')} error={submitted ? errors.name : undefined}>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Clínica Vital" />
         </Field>
         <Field
-          label="Identificador (slug)"
-          hint={editing ? 'Se usa en comandos como create_user --tenant. Cambiarlo puede romper scripts que ya lo usen.' : 'Minúsculas, números y guiones. Debe ser único.'}
+          label={t('common.slug')}
+          hint={editing ? t('tenants.form.slugEditHint') : t('tenants.form.slugHint')}
           error={submitted ? errors.slug : undefined}
         >
           <Input
@@ -101,7 +103,7 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
         </Field>
         {!editing && (
           <>
-            <Field label="Email del cliente" hint="Le llegará un correo para crear su contraseña y activar su cuenta." error={submitted ? errors.clientEmail : undefined}>
+            <Field label={t('tenants.form.clientEmail')} hint={t('tenants.form.clientEmailHint')} error={submitted ? errors.clientEmail : undefined}>
               <Input
                 type="email"
                 value={clientEmail}
@@ -110,8 +112,8 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
                 autoComplete="off"
               />
             </Field>
-            <Field label="Nombre del cliente" error={submitted ? errors.clientName : undefined}>
-              <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="María Cliente" />
+            <Field label={t('tenants.form.clientName')} error={submitted ? errors.clientName : undefined}>
+              <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder={t('tenants.form.clientNamePlaceholder')} />
             </Field>
           </>
         )}

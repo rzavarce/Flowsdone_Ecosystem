@@ -72,3 +72,24 @@ def ensure_tenant_access(user: AuthenticatedUser, tenant_id: UUID) -> None:
         return
     if not any(t.id == tenant_id for t in user.tenants):
         raise HTTPException(status_code=403, detail="forbidden")
+
+
+CSRF_HEADER = "x-requested-with"
+CSRF_VALUE = "fd-console"
+
+
+def require_console_header(request: Request) -> None:
+    """CSRF guard for cookie-authenticated requests that change state.
+
+    Same rule as the admin API (see `admin/access.py`): a browser will not
+    add a custom header to a cross-site request without a CORS preflight,
+    which this API never grants.
+
+    Args:
+        request (Request): The incoming request.
+
+    Raises:
+        HTTPException: 403 if `X-Requested-With: fd-console` is missing.
+    """
+    if request.headers.get(CSRF_HEADER) != CSRF_VALUE:
+        raise HTTPException(status_code=403, detail="missing X-Requested-With header")

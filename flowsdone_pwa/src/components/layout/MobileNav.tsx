@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { useNavItems } from './useNavItems'
+import { useTranslation } from 'react-i18next'
 
 /** Bottom tab bar for mobile (< lg), designed for the installed PWA. */
 export function MobileNav() {
+  const { t } = useTranslation()
   const items = useNavItems()
   return (
     <nav
-      aria-label="Principal"
-      className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/90 backdrop-blur lg:hidden"
+      aria-label={t('layout.mainNav')}
+      className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-border bg-chrome/95 backdrop-blur lg:hidden"
     >
       <ul className="mx-auto flex max-w-lg">
         {items.map(({ to, label, icon: Icon }) => (

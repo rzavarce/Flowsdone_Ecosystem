@@ -14,7 +14,9 @@ import { ChannelsPage } from '@/features/channels/ChannelsPage'
 import { CompanyPage } from '@/features/company/CompanyPage'
 import { ConversationsPage } from '@/features/conversations/ConversationsPage'
 import { NotFoundPage } from '@/features/NotFoundPage'
+import { ProfilePage } from '@/features/profile/ProfilePage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { SupportPage } from '@/features/support/SupportPage'
 import { TenantsPage } from '@/features/tenants/TenantsPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { DashboardRoute } from './DashboardRoute'
@@ -66,6 +68,8 @@ export const routes = [
     ),
     children: [
       { path: '/dashboard', element: <DashboardRoute /> },
+      { path: '/profile', element: <ProfilePage /> },
+      { path: '/support', element: <SupportPage /> },
       { path: '/conversations', element: guarded('conversations:manage', <ConversationsPage />) },
       { path: '/channels', element: guarded('channels:manage', <ChannelsPage />) },
       { path: '/tenants', element: guarded('projects:manage', <TenantsPage />) },

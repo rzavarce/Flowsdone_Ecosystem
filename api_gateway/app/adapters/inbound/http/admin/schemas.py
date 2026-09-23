@@ -472,12 +472,19 @@ class UserCreate(BaseModel):
         name (str): Display name.
         role (str): `admin`, `tenant_manager`, `botmaster` or `client`.
         tenant_ids (List[UUID]): Tenants to assign; required unless `admin`.
+        phone (Optional[str]): Optional contact phone.
+        address (Optional[str]): Optional postal address.
+        social_links (Optional[Dict[str, str]]): Optional links by network
+            (`website`, `linkedin`, `x`, `facebook`, `instagram`).
     """
 
     email: str = Field(min_length=3, max_length=254)
     name: str = Field(min_length=1, max_length=200)
     role: str
     tenant_ids: List[UUID] = Field(default_factory=list)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    address: Optional[str] = Field(default=None, max_length=300)
+    social_links: Optional[Dict[str, str]] = None
 
 
 class UserUpdate(BaseModel):
@@ -489,6 +496,9 @@ class UserUpdate(BaseModel):
         status (Optional[str]): `active` or `disabled`.
         tenant_ids (Optional[List[UUID]]): New tenants (REPLACES the list).
         password (Optional[str]): New password; also closes the user's sessions.
+        phone (Optional[str]): Optional phone; `""` clears it.
+        address (Optional[str]): Optional address; `""` clears it.
+        social_links (Optional[Dict[str, str]]): Replaces all the links.
     """
 
     name: Optional[str] = Field(default=None, max_length=200)
@@ -496,6 +506,9 @@ class UserUpdate(BaseModel):
     status: Optional[str] = None
     tenant_ids: Optional[List[UUID]] = None
     password: Optional[str] = Field(default=None, max_length=1024)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    address: Optional[str] = Field(default=None, max_length=300)
+    social_links: Optional[Dict[str, str]] = None
 
 
 class UserOut(BaseModel):
@@ -508,6 +521,11 @@ class UserOut(BaseModel):
         role (str): Access profile.
         status (str): `active` or `disabled`.
         tenant_ids (List[UUID]): Tenants the user belongs to (empty for admins).
+        phone (Optional[str]): Optional contact phone.
+        address (Optional[str]): Optional postal address.
+        social_links (Dict[str, str]): Optional links by network.
+        avatar_updated_at (Optional[datetime]): Set when the user has a photo
+            (`GET /users/{id}/avatar`); doubles as a cache-buster.
         last_login_at (Optional[datetime]): Last successful sign-in.
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.
@@ -519,9 +537,29 @@ class UserOut(BaseModel):
     role: str
     status: str
     tenant_ids: List[UUID]
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    social_links: Dict[str, str] = Field(default_factory=dict)
+    avatar_updated_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+
+class ProfileUpdate(BaseModel):
+    """Body for `PATCH /me/profile`: what a user may change about themselves.
+
+    Attributes:
+        name (Optional[str]): New display name.
+        phone (Optional[str]): Optional phone; `""` clears it.
+        address (Optional[str]): Optional address; `""` clears it.
+        social_links (Optional[Dict[str, str]]): Replaces all the links.
+    """
+
+    name: Optional[str] = Field(default=None, max_length=200)
+    phone: Optional[str] = Field(default=None, max_length=40)
+    address: Optional[str] = Field(default=None, max_length=300)
+    social_links: Optional[Dict[str, str]] = None
 
 
 class LangflowSessionCreate(BaseModel):

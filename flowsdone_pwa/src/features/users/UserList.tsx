@@ -1,14 +1,17 @@
-import { LoaderCircle, Mail, Pencil, Trash2, UserRound } from 'lucide-react'
+import { LoaderCircle, Mail, Pencil, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { Avatar } from '@/components/ui/Avatar'
 import { Badge, type BadgeTone } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ROLE_META } from '@/core/auth/permissions'
 import type { UserRecord } from '@/core/admin/types'
+import { useAdminApi } from '@/core/admin/useAdminApi'
 
-const STATUS: Record<UserRecord['status'], { label: string; tone: BadgeTone }> = {
-  active: { label: 'Activo', tone: 'success' },
-  pending: { label: 'Pendiente de activar', tone: 'warning' },
-  disabled: { label: 'Deshabilitado', tone: 'neutral' },
+const STATUS_TONE: Record<UserRecord['status'], BadgeTone> = {
+  active: 'success',
+  pending: 'warning',
+  disabled: 'neutral',
 }
 
 /** Props for {@link UserList}. */
@@ -23,26 +26,25 @@ export interface UserListProps {
 
 /** List of console users (admin, managers and botmasters) with their actions. */
 export function UserList({ users, onEdit, onDelete, onResendActivation, resendingId }: UserListProps) {
+  const { t } = useTranslation()
+  const api = useAdminApi()
   return (
     <Card className="overflow-hidden">
-      <ul aria-label="Usuarios" className="divide-y divide-border">
+      <ul aria-label={t('nav.users')} className="divide-y divide-border">
         {users.map((user) => {
-          const status = STATUS[user.status]
           return (
             <li key={user.id} className="flex items-center gap-3 px-4 py-3.5">
-              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-primary-ink">
-                <UserRound className="size-4.5" aria-hidden="true" />
-              </span>
+              <Avatar name={user.name} src={api.userAvatarUrl(user)} className="size-10" />
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="truncate font-medium">{user.name}</span>
                   <Badge tone="primary">{ROLE_META[user.role].label}</Badge>
-                  <Badge tone={status.tone}>{status.label}</Badge>
+                  <Badge tone={STATUS_TONE[user.status]}>{t(`users.status.${user.status}`)}</Badge>
                 </span>
                 <span className="block truncate text-xs text-muted">{user.email}</span>
                 {user.role !== 'admin' && (
                   <span className="block text-xs text-muted">
-                    {user.tenant_ids.length} tenant{user.tenant_ids.length === 1 ? '' : 's'}
+                    {t('users.tenantCount', { count: user.tenant_ids.length })}
                   </span>
                 )}
               </span>
@@ -51,8 +53,8 @@ export function UserList({ users, onEdit, onDelete, onResendActivation, resendin
                   <Button
                     variant="ghost"
                     size="icon"
-                    title={resendingId === user.id ? 'Reenviando…' : 'Reenviar email de activación'}
-                    aria-label={resendingId === user.id ? `Reenviando activación a ${user.name}` : `Reenviar email de activación a ${user.name}`}
+                    title={resendingId === user.id ? t('users.resend.pending') : t('users.resend.action')}
+                    aria-label={resendingId === user.id ? t('users.resend.pendingItem', { name: user.name }) : t('users.resend.actionItem', { name: user.name })}
                     disabled={resendingId === user.id}
                     onClick={() => onResendActivation(user)}
                   >
@@ -63,10 +65,10 @@ export function UserList({ users, onEdit, onDelete, onResendActivation, resendin
                     )}
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" title="Editar" aria-label={`Editar ${user.name}`} onClick={() => onEdit(user)}>
+                <Button variant="ghost" size="icon" title={t('common.edit')} aria-label={t('common.editItem', { name: user.name })} onClick={() => onEdit(user)}>
                   <Pencil className="size-4" aria-hidden="true" />
                 </Button>
-                <Button variant="ghost" size="icon" title="Eliminar" aria-label={`Eliminar ${user.name}`} onClick={() => onDelete(user)}>
+                <Button variant="ghost" size="icon" title={t('common.delete')} aria-label={t('common.deleteItem', { name: user.name })} onClick={() => onDelete(user)}>
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
               </span>

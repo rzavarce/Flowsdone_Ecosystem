@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Dict, Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -31,6 +33,11 @@ class AuthenticatedUser(BaseModel):
         role (UserRole): Access profile.
         tenants (list[TenantRef]): Tenants the user can work on. For an
             `admin` this is every tenant.
+        phone (Optional[str]): Optional contact phone.
+        address (Optional[str]): Optional postal address.
+        social_links (Dict[str, str]): Optional profile links by network.
+        avatar_updated_at (Optional[datetime]): Set when the user has a
+            photo (served by `GET /me/avatar`); doubles as a cache-buster.
     """
 
     id: UUID
@@ -38,3 +45,7 @@ class AuthenticatedUser(BaseModel):
     name: str
     role: UserRole
     tenants: list[TenantRef]
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    social_links: Dict[str, str] = {}
+    avatar_updated_at: Optional[datetime] = None

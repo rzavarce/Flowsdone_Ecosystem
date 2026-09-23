@@ -7,12 +7,14 @@ import { AuthError } from '@/core/auth/AuthApi'
 import { AUTH_MODE } from '@/core/auth/createAuthApi'
 import { useAuth } from '@/core/auth/useAuth'
 import { DemoAccounts } from './DemoAccounts'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Login form. Once authenticated, `PublicOnly` (which wraps the route)
  * handles the redirect; this component only manages submission and errors.
  */
 export function LoginForm() {
+  const { t } = useTranslation()
   const { login } = useAuth()
   const ids = { email: useId(), password: useId(), error: useId() }
   const [email, setEmail] = useState('')
@@ -28,7 +30,7 @@ export function LoginForm() {
     try {
       await login({ email: email.trim(), password })
     } catch (err) {
-      setError(err instanceof AuthError ? err.message : 'Ocurrió un error inesperado.')
+      setError(err instanceof AuthError ? err.message : t('common.unexpectedError'))
       setPending(false)
     }
   }
@@ -38,7 +40,7 @@ export function LoginForm() {
       <form onSubmit={onSubmit} noValidate className="space-y-5" aria-describedby={error ? ids.error : undefined}>
         <div className="space-y-1.5">
           <label htmlFor={ids.email} className="text-sm font-medium">
-            Correo electrónico
+            {t('auth.email')}
           </label>
           <Input
             id={ids.email}
@@ -47,17 +49,17 @@ export function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="tu@empresa.com"
+            placeholder={t('auth.emailPlaceholder')}
           />
         </div>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor={ids.password} className="text-sm font-medium">
-              Contraseña
+              {t('auth.password')}
             </label>
             <Link to="/forgot-password" className="text-sm font-medium text-primary-ink hover:underline">
-              ¿Olvidaste tu contraseña?
+              {t('auth.forgotLink')}
             </Link>
           </div>
           <div className="relative">
@@ -73,7 +75,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
               aria-pressed={showPassword}
               className="absolute top-1/2 right-2 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-muted hover:text-foreground"
             >
@@ -83,14 +85,14 @@ export function LoginForm() {
         </div>
 
         {error && (
-          <p id={ids.error} role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p id={ids.error} role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
           </p>
         )}
 
         <Button type="submit" disabled={pending || !email.trim() || !password} className="w-full">
           {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
-          {pending ? 'Ingresando…' : 'Ingresar'}
+          {pending ? t('auth.login.submitting') : t('auth.login.submit')}
         </Button>
       </form>
 

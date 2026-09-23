@@ -86,4 +86,10 @@ export interface AdminApi {
   deleteUser(id: string): Promise<void>
   /** Resends the activation email (only while still `pending`). */
   resendUserActivation(id: string): Promise<void>
+  /** Sets (or replaces) a user's photo (admin only). */
+  uploadUserAvatar(id: string, image: Blob): Promise<UserRecord>
+  /** Removes a user's photo (admin only). */
+  removeUserAvatar(id: string): Promise<UserRecord>
+  /** URL to display a user's photo, or `null` if they have none. */
+  userAvatarUrl(user: UserRecord): string | null
 }

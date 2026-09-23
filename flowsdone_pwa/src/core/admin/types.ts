@@ -1,6 +1,6 @@
 /** Types for the gateway's admin API (`/internal/admin/*`) as used by the console. */
 
-import type { Role } from '@/core/auth/types'
+import type { ProfileFields, Role, SocialNetwork } from '@/core/auth/types'
 
 /** Channels supported by the gateway. */
 export type ChannelType =
@@ -157,7 +157,7 @@ export interface UpdateChannelConnectionInput {
 export type UserAccountStatus = 'pending' | 'active' | 'disabled'
 
 /** A console user as returned by the admin API. Never carries the password hash. */
-export interface UserRecord {
+export interface UserRecord extends ProfileFields {
   id: string
   email: string
   name: string
@@ -176,6 +176,9 @@ export interface CreateUserInput {
   name: string
   role: Role
   tenant_ids: string[]
+  phone?: string
+  address?: string
+  social_links?: Partial<Record<SocialNetwork, string>>
 }
 
 /** Editable fields of a user; omitted ones stay unchanged. */
@@ -184,6 +187,12 @@ export interface UpdateUserInput {
   role?: Role
   status?: 'active' | 'disabled'
   tenant_ids?: string[]
+  /** An empty string clears it. */
+  phone?: string
+  /** An empty string clears it. */
+  address?: string
+  /** Replaces all the links. */
+  social_links?: Partial<Record<SocialNetwork, string>>
 }
 
 /** A session for opening Langflow as a tenant's user. */

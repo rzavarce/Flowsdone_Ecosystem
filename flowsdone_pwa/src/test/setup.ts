@@ -1,9 +1,12 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
+// Los tests se escriben contra los textos en español (el idioma por defecto).
+import { i18n } from '@/core/i18n/i18n'
 
 afterEach(() => {
   cleanup()
+  void i18n.changeLanguage('es')
   localStorage.clear()
   document.documentElement.className = ''
   document.documentElement.removeAttribute('data-theme')

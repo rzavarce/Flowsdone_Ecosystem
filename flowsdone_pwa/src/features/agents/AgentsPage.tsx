@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { useTenant } from '@/core/tenant/useTenant'
 import { LangflowEmbed } from './LangflowEmbed'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Agents: the embedded Langflow editor, for any staff allowed to edit agents
@@ -18,11 +19,12 @@ import { LangflowEmbed } from './LangflowEmbed'
  * (Flowsdone staff, not clients) - see `POLICY["langflow"]` in the gateway.
  */
 export function AgentsPage() {
+  const { t } = useTranslation()
   const { current } = useTenant()
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Agentes" description="Diseña y ajusta los agentes de tu plataforma en Langflow." />
+      <PageHeader title={t('nav.agents')} description={t('agents.description')} />
       {/* min-h-0: sin esto, un flex item no encoge por debajo del alto de su contenido y
           el editor de Langflow (que sí debe llenar el espacio disponible) se desborda. */}
       <div className="min-h-0 flex-1">

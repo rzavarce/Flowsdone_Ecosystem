@@ -30,11 +30,11 @@ function mockSystemDark(initial: boolean) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('ThemeProvider', () => {
-  it('arranca con aurora + system y refleja el SO claro', () => {
+  it('arranca con admin + system y refleja el SO claro', () => {
     mockSystemDark(false)
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(screen.getByTestId('state')).toHaveTextContent('flowsdone|system|light')
-    expect(document.documentElement.dataset.theme).toBe('flowsdone')
+    expect(screen.getByTestId('state')).toHaveTextContent('admin|system|light')
+    expect(document.documentElement.dataset.theme).toBe('admin')
     expect(document.documentElement).not.toHaveClass('dark')
   })
 
@@ -62,7 +62,7 @@ describe('ThemeProvider', () => {
     render(<ThemeProvider><Probe /></ThemeProvider>)
 
     act(() => emit(true))
-    expect(screen.getByTestId('state')).toHaveTextContent('flowsdone|system|dark')
+    expect(screen.getByTestId('state')).toHaveTextContent('admin|system|dark')
     expect(document.documentElement).toHaveClass('dark')
   })
 })

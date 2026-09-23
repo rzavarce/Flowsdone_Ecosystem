@@ -1,4 +1,5 @@
 import type { ChannelAppProvider } from '@/core/admin/types'
+import { i18n } from '@/core/i18n/i18n'
 
 /** A secret value of the shared app (sent inside `credentials`). */
 export interface AppCredentialField {
@@ -21,39 +22,42 @@ export interface ChannelAppConfig {
  * Twilio), shared across all tenants and configured once by an admin from
  * `PlatformIntegrations`.
  */
+/** Translates a platform-app text when read (follows language changes). */
+const tr = (key: string) => i18n.t(`settings.apps.${key}` as 'settings.apps.meta.description')
+
+/** A credential field whose label is the raw key name (a brand term) and whose hint is translated. */
+const field = (provider: ChannelAppProvider, key: string, label: string, opts: { hint?: boolean; required?: boolean } = {}): AppCredentialField => ({
+  key,
+  required: opts.required,
+  get label() {
+    return key === 'webhook_verify_token' ? tr(`${provider}.fields.${key}.label`) : label
+  },
+  get hint() {
+    return opts.hint ? tr(`${provider}.fields.${key}.hint`) : undefined
+  },
+})
+
+/** An app whose label and description are getters. */
+const app = (provider: ChannelAppProvider, fields: AppCredentialField[], translatedLabel = false, label = ''): ChannelAppConfig => ({
+  provider,
+  fields,
+  get label() {
+    return translatedLabel ? tr(`${provider}.label`) : label
+  },
+  get description() {
+    return tr(`${provider}.description`)
+  },
+})
+
 export const CHANNEL_APPS: readonly ChannelAppConfig[] = [
-  {
-    provider: 'meta',
-    label: 'Meta (Facebook + Instagram)',
-    description: 'Una sola app de Meta para Messenger e Instagram de todos los tenants.',
-    fields: [
-      { key: 'app_secret', label: 'App Secret', hint: 'Está en el panel de tu app de Meta. Firma todos los webhooks.', required: true },
-      {
-        key: 'webhook_verify_token',
-        label: 'Token de verificación del webhook',
-        hint: 'Opcional: si lo dejas vacío, Flowsdone genera uno (y podrás verlo después para pegarlo en Meta).',
-      },
-    ],
-  },
-  {
-    provider: 'twitter',
-    label: 'X (Twitter)',
-    description: 'La app de X compartida para todos los tenants.',
-    fields: [{ key: 'consumer_secret', label: 'Consumer Secret', required: true }],
-  },
-  {
-    provider: 'tiktok',
-    label: 'TikTok',
-    description: 'La app de TikTok compartida para todos los tenants.',
-    fields: [{ key: 'client_secret', label: 'Client Secret', required: true }],
-  },
-  {
-    provider: 'twilio',
-    label: 'Twilio (voz)',
-    description: 'La cuenta de Twilio de la plataforma; cada número se conecta como un canal de voz.',
-    fields: [
-      { key: 'auth_token', label: 'Auth Token', hint: 'Valida que las llamadas entrantes vengan de Twilio.', required: true },
-      { key: 'account_sid', label: 'Account SID', hint: 'Opcional.' },
-    ],
-  },
+  app('meta', [
+    field('meta', 'app_secret', 'App Secret', { hint: true, required: true }),
+    field('meta', 'webhook_verify_token', '', { hint: true }),
+  ], false, 'Meta (Facebook + Instagram)'),
+  app('twitter', [field('twitter', 'consumer_secret', 'Consumer Secret', { required: true })], false, 'X (Twitter)'),
+  app('tiktok', [field('tiktok', 'client_secret', 'Client Secret', { required: true })], false, 'TikTok'),
+  app('twilio', [
+    field('twilio', 'auth_token', 'Auth Token', { hint: true, required: true }),
+    field('twilio', 'account_sid', 'Account SID', { hint: true }),
+  ], true),
 ]

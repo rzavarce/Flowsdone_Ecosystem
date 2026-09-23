@@ -34,7 +34,7 @@ from app.adapters.outbound.db.tenant_billing_profile_repository import (
     SqlAlchemyTenantBillingProfileRepository,
 )
 from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
-from app.adapters.outbound.db.user_repository import SqlAlchemyUserRepository
+from app.adapters.outbound.db.user_repository import SqlAlchemyUserAvatarRepository, SqlAlchemyUserRepository
 from app.adapters.outbound.email.resend_client import ResendEmailAdapter
 from app.adapters.outbound.session.redis_account_token_store import RedisAccountTokenStore
 from app.adapters.outbound.session.redis_auth_session_repository import RedisAuthSessionRepository
@@ -67,6 +67,11 @@ from app.application.use_cases.handle_outbound_response import HandleOutboundRes
 from app.application.use_cases.ingest_message import IngestMessageUseCase
 from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
+from app.application.use_cases.manage_profile import (
+    RemoveAvatarUseCase,
+    SetAvatarUseCase,
+    UpdateOwnProfileUseCase,
+)
 from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
 from app.application.use_cases.provision_user import ProvisionUserUseCase
 from app.application.use_cases.request_password_reset import RequestPasswordResetUseCase
@@ -306,6 +311,15 @@ async def lifespan(app: FastAPI):
         sessions=auth_sessions,
     )
     app.state.delete_user_use_case = DeleteUserUseCase(user_repo=user_repo, sessions=auth_sessions)
+    # Self-service profile ("My profile" in the PWA) and profile photos,
+    # shared by /me/* and the admin Users endpoints.
+    user_avatar_repo = SqlAlchemyUserAvatarRepository(db_sessionmaker)
+    app.state.user_avatar_repo = user_avatar_repo
+    app.state.update_own_profile_use_case = UpdateOwnProfileUseCase(
+        user_repo=user_repo, tenant_repo=app.state.tenant_repo
+    )
+    app.state.set_avatar_use_case = SetAvatarUseCase(avatar_repo=user_avatar_repo)
+    app.state.remove_avatar_use_case = RemoveAvatarUseCase(avatar_repo=user_avatar_repo)
     logger.info("auth.dependencies.initialized")
 
     # Account activation by email (see application/use_cases/provision_user.py)

@@ -5,19 +5,20 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
 /**
- * Common shell for authenticated views: sidebar (desktop), top bar,
- * content (`<Outlet />`) and bottom tabs (mobile).
+ * Common shell for authenticated views: sidebar (desktop), top bar (which
+ * also holds the sidebar collapse toggle), content (`<Outlet />`) and bottom
+ * tabs (mobile).
  */
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+      <Sidebar collapsed={collapsed} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+        <Topbar sidebarCollapsed={collapsed} onToggleSidebar={() => setCollapsed((c) => !c)} />
         {/* pb-24: deja libre la barra inferior en móvil. */}
-        <main className="w-full flex-1 px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+        <main className="w-full flex-1 p-4 pb-24 md:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
