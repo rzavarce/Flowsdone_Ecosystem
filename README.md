@@ -1258,8 +1258,7 @@ Nadie recibe una contraseña en texto plano: todo usuario nuevo (`admin`/`tenant
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | Remitente de los correos. Default `no-reply@flowsdone.com` / `Flowsdone`. |
 | `ACCOUNT_ACTIVATION_TTL_SECONDS` | Vigencia del link de activación (default `86400`, 24h). |
 | `PASSWORD_RESET_TTL_SECONDS` | Vigencia del link de "olvidé mi contraseña" (default `3600`, 1h — más corto que la activación por ser más sensible). |
-
-`PUBLIC_BASE_URL` (ya existía) se reusa para construir ambos links (`{PUBLIC_BASE_URL}/activar-cuenta/{token}`, `.../restablecer-password/{token}`) — debe apuntar al dominio donde la PWA sirve esas rutas, no solo la API.
+| `PWA_PUBLIC_URL` | Dominio donde la PWA sirve `/activar-cuenta` y `/restablecer-password` — con esto se arman ambos links (`{PWA_PUBLIC_URL}/activar-cuenta/{token}`, `.../restablecer-password/{token}`). **No** es `PUBLIC_BASE_URL`: esa variable sigue siendo la del gateway (Telegram/voz la necesitan apuntando a `platform.`/`agents.`, nunca al dominio de la PWA) — si `PWA_PUBLIC_URL` falta, cae a `PUBLIC_BASE_URL` (sirve en dev de un solo dominio; en prod, con dominios distintos, hay que ponerla explícita o los links de email dan 404). |
 
 ### Fuera de alcance (a propósito, por ahora)
 

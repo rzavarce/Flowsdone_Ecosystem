@@ -150,8 +150,20 @@ class Settings(BaseModel):
     # GATEWAY_INTERNAL_URL, which is only reachable inside the Docker
     # network). Used to build callback URLs that external platforms
     # must call back into, e.g. Telegram's setWebhook (see
-    # TelegramWebhookRegistrar).
+    # TelegramWebhookRegistrar) and the voice channel's webhooks - these
+    # must hit the gateway directly (in prod, agents./platform., NOT the
+    # PWA's domain), so this is deliberately NOT the same as PWA_PUBLIC_URL
+    # below even though they're often set to look-alike values in dev.
     PUBLIC_BASE_URL: str = "http://localhost:8000"
+    # Public URL of the console (PWA) - where /activar-cuenta and
+    # /restablecer-password are actually served (nginx SPA fallback), unlike
+    # PUBLIC_BASE_URL above which points at this gateway. Defaults to
+    # PUBLIC_BASE_URL so a single-domain dev setup (same origin for both)
+    # keeps working without setting this - but in prod they're different
+    # domains (app. vs platform./agents.) and this MUST be set explicitly,
+    # or activation/reset links 404 (they'd point at the gateway, which has
+    # no route for those paths).
+    PWA_PUBLIC_URL: Optional[str] = None
 
     # OpenTelemetry (logs + traces)
     OTEL_ENABLED: bool = False
@@ -261,6 +273,9 @@ settings = Settings(
 
     GATEWAY_INTERNAL_URL=os.getenv("GATEWAY_INTERNAL_URL", "http://api:8000"),
     PUBLIC_BASE_URL=os.getenv("PUBLIC_BASE_URL", "http://localhost:8000"),
+    # Sin PWA_PUBLIC_URL propio, cae a PUBLIC_BASE_URL (mismo origen en dev);
+    # en prod hace falta ponerlo aparte - ver el comentario del campo arriba.
+    PWA_PUBLIC_URL=os.getenv("PWA_PUBLIC_URL") or os.getenv("PUBLIC_BASE_URL", "http://localhost:8000"),
 
     OTEL_ENABLED=_bool(os.getenv("OTEL_ENABLED"), False),
     OTEL_EXPORTER_OTLP_ENDPOINT=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
