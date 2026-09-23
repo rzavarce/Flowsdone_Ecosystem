@@ -23,6 +23,7 @@ from app.domain.ports.outbound import (
     SessionHistoryRepositoryPort,
     SessionRepositoryPort,
 )
+from app.application.services.conversation_tracker import ConversationTracker
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 
 logger = logging.getLogger("switchboard")
@@ -73,6 +74,7 @@ class Switchboard:
         outbound_handler: HandleOutboundResponseUseCase,
         session_ttl_seconds: int,
         default_app: str = DEFAULT_APP,
+        conversation_tracker: Optional[ConversationTracker] = None,
     ) -> None:
         """Build the switchboard.
 
@@ -92,6 +94,10 @@ class Switchboard:
             session_ttl_seconds (int): TTL applied every time a session
                 is saved to Redis.
             default_app (str): Which app a brand-new session starts on.
+            conversation_tracker (Optional[ConversationTracker]): Opens/
+                rotates the session's Conversation and records the
+                inbound message into the conversation archive. Optional
+                so tests/callers that don't need it can omit it.
         """
         self.channel_connection_repo = channel_connection_repo
         self.session_repo = session_repo
@@ -100,6 +106,7 @@ class Switchboard:
         self.outbound_handler = outbound_handler
         self.session_ttl_seconds = session_ttl_seconds
         self.default_app = default_app
+        self.conversation_tracker = conversation_tracker
 
     async def handle_inbound_turn(
         self,
@@ -193,6 +200,7 @@ class Switchboard:
         session.record_message(
             direction="inbound", text=message_text, app=session.current_app, timestamp=now
         )
+        await self._track_inbound(session, message_text, now)
 
         logger.info(
             "switchboard.turn.dispatched",
@@ -257,6 +265,31 @@ class Switchboard:
         )
 
         return session
+
+    async def _track_inbound(self, session: Session, text: str, now: datetime) -> None:
+        """Best-effort: attach the session to its current Conversation
+        (opening a new one if needed) and record the inbound message.
+
+        Runs before the connector is called, so the connector already
+        sees the right `session.conversation_id`. Never raises - a
+        tracking failure must not stop the contact from getting an
+        answer; the connector then falls back to the session id.
+
+        Args:
+            session (Session): The contact's session (mutated in place).
+            text (str): The inbound message text.
+            now (datetime): When the message arrived.
+        """
+        if self.conversation_tracker is None:
+            return
+        try:
+            await self.conversation_tracker.record_inbound(session=session, text=text, now=now)
+        except Exception:
+            logger.error(
+                "switchboard.conversation_tracking.failed",
+                extra={"session_id": session.id},
+                exc_info=True,
+            )
 
     async def _deliver_immediately(self, session: Session, text: str) -> None:
         """Deliver a connector's synchronous result right away, reusing

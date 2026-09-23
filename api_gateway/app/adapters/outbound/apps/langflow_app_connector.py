@@ -55,7 +55,8 @@ class LangflowAppConnector(AppConnectorPort):
         Args:
             session (Session): The conversation's current state; reads
                 `session.variables["langflow_flow_id"]` (snapshotted by
-                Switchboard when the session was created).
+                Switchboard when the session was created) and
+                `session.conversation_id` (sent as Langflow's session_id).
             message_text (str): The caller's message for this turn.
             raw_payload (Dict[str, Any]): The raw, channel-specific
                 payload, forwarded as-is for debugging.
@@ -76,6 +77,10 @@ class LangflowAppConnector(AppConnectorPort):
             channel=session.channel_type,
             channel_connection_id=str(session.channel_connection_id),
             external_conversation_key=session.external_conversation_key,
+            # Langflow memory/Langfuse traces are per Conversation, so a
+            # conversation that expired starts the bot from a clean
+            # context instead of the contact's whole history.
+            llm_session_id=str(session.conversation_id) if session.conversation_id else None,
         )
 
         logger.info(

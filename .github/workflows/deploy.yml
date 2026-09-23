@@ -103,6 +103,13 @@ jobs:
             # de llegar al `up -d` final. /tmp es la capa efímera del
             # contenedor, se limpia solo en el próximo recreate.
 
+            # ClickHouse: base "flowsdone" y tablas del archivo de conversaciones
+            # (idempotente) ANTES de levantar kafka_conversations_worker.
+            docker compose --profile prod up -d --no-deps clickhouse
+            CH_CONTAINER=$(docker compose --profile prod ps -q clickhouse)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $CH_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+            docker exec -i "$CH_CONTAINER" sh -s < scripts/clickhouse/init-clickhouse.sh
+
             # Ahora sí, el resto del stack (incluye otel-collector, que ya
             # encuentra el index template listo) incluyendo el perfil 'prod'
             # (Traefik, etc.)

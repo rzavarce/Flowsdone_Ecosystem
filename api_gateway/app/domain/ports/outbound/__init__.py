@@ -77,6 +77,11 @@ from app.domain.ports.outbound.auth import (  # noqa: F401
 )
 from app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.channel_sender import ChannelSenderPort  # noqa: F401
+from app.domain.ports.outbound.conversations import (  # noqa: F401
+    ConversationEventPublisherPort,
+    ConversationRepositoryPort,
+    MessageArchivePort,
+)
 from app.domain.ports.outbound.email import EmailSendError, EmailSenderPort  # noqa: F401
 from app.domain.ports.outbound.langflow_sso import (  # noqa: F401
     LangflowAccountRepositoryPort,

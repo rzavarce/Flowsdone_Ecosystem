@@ -4,6 +4,7 @@ together at startup and exposes the resulting `app`.
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -41,6 +42,11 @@ from app.adapters.outbound.session.redis_auth_session_repository import RedisAut
 from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
 from app.adapters.outbound.session.redis_sso_ticket_store import RedisSsoTicketStore
 from app.adapters.outbound.db.workflow_config_repository import SqlAlchemyWorkflowConfigRepository
+from app.adapters.outbound.conversations.event_publishers import (
+    BrokerConversationEventPublisher,
+    NullConversationEventPublisher,
+)
+from app.adapters.outbound.db.conversation_repository import SqlAlchemyConversationRepository
 from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
 from app.adapters.outbound.queue.factory import PublisherFactory
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
@@ -53,6 +59,7 @@ from app.adapters.outbound.session.postgres_session_history_repository import (
 from app.adapters.outbound.session.redis_session_repository import RedisSessionRepository
 from app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
 from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
+from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.switchboard import Switchboard
 from app.application.services.ws_registry import WSRegistry
 from app.application.services.access_control import AccessControl
@@ -79,6 +86,7 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
+from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
 from app.core.tracing import instrument_fastapi_app, setup_tracing
 from app.infrastructure.database import create_engine, create_sessionmaker
@@ -265,6 +273,33 @@ async def lifespan(app: FastAPI):
 
     logger.info("database.repositories.ready")
 
+    # Conversations: live records in Postgres, every message published
+    # to CONVERSATION_EVENTS_TOPIC for the conversations worker to
+    # archive into ClickHouse. Without Kafka, conversations are still
+    # tracked but messages are not archived.
+    if settings.ENABLE_KAFKA:
+        conversation_events_kafka = KafkaPublisher(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+            topic=settings.CONVERSATION_EVENTS_TOPIC,
+        )
+        await conversation_events_kafka.start()
+        app.state.conversation_events_kafka_publisher = conversation_events_kafka
+        conversation_event_publisher = BrokerConversationEventPublisher(conversation_events_kafka)
+    else:
+        conversation_event_publisher = NullConversationEventPublisher()
+
+    conversation_tracker = ConversationTracker(
+        conversation_repo=SqlAlchemyConversationRepository(db_sessionmaker),
+        event_publisher=conversation_event_publisher,
+        session_history_repo=session_history_repo,
+        policy=ConversationLifecyclePolicy(
+            inactivity=timedelta(seconds=settings.CONVERSATION_INACTIVITY_SECONDS),
+            max_duration=timedelta(seconds=settings.CONVERSATION_MAX_DURATION_SECONDS),
+        ),
+    )
+    app.state.conversation_tracker = conversation_tracker
+    logger.info("conversations.tracker.ready")
+
     # Console (PWA) authentication: users in Postgres, opaque sessions and
     # login throttling in Redis (same client as voice/switchboard; own key
     # prefixes), scrypt for passwords.
@@ -438,6 +473,7 @@ async def lifespan(app: FastAPI):
         session_repo=session_repo,
         session_history_repo=session_history_repo,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        conversation_tracker=conversation_tracker,
     )
     app.state.outbound_handler = outbound_handler
 
@@ -453,6 +489,7 @@ async def lifespan(app: FastAPI):
         app_connectors=AppConnectorFactory().build_all(ingest_message_use_case=ingest_use_case),
         outbound_handler=outbound_handler,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        conversation_tracker=conversation_tracker,
     )
 
     logger.info("switchboard.initialized")
@@ -474,6 +511,11 @@ async def lifespan(app: FastAPI):
         if voice_kafka_pub:
             await voice_kafka_pub.stop()
             logger.info("kafka.voice_publisher.stopped")
+
+        conversation_events_pub = getattr(app.state, "conversation_events_kafka_publisher", None)
+        if conversation_events_pub:
+            await conversation_events_pub.stop()
+            logger.info("kafka.conversation_events_publisher.stopped")
 
     redis_client = getattr(app.state, "redis_client", None)
     if redis_client:

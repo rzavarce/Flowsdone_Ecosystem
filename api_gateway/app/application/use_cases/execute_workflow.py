@@ -74,7 +74,9 @@ class ExecuteWorkflowUseCase:
             result = await self.executor.run(
                 workflow_id=meta.workflow_id,
                 payload=envelope.payload,
-                conversation_id=meta.conversation_id,
+                # Scopes Langflow's memory (and Langfuse's session) to
+                # the Conversation, not to the contact forever.
+                conversation_id=meta.effective_llm_session_id(),
             )
 
             await self.idempotency_repo.mark_completed(meta.message_id)

@@ -29,6 +29,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 21. [Agente de onboarding interno (Langflow → admin API)](#21-agente-de-onboarding-interno-langflow--admin-api)
 22. [Activación de cuentas por email + Usuarios en la PWA](#22-activación-de-cuentas-por-email--usuarios-en-la-pwa)
 23. [Editor de Langflow para todo el staff, rol `consultant`, Reportes y facturación del cliente](#23-editor-de-langflow-para-todo-el-staff-rol-consultant-reportes-y-facturación-del-cliente)
+24. [Conversaciones y archivo de mensajes (ClickHouse)](#24-conversaciones-y-archivo-de-mensajes-clickhouse)
 
 ---
 
@@ -875,6 +876,16 @@ pytest
 - `adapters/outbound/` — `RandomHexSecretGenerator`, `TelegramWebhookRegistrar`, `MetaWebhookRegistrar`, las dos factories (`ChannelSenderFactory`, `WebhookRegistrarFactory`), todos los senders (incluidos los stubs de X/TikTok), `RedisSessionRepository`, `LangflowAppConnector` y `AppConnectorFactory` (sección 20).
 - `adapters/inbound/http/channels/` — los helpers puros de verificación de firma de cada canal (Meta, X, TikTok, extracción de texto de Evolution), más tests end-to-end vía ASGI (sin DB real, con fakes en `app.state`) para Telegram, Facebook y WhatsApp — los tres patrones de verificación distintos (secret por conexión, firma HMAC de app compartida, apikey estático).
 
+**Tests de integración (opcionales):** `tests/integration/` pega contra Postgres y ClickHouse reales y se **salta** si no están estas variables (en CI no se definen). Usar siempre bases desechables, nunca `gatewaydb` ni `flowsdone`: los tests escriben filas.
+
+```bash
+# Postgres: base vacía migrada a head
+TEST_POSTGRES_URL=postgresql+asyncpg://user:pass@localhost:5432/conversations_it pytest api_gateway/tests/integration
+# ClickHouse: base creada con scripts/clickhouse/init-clickhouse.sh (CLICKHOUSE_DATABASE=conversations_it)
+TEST_CLICKHOUSE_URL=http://localhost:8125 TEST_CLICKHOUSE_USER=... TEST_CLICKHOUSE_PASSWORD=... \
+TEST_CLICKHOUSE_DATABASE=conversations_it pytest api_gateway/tests/integration
+```
+
 **Qué falta (deliberadamente fuera de este alcance):** tests end-to-end de Instagram/X/TikTok a nivel HTTP (sus helpers de firma sí están cubiertos), y cualquier test de integración contra Postgres/Kafka/RabbitMQ reales o contra el `admin` router completo (routers CRUD), `adapters/outbound/db/` (repositorios SQLAlchemy), `infrastructure/` o `main.py` (wiring de arranque). Los fakes reutilizables viven en `tests/support/` (`fakes.py` para los puertos, `fake_httpx.py` para las llamadas salientes, `asgi.py` para levantar un router aislado).
 
 ### Cobertura
@@ -1152,8 +1163,8 @@ Switchboard.handle_inbound_turn(channel_type, external_id, external_conversation
                                  sender_id, message_text, raw_payload)
    │
    ├─ session_id = f"{project_id}:{channel_type}:{external_conversation_key}"
-   │  (mismo formato de siempre — Langflow sigue recibiendo el mismo session_id/
-   │   conversation_id, así que su memoria de conversación no se ve afectada)
+   │  (mismo formato de siempre para enrutar/entregar; desde la sección 24,
+   │   Langflow recibe como session_id el id de la Conversation, no este)
    │
    ├─ session_repo.get(session_id)  (Redis)
    │  si no existe: channel_connection_repo.get_by_channel_and_external_id(...) resuelve
@@ -1302,4 +1313,65 @@ Cuarto rol "de staff visible" (se crea desde Usuarios, con tenant(s) asignados),
 - Motor de cobro/pasarela de pago, sistema real de planes y precios - `plan`/`billing_cycle` son texto libre, sin validar contra un catálogo.
 - Embeber Metabase de verdad en `ReportsPlaceholder` - queda para cuando se integre.
 - Que `client` también pueda editar sus propios datos de facturación (hoy es de solo lectura; lo edita admin/tenant_manager).
+
+---
+
+## 24. Conversaciones y archivo de mensajes (ClickHouse)
+
+Una **Conversation** es un intercambio acotado con un contacto, distinto de la `Session` de Switchboard (sección 20). La Session tiene un id fijo por contacto (`{project}:{canal}:{contacto}`) y se reutiliza siempre. La Conversation tiene su propio UUID, empieza con el primer mensaje del contacto y termina con **lo primero** que ocurra de:
+
+| Límite | Variable | Por defecto |
+|---|---|---|
+| Inactividad desde el último mensaje **del contacto** (como la ventana de 24 h de WhatsApp) | `CONVERSATION_INACTIVITY_SECONDS` | 86400 (24 h) |
+| Duración máxima desde que empezó | `CONVERSATION_MAX_DURATION_SECONDS` | 604800 (7 días) |
+| Cierre manual (reservado, sin endpoint todavía) | — | — |
+
+### La memoria del bot es por conversación
+
+El id de la Conversation viaja en el envelope como `meta.llm_session_id`, y `ExecuteWorkflowUseCase` se lo pasa a Langflow como `session_id`. Consecuencias:
+
+- Pasadas 24 h sin mensajes, el bot **empieza de cero** (no recuerda la conversación anterior).
+- El contexto que se manda al LLM en cada turno no crece sin fin, lo que ahorra tokens.
+- En Langfuse, las traces quedan agrupadas por conversación, que es lo que usará la medición de tokens (Fase 2).
+- El webchat no pasa por Switchboard: sigue usando su `conversation_id` como `session_id`, igual que antes.
+
+### Dónde vive cada cosa
+
+| Qué | Dónde | Por qué |
+|---|---|---|
+| Estado de cada conversación (abierta/cerrada, contadores, fechas) | Postgres, tabla `conversations` (migración `0010`) | Datos que cambian y que la bandeja de entrada consulta. Una sola conversación abierta por sesión (índice único parcial) |
+| Texto de cada mensaje | ClickHouse, `flowsdone.messages` | Solo se añaden filas, volumen alto, borrado automático por TTL a los `MESSAGE_RETENTION_DAYS` (183 ≈ 6 meses), guardado por fila en `retention_until` |
+| Consumo medido (canal, tokens, plataforma) | ClickHouse, `flowsdone.usage_events` | Solo se crea la tabla; se llena en la Fase 2. **Sin TTL** (respalda la facturación) |
+| Auditoría de sesión | Postgres, `session_events` | Un evento `closed` por cada conversación cerrada |
+
+`session_messages` (Postgres) se sigue escribiendo en paralelo por ahora. Se retira cuando el archivo de ClickHouse esté validado en producción.
+
+### Flujo
+
+```
+Switchboard.handle_inbound_turn ─┐
+                                 ├─ ConversationTracker ── conversations (Postgres)
+HandleOutboundResponse.deliver ──┘        │
+                                          └─ topic conversation.events (clave = conversation_id)
+                                                     │
+                                  kafka_conversations_worker
+                                   ├─ inserción por lotes → ClickHouse flowsdone.messages
+                                   └─ cada CONVERSATION_SWEEP_INTERVAL_SECONDS: cierra las vencidas
+```
+
+- **Si algo falla, el contacto recibe respuesta igual.** Un fallo al registrar la conversación se loguea (`switchboard.conversation_tracking.failed`) y el turno llega a Langflow con el id de sesión.
+- **Un evento repetido no duplica filas.** `ReplacingMergeTree` con `message_id` en la clave hace que colapse sobre la misma fila (consultar con `FINAL` si hace falta exactitud antes del merge).
+- **Si ClickHouse no está disponible, no se pierde nada.** El worker no hace commit del offset, reintenta el mismo lote y los mensajes esperan en Kafka.
+- **Con `ENABLE_KAFKA=false`**, las conversaciones se siguen registrando en Postgres pero los mensajes no se archivan.
+
+### ClickHouse: usuario y esquema
+
+- **Usuario `flowsdone_app`:** se define en `scripts/clickhouse/users.d/flowsdone_app.xml`, montado en el contenedor. Solo tiene `SELECT/INSERT/ALTER DELETE` sobre `flowsdone.*`, así que no ve las tablas de Langfuse. La contraseña sale de `CLICKHOUSE_APP_PASSWORD`, que es **obligatoria**: sin ella `docker compose` no arranca.
+- **Base y tablas:** las crea `scripts/clickhouse/init-clickhouse.sh`, que es idempotente. El deploy lo ejecuta antes de levantar el stack completo. En local:
+
+  ```bash
+  docker exec -i fd_clickhouse sh -s < scripts/clickhouse/init-clickhouse.sh
+  ```
+
+- **Cambios de esquema:** solo con sentencias idempotentes (`ADD COLUMN IF NOT EXISTS`), nunca con `DROP`.
 

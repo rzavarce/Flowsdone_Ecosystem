@@ -258,3 +258,82 @@ async def test_switch_app_raises_not_routable_when_session_does_not_exist():
 
     with pytest.raises(ChannelMessageNotRoutable):
         await switchboard.switch_app(session_id="missing-session", to_app="zendesk")
+
+
+# --- handle_inbound_turn(): conversation tracking ---------------------------
+
+
+def _tracker(*, publisher_fails: bool = False):
+    from datetime import timedelta
+
+    from app.application.services.conversation_tracker import ConversationTracker
+    from app.domain.models.conversation import ConversationLifecyclePolicy
+    from api_gateway.tests.support.fakes import (
+        FakeConversationEventPublisher,
+        FakeConversationRepository,
+    )
+
+    repo = FakeConversationRepository()
+    events = FakeConversationEventPublisher(fail=publisher_fails)
+    tracker = ConversationTracker(
+        conversation_repo=repo,
+        event_publisher=events,
+        session_history_repo=FakeSessionHistoryRepository(),
+        policy=ConversationLifecyclePolicy(inactivity=timedelta(hours=24), max_duration=timedelta(days=7)),
+    )
+    return tracker, repo, events
+
+
+async def test_inbound_turn_opens_a_conversation_before_calling_the_connector():
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, repo, events = _tracker()
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=FakeSessionRepository(),
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+    )
+
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram",
+        external_id="bot-1",
+        external_conversation_key="chat-42",
+        sender_id="user-7",
+        message_text="hola",
+        raw_payload={},
+    )
+
+    [conversation] = repo.conversations.values()
+    # The connector already sees the conversation (it becomes Langflow's session_id).
+    assert connector.calls[0]["session"].conversation_id == conversation.id
+    assert events.events[0].text == "hola"
+
+
+async def test_inbound_turn_still_reaches_the_connector_when_conversation_tracking_fails():
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, _, _ = _tracker(publisher_fails=True)
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=FakeSessionRepository(),
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+    )
+
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram",
+        external_id="bot-1",
+        external_conversation_key="chat-42",
+        sender_id="user-7",
+        message_text="hola",
+        raw_payload={},
+    )
+
+    assert len(connector.calls) == 1

@@ -11,10 +11,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     LargeBinary,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -225,6 +227,58 @@ class SessionEventModel(Base):
     to_app: Mapped[str | None] = mapped_column(Text, nullable=True)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConversationModel(Base):
+    """Row for one Conversation - the live, mutable record an inbox lists
+    and filters (status, counters, timestamps). Message bodies are not
+    here: they live in the ClickHouse archive (MessageArchivePort).
+
+    agent_id/channel_connection_id carry no foreign key on purpose:
+    deleting an agent or a channel connection must neither block on nor
+    erase the conversation history recorded under it.
+    """
+
+    __tablename__ = "conversations"
+    __table_args__ = (
+        CheckConstraint("status IN ('open','closed')", name="ck_conversations_status"),
+        CheckConstraint(
+            "close_reason IS NULL OR close_reason IN ('inactivity','max_duration','manual')",
+            name="ck_conversations_close_reason",
+        ),
+        # At most one open conversation per session (see
+        # ConversationRepositoryPort.open).
+        Index(
+            "uq_conversations_open_session",
+            "session_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
+        ),
+        Index("ix_conversations_tenant_last_message", "tenant_id", "last_message_at"),
+        Index("ix_conversations_project_last_message", "project_id", "last_message_at"),
+        Index("ix_conversations_open_last_inbound", "last_inbound_at", postgresql_where=text("status = 'open'")),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[str] = mapped_column(Text, nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    channel_type: Mapped[str] = mapped_column(Text, nullable=False)
+    channel_connection_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    contact: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_inbound_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_message_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    inbound_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    outbound_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class UserModel(Base):

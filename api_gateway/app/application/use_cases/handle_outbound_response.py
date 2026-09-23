@@ -14,6 +14,7 @@ from app.domain.ports.outbound import (
     SessionHistoryRepositoryPort,
     SessionRepositoryPort,
 )
+from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.langflow_result import extract_text_from_langflow_result
 
 logger = logging.getLogger("usecase.handle_outbound_response")
@@ -39,6 +40,7 @@ class HandleOutboundResponseUseCase:
         session_repo: Optional[SessionRepositoryPort] = None,
         session_history_repo: Optional[SessionHistoryRepositoryPort] = None,
         session_ttl_seconds: int = 86400,
+        conversation_tracker: Optional[ConversationTracker] = None,
     ):
         """Build the use case.
 
@@ -62,6 +64,9 @@ class HandleOutboundResponseUseCase:
                 Durable (Postgres) transcript, appended to on delivery.
             session_ttl_seconds (int): TTL applied when re-saving the
                 session after recording a delivered turn.
+            conversation_tracker (Optional[ConversationTracker]):
+                Records the delivered message into the session's current
+                Conversation. Optional, like the session ports.
         """
         self.publisher = publisher
         self.ws_registry = ws_registry
@@ -70,6 +75,7 @@ class HandleOutboundResponseUseCase:
         self.session_repo = session_repo
         self.session_history_repo = session_history_repo
         self.session_ttl_seconds = session_ttl_seconds
+        self.conversation_tracker = conversation_tracker
 
     def _extract_text(self, value: Any) -> Optional[str]:
         """Recursively extract a human-readable response string.
@@ -330,12 +336,21 @@ class HandleOutboundResponseUseCase:
                 text=text,
                 app=session.current_app,
             )
+            now = datetime.now(timezone.utc)
             session.record_message(
                 direction="outbound",
                 text=text,
                 app=session.current_app,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=now,
             )
             await self.session_repo.save(session, ttl_seconds=self.session_ttl_seconds)
         except Exception:
             logger.error("handle.outbound.session_record.failed", exc_info=True)
+            return
+
+        if self.conversation_tracker is None:
+            return
+        try:
+            await self.conversation_tracker.record_outbound(session=session, text=text, now=now)
+        except Exception:
+            logger.error("handle.outbound.conversation_record.failed", exc_info=True)

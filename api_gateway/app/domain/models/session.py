@@ -44,9 +44,10 @@ class Session(BaseModel):
 
     `id` is the same deterministic string every channel has always used
     as `conversation_id` (`f"{project_id}:{channel_type}:{external_conversation_key}"`)
-    - kept identical on purpose so Langflow's own session memory (keyed
-    by that same string, see LangflowExecutorPort) is never fragmented
-    by this feature.
+    - kept identical on purpose so routing/delivery keep working
+    unchanged. Langflow's memory is NOT keyed by it anymore: it is
+    scoped to the current Conversation (`conversation_id`), which the
+    Langflow connector sends as `llm_session_id`.
 
     Attributes:
         id (str): Conversation id (see above).
@@ -73,6 +74,11 @@ class Session(BaseModel):
         started_at (datetime): When the session was first created.
         last_activity_at (datetime): When the session last saw a turn.
         status (SessionStatus): Lifecycle state.
+        conversation_id (Optional[UUID]): Id of the Conversation this
+            session is currently in (see domain/models/conversation.py).
+            A session outlives many conversations; None for sessions
+            stored before conversations existed, until their next
+            inbound message opens one.
     """
 
     id: str
@@ -89,6 +95,7 @@ class Session(BaseModel):
     started_at: datetime
     last_activity_at: datetime
     status: SessionStatus = "active"
+    conversation_id: Optional[UUID] = None
 
     def record_message(self, *, direction: MessageDirection, text: str, app: str, timestamp: datetime) -> None:
         """Append a turn to the bounded rolling window and touch activity.

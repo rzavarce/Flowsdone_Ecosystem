@@ -6,8 +6,8 @@ to support the use cases under test — no real I/O, no framework.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Sequence
 from uuid import UUID, uuid4
 
 from app.domain.models.call_session import CallSession
@@ -15,6 +15,8 @@ from app.domain.models.channel_app import ChannelApp
 from app.domain.models.channel_connection import ChannelConnection
 from app.domain.models.tenant_billing_profile import TenantBillingProfile
 from app.domain.models.channel_resolution import ChannelResolution
+from app.domain.models.conversation import Conversation
+from app.domain.models.conversation_message import ConversationMessageRecorded
 from app.domain.models.session import Session
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User, UserAvatar, UserCredentials
@@ -499,6 +501,98 @@ class FakeSessionHistoryRepository:
                 "reason": reason,
             }
         )
+
+
+def make_conversation(**overrides: Any) -> Conversation:
+    """Build an open Conversation with sane defaults, overridable per test."""
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        session_id=f"{uuid4()}:telegram:chat-1",
+        tenant_id=uuid4(),
+        project_id=uuid4(),
+        agent_id=uuid4(),
+        channel_type="telegram",
+        channel_connection_id=uuid4(),
+        contact="user-1",
+        started_at=now,
+        last_inbound_at=now,
+        last_message_at=now,
+    )
+    defaults.update(overrides)
+    return Conversation(**defaults)
+
+
+class FakeConversationRepository:
+    """In-memory stand-in for ConversationRepositoryPort, mirroring the
+    real one's "one open conversation per session" rule."""
+
+    def __init__(self, *conversations: Conversation, fail: bool = False) -> None:
+        self.conversations: Dict[UUID, Conversation] = {c.id: c for c in conversations}
+        self.recorded: List[Dict[str, Any]] = []
+        self.close_expired_calls: List[Dict[str, Any]] = []
+        self.expired_batches: List[List[Conversation]] = []
+        self.fail = fail
+
+    async def get(self, conversation_id: UUID) -> Optional[Conversation]:
+        if self.fail:
+            raise RuntimeError("database down")
+        return self.conversations.get(conversation_id)
+
+    async def open(self, conversation: Conversation) -> Conversation:
+        for existing in self.conversations.values():
+            if existing.session_id == conversation.session_id and existing.status == "open":
+                return existing
+        self.conversations[conversation.id] = conversation
+        return conversation
+
+    async def record_message(self, conversation_id: UUID, *, direction: str, at: datetime) -> None:
+        self.recorded.append({"conversation_id": conversation_id, "direction": direction, "at": at})
+
+    async def close(self, conversation_id: UUID, *, reason: str, closed_at: datetime) -> bool:
+        conversation = self.conversations.get(conversation_id)
+        if conversation is None or conversation.status != "open":
+            return False
+        self.conversations[conversation_id] = conversation.model_copy(
+            update={"status": "closed", "close_reason": reason, "closed_at": closed_at}
+        )
+        return True
+
+    async def close_expired(
+        self, *, now: datetime, inactivity: timedelta, max_duration: timedelta, limit: int
+    ) -> List[Conversation]:
+        self.close_expired_calls.append(
+            {"now": now, "inactivity": inactivity, "max_duration": max_duration, "limit": limit}
+        )
+        return self.expired_batches.pop(0) if self.expired_batches else []
+
+
+class FakeConversationEventPublisher:
+    """Records published conversation events."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.events: List[ConversationMessageRecorded] = []
+        self.fail = fail
+
+    async def publish_message_recorded(self, event: ConversationMessageRecorded) -> None:
+        if self.fail:
+            raise RuntimeError("kafka down")
+        self.events.append(event)
+
+
+class FakeMessageArchive:
+    """Records archived message batches."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.batches: List[Dict[str, Any]] = []
+        self.fail = fail
+
+    async def insert_messages(
+        self, events: Sequence[ConversationMessageRecorded], *, retention: timedelta
+    ) -> None:
+        if self.fail:
+            raise RuntimeError("clickhouse down")
+        self.batches.append({"events": list(events), "retention": retention})
 
 
 class FakeAppConnector:
