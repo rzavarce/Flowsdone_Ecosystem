@@ -252,11 +252,33 @@ class World:
                         for f in world.langflow_flows.get(project_id, [])]
 
         flows = _Flows()
+        manage = ManageAgentsUseCase(agent_repo=self.agents, channel_connection_repo=self.connections, flows=flows)
+
+        class _BaseAgent:
+            """Registers a fake flow and the agent, like CreateBaseAgentUseCase."""
+
+            calls: List[Dict[str, Any]] = []
+
+            async def execute(self, *, project_id, assistant_name, tone, instructions):
+                self.calls.append(dict(project_id=project_id, assistant_name=assistant_name, tone=tone, instructions=instructions))
+                flow_id = f"base-{len(self.calls)}"
+                world.langflow_flows.setdefault(project_id, []).append(flow_id)
+                return await manage.create(project_id=project_id, name=assistant_name, langflow_flow_id=flow_id,
+                                           is_default=True, verify_flow=False)
+
+        class _Onboarding:
+            async def execute(self, tenant_id):
+                from app.application.use_cases.onboarding import OnboardingCheck, OnboardingStatus
+
+                return OnboardingStatus(tenant_id=tenant_id, next_step="plan", project_id=None,
+                                        checks=[OnboardingCheck("billing", "ok", "Acme")])
+
+        self.base_agent = _BaseAgent()
         return dict(
+            create_base_agent_use_case=self.base_agent,
+            get_onboarding_status_use_case=_Onboarding(),
             list_project_flows_use_case=flows,
-            manage_agents_use_case=ManageAgentsUseCase(
-                agent_repo=self.agents, channel_connection_repo=self.connections, flows=flows
-            ),
+            manage_agents_use_case=manage,
         )
 
     def billing_state(self) -> Dict[str, Any]:

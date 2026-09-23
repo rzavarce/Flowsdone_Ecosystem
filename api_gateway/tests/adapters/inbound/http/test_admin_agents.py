@@ -84,3 +84,39 @@ async def test_an_agent_with_channels_cannot_be_deleted(world):
 
     assert in_use.status_code == 409 and in_use.json()["detail"] == "agent has channels"
     assert deleted.status_code == 204 and missing.status_code == 404
+
+
+async def test_base_agent_is_created_as_default_in_own_projects_only(world):
+    token = await world.token("botmaster")
+    async with world.client() as c:
+        created = await _call(c, "POST", "/agents/base", token=token, json={
+            "project_id": str(world.project_a.id), "assistant_name": " Fibi ", "tone": "formal", "instructions": "Fibra.",
+        })
+        other = await _call(c, "POST", "/agents/base", token=token, json={
+            "project_id": str(world.project_b.id), "assistant_name": "X",
+        })
+        bad_tone = await _call(c, "POST", "/agents/base", token=token, json={
+            "project_id": str(world.project_a.id), "assistant_name": "X", "tone": "gracioso",
+        })
+
+    assert created.status_code == 201
+    assert created.json()["name"] == "Fibi" and created.json()["is_default"] is True
+    assert world.base_agent.calls[-1]["tone"] == "formal"
+    assert world.agents.items[world.agent_a.id].is_default is False
+    assert other.status_code == 404 and bad_tone.status_code == 422
+
+
+@pytest.mark.parametrize("role,expected", [("admin", 200), ("tenant_manager", 200), ("botmaster", 403), ("client", 403)])
+async def test_onboarding_status_roles(world, role, expected):
+    async with world.client() as c:
+        resp = await _call(c, "GET", f"/tenants/{world.tenant_a.id}/onboarding", token=await world.token(role))
+    assert resp.status_code == expected
+    if expected == 200:
+        assert resp.json()["next_step"] == "plan" and resp.json()["checks"][0] == {"key": "billing", "status": "ok", "detail": "Acme"}
+
+
+async def test_onboarding_status_of_another_or_unknown_tenant_is_404(world):
+    async with world.client() as c:
+        other = await _call(c, "GET", f"/tenants/{world.tenant_b.id}/onboarding", token=await world.token("tenant_manager"))
+        unknown = await _call(c, "GET", f"/tenants/{uuid4()}/onboarding", token=await world.token("admin"))
+    assert other.status_code == unknown.status_code == 404

@@ -17,7 +17,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
-from app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate
+from app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate, BaseAgentCreate
+from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError
 from app.application.use_cases.manage_agents import AgentInUseError, FlowNotInProjectError
 from app.domain.ports.outbound import LangflowSessionError
 
@@ -107,6 +108,46 @@ async def create_agent(
         )
     except (FlowNotInProjectError, LangflowSessionError) as exc:
         raise _flow_errors(exc) from exc
+    return AgentOut(**item.model_dump())
+
+
+@router.post("/base", response_model=AgentOut, status_code=201)
+async def create_base_agent(
+    body: BaseAgentCreate,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("agents", "write")),
+) -> AgentOut:
+    """Create a project's base agent (new-client wizard): a chat flow with
+    conversation memory and a prompt built from the answers, created in
+    the project's Langflow folder and registered as its default agent. Its
+    LLM reads the `OPENAI_API_KEY` global variable of the tenant's Langflow,
+    which the Flowsdone team configures.
+
+    Args:
+        body (BaseAgentCreate): Project and the assistant's answers.
+        request (Request): Used to reach `request.app.state.create_base_agent_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Returns:
+        AgentOut: The new agent.
+
+    Raises:
+        HTTPException: 404 if the project is outside the caller's tenants;
+            409 if the project already has an agent with that name; 502 if
+            Langflow fails.
+    """
+    await access.project(body.project_id)
+    try:
+        item = await request.app.state.create_base_agent_use_case.execute(
+            project_id=body.project_id,
+            assistant_name=body.assistant_name.strip(),
+            tone=body.tone,
+            instructions=body.instructions,
+        )
+    except LangflowTargetNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LangflowSessionError as exc:
+        raise HTTPException(status_code=502, detail=f"langflow unavailable: {exc}") from exc
     return AgentOut(**item.model_dump())
 
 
