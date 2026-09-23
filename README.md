@@ -278,7 +278,7 @@ Diseño (decisiones que conviene conocer):
 
    "Olvidé mi contraseña" sigue el mismo patrón: `POST /auth/forgot-password` (siempre responde igual, exista o no la cuenta) emite un link de `PASSWORD_RESET_TTL_SECONDS` (1 h) a `POST /auth/reset-password`.
 
-   Requiere `RESEND_API_KEY` en `.env` (cuenta en resend.com — capa gratuita) y `PUBLIC_BASE_URL` apuntando al dominio donde la PWA sirve `/activar-cuenta` y `/restablecer-password` (no solo la API); si `RESEND_API_KEY` falta, la creación del usuario queda hecha pero el email falla con 502 (reintentable con el resend-activation de arriba).
+   Requiere `RESEND_API_KEY` en `.env` (cuenta en resend.com — capa gratuita) y `PUBLIC_BASE_URL` apuntando al dominio donde la PWA sirve `/activate-account` y `/reset-password` (no solo la API); si `RESEND_API_KEY` falta, la creación del usuario queda hecha pero el email falla con 502 (reintentable con el resend-activation de arriba).
 
 **Proteger un endpoint con la sesión** (bloques listos en `adapters/inbound/http/auth_deps.py`): `Depends(get_current_user)`, `Depends(require_roles("admin", "tenant_manager"))` y `ensure_tenant_access(user, tenant_id)`. Migrar `/internal/admin/*` de la API key a estas dependencias es el paso siguiente para que la consola gestione tenants y canales.
 
@@ -1243,7 +1243,7 @@ Nadie recibe una contraseña en texto plano: todo usuario nuevo (`admin`/`tenant
 | `POST /auth/activate`, `POST /auth/forgot-password`, `POST /auth/reset-password` | `adapters/inbound/http/auth.py` | Públicos (sin `POLICY`, como `/auth/login`). `forgot-password` siempre responde 202 exista o no la cuenta. `activate`/`reset-password` tienen throttle por IP reusando `LoginThrottlePort` (defensa en profundidad; el token en sí es imposible de adivinar). |
 | `POST /internal/admin/users/{id}/resend-activation` | `adapters/inbound/http/admin/users.py` | Reenvía el email si el usuario sigue `pending` — cubre un link perdido o caído en spam dentro de las 24h. |
 | Pantalla **Usuarios** (PWA) | `flowsdone_pwa/src/features/users/` | CRUD de `admin`/`tenant_manager`/`botmaster` (solo admin, permiso `users:manage`). Los `client` no aparecen: se gestionan desde Tenants. |
-| `/activar-cuenta/:token`, `/recuperar-password`, `/restablecer-password/:token` (PWA) | `flowsdone_pwa/src/features/auth/` | Pantallas públicas (bajo `PublicOnly`), mismo `AuthLayout` que `/login`. |
+| `/activate-account/:token`, `/forgot-password`, `/reset-password/:token` (PWA) | `flowsdone_pwa/src/features/auth/` | Pantallas públicas (bajo `PublicOnly`), mismo `AuthLayout` que `/login`. |
 
 ### Cambios en Tenants y en `botmaster`
 
@@ -1258,12 +1258,11 @@ Nadie recibe una contraseña en texto plano: todo usuario nuevo (`admin`/`tenant
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | Remitente de los correos. Default `no-reply@flowsdone.com` / `Flowsdone`. |
 | `ACCOUNT_ACTIVATION_TTL_SECONDS` | Vigencia del link de activación (default `86400`, 24h). |
 | `PASSWORD_RESET_TTL_SECONDS` | Vigencia del link de "olvidé mi contraseña" (default `3600`, 1h — más corto que la activación por ser más sensible). |
-
-`PUBLIC_BASE_URL` (ya existía) se reusa para construir ambos links (`{PUBLIC_BASE_URL}/activar-cuenta/{token}`, `.../restablecer-password/{token}`) — debe apuntar al dominio donde la PWA sirve esas rutas, no solo la API.
+| `PWA_PUBLIC_URL` | Dominio donde la PWA sirve `/activate-account` y `/reset-password` — con esto se arman ambos links (`{PWA_PUBLIC_URL}/activate-account/{token}`, `.../reset-password/{token}`). **No** es `PUBLIC_BASE_URL`: esa variable sigue siendo la del gateway (Telegram/voz la necesitan apuntando a `platform.`/`agents.`, nunca al dominio de la PWA) — si `PWA_PUBLIC_URL` falta, cae a `PUBLIC_BASE_URL` (sirve en dev de un solo dominio; en prod, con dominios distintos, hay que ponerla explícita o los links de email dan 404). |
 
 ### Fuera de alcance (a propósito, por ahora)
 
-- Reenvío de reset (si el link de "olvidé mi contraseña" se pierde, hay que pedir uno nuevo desde `/recuperar-password` — no hay un endpoint admin equivalente al `resend-activation`, no hace falta: cualquiera puede pedirlo solo).
+- Reenvío de reset (si el link de "olvidé mi contraseña" se pierde, hay que pedir uno nuevo desde `/forgot-password` — no hay un endpoint admin equivalente al `resend-activation`, no hace falta: cualquiera puede pedirlo solo).
 - Plantillas de email en un idioma configurable — hoy siempre en español.
 - Un mecanismo para que un `tenant_manager` gestione usuarios de sus propios tenants (quedó decidido en una sesión anterior pero no se construyó en esta tarea) — hoy `users` en `POLICY` sigue siendo admin-only.
 

@@ -69,7 +69,7 @@ async def test_sends_the_activation_email_with_a_link_built_from_the_base_url():
     assert sent["template"] == "account_activation"
     assert sent["context"]["name"] == "Carla"
     assert sent["context"]["ttl_hours"] == 24
-    token = sent["context"]["link"].removeprefix("https://app.flowsdone.com/activar-cuenta/")
+    token = sent["context"]["link"].removeprefix("https://app.flowsdone.com/activate-account/")
     assert await tokens.redeem(token) == user.id
 
 

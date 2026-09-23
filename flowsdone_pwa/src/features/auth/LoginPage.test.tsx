@@ -70,7 +70,7 @@ describe('LoginPage', () => {
     const user = makeUser('admin')
     let session: typeof user | null = null
     const api = { ...fakeAuthApi(null), restore: async () => session, login: async () => (session = user) }
-    renderApp('/canales', api) // sin sesión -> /login con from=/canales
+    renderApp('/channels', api) // sin sesión -> /login con from=/channels
     await h1('Inicia sesión')
     await userEvent.type(screen.getByLabelText('Correo electrónico'), user.email)
     await userEvent.type(screen.getByLabelText('Contraseña'), 'x')

@@ -6,7 +6,7 @@ const h1 = (name: string | RegExp) => screen.findByRole('heading', { level: 1, n
 
 describe('CompanyPage', () => {
   it('muestra los datos de facturación de la propia empresa (autoservicio, modo mock)', async () => {
-    renderApp('/mi-empresa', fakeAuthApi(makeUser('client')))
+    renderApp('/company', fakeAuthApi(makeUser('client')))
     await h1('Mi empresa')
 
     expect(await screen.findByText('Clínica Vital S.A. de C.V.')).toBeInTheDocument()

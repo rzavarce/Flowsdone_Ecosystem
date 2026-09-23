@@ -14,7 +14,7 @@ const selectTenant = (id: string) => userEvent.selectOptions(screen.getByRole('c
 const session = (url = LANGFLOW_URL) => vi.fn().mockResolvedValue({ url })
 
 async function open(role: Role, adminApi: AdminApi = api()) {
-  renderApp('/agentes', fakeAuthApi(makeUser(role)), adminApi)
+  renderApp('/agents', fakeAuthApi(makeUser(role)), adminApi)
   await screen.findByRole('heading', { level: 1, name: 'Agentes' })
 }
 

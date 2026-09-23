@@ -172,7 +172,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
           {agentOptions.length === 0 && (
             <Alert tone="info">
               Este proyecto todavía no tiene agentes. Crea uno en{' '}
-              <Link to="/agentes" className="font-medium underline">
+              <Link to="/agents" className="font-medium underline">
                 Agentes
               </Link>{' '}
               para poder conectar un canal.

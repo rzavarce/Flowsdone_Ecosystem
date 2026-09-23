@@ -322,7 +322,7 @@ async def lifespan(app: FastAPI):
         tokens=activation_tokens,
         mailer=email_sender,
         ttl_seconds=settings.ACCOUNT_ACTIVATION_TTL_SECONDS,
-        activation_base_url=settings.PUBLIC_BASE_URL,
+        activation_base_url=settings.PWA_PUBLIC_URL,
     )
     app.state.activate_account_use_case = ActivateAccountUseCase(
         tokens=activation_tokens,
@@ -338,7 +338,7 @@ async def lifespan(app: FastAPI):
         mailer=email_sender,
         throttle=login_throttle,
         ttl_seconds=settings.PASSWORD_RESET_TTL_SECONDS,
-        reset_base_url=settings.PUBLIC_BASE_URL,
+        reset_base_url=settings.PWA_PUBLIC_URL,
         window_seconds=settings.AUTH_LOGIN_WINDOW_SECONDS,
         max_requests_per_email=settings.AUTH_LOGIN_MAX_FAILURES_PER_EMAIL,
         max_requests_per_ip=settings.AUTH_LOGIN_MAX_FAILURES_PER_IP,

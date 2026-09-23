@@ -56,7 +56,7 @@ export function LoginForm() {
             <label htmlFor={ids.password} className="text-sm font-medium">
               Contraseña
             </label>
-            <Link to="/recuperar-password" className="text-sm font-medium text-primary-ink hover:underline">
+            <Link to="/forgot-password" className="text-sm font-medium text-primary-ink hover:underline">
               ¿Olvidaste tu contraseña?
             </Link>
           </div>

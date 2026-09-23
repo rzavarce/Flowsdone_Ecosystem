@@ -53,7 +53,7 @@ class ProvisionUserUseCase:
             mailer (EmailSenderPort): Sends the activation email.
             ttl_seconds (int): Activation link lifetime.
             activation_base_url (str): Public origin the link is built
-                against (`{activation_base_url}/activar-cuenta/{token}`) -
+                against (`{activation_base_url}/activate-account/{token}`) -
                 must be where the PWA serves that route, not just the API.
         """
         self._create_user = create_user
@@ -128,7 +128,7 @@ class ProvisionUserUseCase:
             user (User): Recipient; must currently be `pending`.
         """
         token = await self._tokens.issue(user.id, ttl_seconds=self._ttl)
-        link = f"{self._base_url}/activar-cuenta/{token}"
+        link = f"{self._base_url}/activate-account/{token}"
         await self._mailer.send_template(
             to=user.email,
             template="account_activation",

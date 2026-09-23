@@ -29,7 +29,7 @@ export const DEMO_ACCOUNTS: readonly { email: string; password: string; role: Ro
 
 export const MOCK_SESSION_KEY = 'fd-mock-session'
 
-/** Tokens de maqueta para probar `/activar-cuenta/:token` y `/restablecer-password/:token`
+/** Tokens de maqueta para probar `/activate-account/:token` y `/reset-password/:token`
  * en modo mock sin backend; cualquier otro valor se rechaza como inválido/vencido. */
 export const DEMO_ACTIVATION_TOKEN = 'demo-activate-token'
 export const DEMO_RESET_TOKEN = 'demo-reset-token'

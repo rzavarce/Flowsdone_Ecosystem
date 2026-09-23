@@ -52,7 +52,7 @@ async def test_active_account_gets_a_reset_email_with_a_working_token():
     sent = mailer.sent[0]
     assert sent["to"] == "carla@cliente.com"
     assert sent["template"] == "password_reset"
-    token = sent["context"]["link"].removeprefix("https://app.flowsdone.com/restablecer-password/")
+    token = sent["context"]["link"].removeprefix("https://app.flowsdone.com/reset-password/")
     assert await tokens.redeem(token) == user.id
 
 

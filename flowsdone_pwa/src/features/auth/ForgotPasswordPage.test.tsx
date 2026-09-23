@@ -9,7 +9,7 @@ const h1 = (name: string | RegExp) => screen.findByRole('heading', { level: 1, n
 describe('ForgotPasswordPage', () => {
   it('tras enviar, muestra el mismo mensaje exista o no la cuenta', async () => {
     const api = { ...fakeAuthApi(null), requestPasswordReset: vi.fn().mockResolvedValue(undefined) }
-    renderApp('/recuperar-password', api)
+    renderApp('/forgot-password', api)
     await h1('Recupera tu contraseña')
 
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ghost@x.com')
@@ -22,7 +22,7 @@ describe('ForgotPasswordPage', () => {
 
   it('el aviso de éxito se puede quitar y vuelve a mostrar el formulario', async () => {
     const api = { ...fakeAuthApi(null), requestPasswordReset: vi.fn().mockResolvedValue(undefined) }
-    renderApp('/recuperar-password', api)
+    renderApp('/forgot-password', api)
     await h1('Recupera tu contraseña')
 
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'ghost@x.com')
@@ -40,7 +40,7 @@ describe('ForgotPasswordPage', () => {
       ...fakeAuthApi(null),
       requestPasswordReset: vi.fn().mockRejectedValue(new AuthError('rate_limited', 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.')),
     }
-    renderApp('/recuperar-password', api)
+    renderApp('/forgot-password', api)
     await h1('Recupera tu contraseña')
 
     await userEvent.type(screen.getByLabelText('Correo electrónico'), 'a@b.c')
@@ -51,7 +51,7 @@ describe('ForgotPasswordPage', () => {
   })
 
   it('tiene un link de vuelta a login', async () => {
-    renderApp('/recuperar-password', fakeAuthApi(null))
+    renderApp('/forgot-password', fakeAuthApi(null))
     await h1('Recupera tu contraseña')
     expect(screen.getByRole('link', { name: 'Volver a iniciar sesión' })).toHaveAttribute('href', '/login')
   })
