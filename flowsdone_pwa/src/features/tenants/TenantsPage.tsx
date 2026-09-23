@@ -18,6 +18,7 @@ import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
 import { OnboardingCard } from '@/features/onboarding/OnboardingCard'
 import { BillingProfileCard } from './BillingProfileCard'
+import { ClientAccountCard } from './ClientAccountCard'
 import { SubscriptionCard } from './SubscriptionCard'
 import { UsageCard } from './UsageCard'
 import { ProjectDialog } from './ProjectDialog'
@@ -239,6 +240,8 @@ export function TenantsPage() {
           {canManageBilling && (
             <>
               <OnboardingCard tenantId={tenant.id} canResume={canManageTenants} />
+              {/* Listar usuarios es solo de admin (POLICY["users"]). */}
+              {canManageTenants && <ClientAccountCard tenantId={tenant.id} />}
               {/* Asignar/cambiar el plan: solo admin (POLICY["billing"] write en el gateway). */}
               <SubscriptionCard tenantId={tenant.id} tenantName={tenant.name} canEdit={can(user, 'platform:manage')} />
               <UsageCard tenantId={tenant.id} />

@@ -113,9 +113,9 @@ export function useUpdateTenantBilling() {
 }
 
 /** Console users (includes `client` accounts; the Users screen filters them out). */
-export function useUsers() {
+export function useUsers(enabled = true) {
   const api = useAdminApi()
-  return useQuery({ queryKey: adminKeys.users, queryFn: () => api.listUsers() })
+  return useQuery({ queryKey: adminKeys.users, queryFn: () => api.listUsers(), enabled })
 }
 
 /** Creates a user: stays `pending` and gets sent the activation email. */

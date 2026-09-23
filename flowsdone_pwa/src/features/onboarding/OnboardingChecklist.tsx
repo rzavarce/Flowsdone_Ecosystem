@@ -1,4 +1,5 @@
 import { CircleAlert, CircleCheck, CircleDashed, CircleHelp, type LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { OnboardingCheck } from '@/core/admin/types'
 import { cn } from '@/lib/cn'
@@ -25,9 +26,17 @@ const FIX_AT: Record<OnboardingCheck['key'], string> = {
 /**
  * A tenant's onboarding checklist: one line per item with its state, what
  * was found (plan name, project…) and, when something is pending, what to
- * do and a link to the section where it is done.
+ * do and a link to the section where it is done (plus any `actions` given
+ * for that item).
  */
-export function OnboardingChecklist({ checks }: { checks: OnboardingCheck[] }) {
+export function OnboardingChecklist({
+  checks,
+  actions = {},
+}: {
+  checks: OnboardingCheck[]
+  /** Extra controls under an item (e.g. "resend activation" for the client account). */
+  actions?: Partial<Record<OnboardingCheck['key'], ReactNode>>
+}) {
   const { t, i18n } = useTranslation()
   return (
     <ul className="divide-y divide-border">
@@ -54,6 +63,7 @@ export function OnboardingChecklist({ checks }: { checks: OnboardingCheck[] }) {
                   </Link>
                 </span>
               )}
+              {check.status !== 'ok' && actions[check.key]}
             </span>
           </li>
         )

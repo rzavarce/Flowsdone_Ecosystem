@@ -558,6 +558,14 @@ export const es = {
   tenants: {
     new: 'Nuevo tenant',
     search: 'Buscar tenant',
+    clientAccount: {
+      title: 'Cuenta del cliente',
+      description: 'Acceso del cliente a la consola: sus paneles, su consumo y los datos de su empresa.',
+      loading: 'Cargando la cuenta del cliente',
+      none: 'Este tenant no tiene cuenta de cliente.',
+      lastLogin: 'Último acceso: {{date}}',
+      neverLogged: 'Todavía no ha entrado en la consola.',
+    },
     searchPlaceholder: 'Nombre o identificador',
     noMatches: 'Ningún tenant coincide con la búsqueda.',
     descriptionAll: 'Organizaciones clientes y sus proyectos.',
@@ -757,7 +765,7 @@ export const es = {
       status: 'Estado',
       allStatuses: 'Todos los estados',
     },
-    scopedTo: 'Usuarios de {{name}}. Elige "Todos los tenants" arriba para ver también a los administradores.',
+    scopedTo: 'Usuarios de {{name}}. Elige "Todos los tenants" arriba para ver también a los administradores. La cuenta del cliente está en la ficha del tenant, en Tenants.',
     noMatches: { title: 'Ningún usuario coincide', description: 'Prueba con otro nombre, rol o estado, o con otro tenant.' },
     description: 'Administradores, gestores de tenant, botmasters y consultores de la plataforma.',
     loading: 'Cargando usuarios',
