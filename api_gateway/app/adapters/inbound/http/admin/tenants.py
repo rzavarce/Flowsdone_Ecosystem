@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import TenantCreate, TenantOut, TenantUpdate
+from app.domain.ports.outbound import EmailSendError, UserAlreadyExistsError
 
 router = APIRouter(prefix="/tenants", tags=["admin:tenants"])
 
@@ -20,18 +21,44 @@ router = APIRouter(prefix="/tenants", tags=["admin:tenants"])
 async def create_tenant(
     body: TenantCreate, request: Request, access: AdminAccess = Depends(admin_access("tenants", "write"))
 ) -> TenantOut:
-    """Create a tenant.
+    """Create a tenant together with its `client` user.
+
+    The client is created `pending` and emailed an activation link, same as
+    any other user (see `CreateTenantUseCase`).
 
     Args:
-        body (TenantCreate): Tenant fields to create.
+        body (TenantCreate): Tenant fields, plus the client's email/name.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.tenant_repo`.
+            `request.app.state.create_tenant_use_case`.
         access (AdminAccess): The authenticated caller (admin only).
 
     Returns:
         TenantOut: The created tenant.
+
+    Raises:
+        HTTPException: 409 if `client_email` is already registered, 400 on
+            invalid client fields, 502 if the tenant (and its client user)
+            were created but the activation email could not be sent (retry
+            via `POST /users/{id}/resend-activation`).
     """
-    tenant = await request.app.state.tenant_repo.create(name=body.name, slug=body.slug)
+    try:
+        tenant = await request.app.state.create_tenant_use_case.execute(
+            name=body.name,
+            slug=body.slug,
+            client_email=body.client_email,
+            client_name=body.client_name,
+        )
+    except UserAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=409, detail="a user with that client email already exists"
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except EmailSendError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"tenant created but the client's activation email could not be sent: {exc}",
+        ) from exc
     return TenantOut(**tenant.model_dump())
 
 

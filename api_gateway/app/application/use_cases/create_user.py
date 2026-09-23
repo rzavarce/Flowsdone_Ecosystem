@@ -51,6 +51,7 @@ class CreateUserUseCase:
         role: str,
         password: str,
         tenant_ids: List[UUID],
+        status: str = "active",
     ) -> User:
         """Create a user.
 
@@ -59,8 +60,14 @@ class CreateUserUseCase:
             name (str): Display name.
             role (str): One of `USER_ROLES`.
             password (str): Plaintext password (min `MIN_PASSWORD_LENGTH`).
+                For `status="pending"` this is meant to be an unusable,
+                randomly generated value (see `ProvisionUserUseCase`) - the
+                real password is whatever the user sets on activation.
             tenant_ids (List[UUID]): Tenants to assign. Required for every
                 role except `admin`, who sees all tenants.
+            status (str): One of `UserStatus`; defaults to `active` so the
+                CLI bootstrap (`app/cli/create_user.py`, the only way to
+                create the very first admin) keeps working unchanged.
 
         Returns:
             User: The created user.
@@ -97,4 +104,5 @@ class CreateUserUseCase:
             role=role,
             password_hash=password_hash,
             tenant_ids=tenant_ids,
+            status=status,
         )

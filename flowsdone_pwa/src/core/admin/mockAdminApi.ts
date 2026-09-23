@@ -1,6 +1,15 @@
 import { ApiError } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
-import type { Agent, ChannelApp, ChannelAppProvider, ChannelConnection, Project, TenantRecord } from './types'
+import type {
+  Agent,
+  ChannelApp,
+  ChannelAppProvider,
+  ChannelConnection,
+  Project,
+  TenantBillingProfile,
+  TenantRecord,
+  UserRecord,
+} from './types'
 
 /**
  * Adaptador de MAQUETA: datos en memoria coherentes con los tenants del
@@ -39,6 +48,13 @@ const CONNECTIONS: ChannelConnection[] = [
   { id: 'c-4', project_id: 'p-aurora-1', agent_id: 'a-aurora-1', channel_type: 'facebook', external_id: '102030405060', display_name: null, has_credentials: true, config: {}, status: 'inactive', created_at: NOW, updated_at: NOW },
 ]
 
+const USERS: UserRecord[] = [
+  { id: 'u-admin', email: 'admin@flowsdone.dev', name: 'Ana Administradora', role: 'admin', status: 'active', tenant_ids: [], last_login_at: NOW, created_at: NOW, updated_at: NOW },
+  { id: 'u-manager', email: 'gestor@flowsdone.dev', name: 'Marcos Gestor', role: 'tenant_manager', status: 'active', tenant_ids: ['t-vital', 't-norte'], last_login_at: NOW, created_at: NOW, updated_at: NOW },
+  { id: 'u-botmaster', email: 'botmaster@flowsdone.dev', name: 'Bea Botmaster', role: 'botmaster', status: 'pending', tenant_ids: ['t-vital', 't-norte', 't-aurora'], last_login_at: null, created_at: NOW, updated_at: NOW },
+  { id: 'u-client', email: 'cliente@flowsdone.dev', name: 'Carla Cliente', role: 'client', status: 'active', tenant_ids: ['t-vital'], last_login_at: NOW, created_at: NOW, updated_at: NOW },
+]
+
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
 /** Opciones de {@link createMockAdminApi}. */
@@ -46,7 +62,13 @@ export interface MockAdminOptions {
   /** Latencia simulada por llamada, en ms. */
   latencyMs?: number
   /** Datos de partida propios (los tests los alinean con sus tenants); por defecto, los de demostración. */
-  seed?: { tenants?: TenantRecord[]; projects?: Project[]; agents?: Agent[]; connections?: ChannelConnection[] }
+  seed?: {
+    tenants?: TenantRecord[]
+    projects?: Project[]
+    agents?: Agent[]
+    connections?: ChannelConnection[]
+    users?: UserRecord[]
+  }
 }
 
 /** Crea el adaptador mock; cada instancia parte de datos limpios. */
@@ -55,8 +77,32 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
   const projects = (seed.projects ?? PROJECTS).map((p) => ({ ...p }))
   const agents = (seed.agents ?? AGENTS).map((a) => ({ ...a }))
   const connections = (seed.connections ?? CONNECTIONS).map((c) => ({ ...c }))
+  const users = (seed.users ?? USERS).map((u) => ({ ...u }))
   const apps = new Map<ChannelAppProvider, { app: ChannelApp; credentials: Record<string, unknown> }>()
+  const billingProfiles = new Map<string, TenantBillingProfile>()
   let seq = 100
+
+  const emptyBillingProfile = (tenantId: string): TenantBillingProfile => ({
+    id: `bp-${tenantId}`,
+    tenant_id: tenantId,
+    legal_name: null,
+    tax_id: null,
+    billing_email: null,
+    billing_contact_name: null,
+    billing_phone: null,
+    address_line1: null,
+    address_line2: null,
+    city: null,
+    state_province: null,
+    postal_code: null,
+    country: null,
+    currency: null,
+    plan: null,
+    billing_cycle: null,
+    notes: null,
+    created_at: NOW,
+    updated_at: NOW,
+  })
 
   const need = <T>(item: T | undefined, what: string): T => {
     if (!item) throw new ApiError(404, `${what} not found`)
@@ -84,12 +130,25 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       return clone(tenants)
     },
-    async createTenant(input) {
+    async createTenant({ client_email, client_name, ...input }) {
       await wait(latencyMs)
       if (tenants.some((t) => t.slug === input.slug)) throw new ApiError(409, 'already exists')
+      if (users.some((u) => u.email === client_email.trim().toLowerCase())) throw new ApiError(409, 'already exists')
       const now = new Date().toISOString()
       const tenant: TenantRecord = { id: `t-${++seq}`, status: 'active', created_at: now, updated_at: now, ...input }
       tenants.push(tenant)
+      // Como CreateTenantUseCase: el tenant siempre trae su usuario `client`, pending.
+      users.push({
+        id: `u-${++seq}`,
+        email: client_email.trim().toLowerCase(),
+        name: client_name,
+        role: 'client',
+        status: 'pending',
+        tenant_ids: [tenant.id],
+        last_login_at: null,
+        created_at: now,
+        updated_at: now,
+      })
       return clone(tenant)
     },
     async updateTenant(id, patch) {
@@ -104,6 +163,21 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       need(tenants.find((t) => t.id === id), 'tenant')
       for (const p of projects.filter((p) => p.tenant_id === id)) cascadeProject(p.id)
       removeWhere(tenants, (t) => t.id !== id)
+      billingProfiles.delete(id)
+    },
+
+    async getTenantBilling(tenantId) {
+      await wait(latencyMs)
+      need(tenants.find((t) => t.id === tenantId), 'tenant')
+      return clone(billingProfiles.get(tenantId) ?? emptyBillingProfile(tenantId))
+    },
+    async updateTenantBilling(tenantId, patch) {
+      await wait(latencyMs)
+      need(tenants.find((t) => t.id === tenantId), 'tenant')
+      const current = billingProfiles.get(tenantId) ?? emptyBillingProfile(tenantId)
+      const updated: TenantBillingProfile = { ...current, ...patch, updated_at: new Date().toISOString() }
+      billingProfiles.set(tenantId, updated)
+      return clone(updated)
     },
 
     async listProjects(tenantId) {
@@ -222,6 +296,46 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     async revealChannelAppCredentials(provider) {
       await wait(latencyMs)
       return clone(need(apps.get(provider), 'channel_app').credentials)
+    },
+
+    async listUsers() {
+      await wait(latencyMs)
+      return clone(users)
+    },
+    async createUser(input) {
+      await wait(latencyMs)
+      const email = input.email.trim().toLowerCase()
+      if (users.some((u) => u.email === email)) throw new ApiError(409, 'already exists')
+      const now = new Date().toISOString()
+      const user: UserRecord = {
+        id: `u-${++seq}`,
+        email,
+        name: input.name,
+        role: input.role,
+        status: 'pending',
+        tenant_ids: input.role === 'admin' ? [] : input.tenant_ids,
+        last_login_at: null,
+        created_at: now,
+        updated_at: now,
+      }
+      users.push(user)
+      return clone(user)
+    },
+    async updateUser(id, patch) {
+      await wait(latencyMs)
+      const user = need(users.find((u) => u.id === id), 'user')
+      Object.assign(user, patch, { updated_at: new Date().toISOString() })
+      return clone(user)
+    },
+    async deleteUser(id) {
+      await wait(latencyMs)
+      need(users.find((u) => u.id === id), 'user')
+      removeWhere(users, (u) => u.id !== id)
+    },
+    async resendUserActivation(id) {
+      await wait(latencyMs)
+      const user = need(users.find((u) => u.id === id), 'user')
+      if (user.status !== 'pending') throw new ApiError(404, 'user not found or not pending')
     },
   }
 }

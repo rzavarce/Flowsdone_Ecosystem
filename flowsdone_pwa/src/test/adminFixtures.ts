@@ -1,4 +1,4 @@
-import type { Agent, ChannelConnection, Project, TenantRecord } from '@/core/admin/types'
+import type { Agent, ChannelConnection, Project, TenantRecord, UserRecord } from '@/core/admin/types'
 
 /**
  * Datos de la API admin alineados con los tenants de `renderApp` (t1 Clínica Vital,
@@ -41,4 +41,11 @@ export const CONNECTIONS: ChannelConnection[] = [
   conn({ id: 'c3', project_id: 'p2', agent_id: 'a2', channel_type: 'instagram', external_id: '17841400000000', display_name: 'Instagram Norte', has_credentials: true, status: 'inactive' }),
 ]
 
-export const SEED = { tenants: TENANTS, projects: PROJECTS, agents: AGENTS, connections: CONNECTIONS }
+export const USERS: UserRecord[] = [
+  { id: 'u1', email: 'ana@flowsdone.com', name: 'Ana Admin', role: 'admin', status: 'active', tenant_ids: [], last_login_at: now, created_at: t0, updated_at: t0 },
+  { id: 'u2', email: 'marcos@flowsdone.com', name: 'Marcos Gestor', role: 'tenant_manager', status: 'active', tenant_ids: ['t1'], last_login_at: now, created_at: t0, updated_at: t0 },
+  { id: 'u3', email: 'bea@flowsdone.com', name: 'Bea Botmaster', role: 'botmaster', status: 'pending', tenant_ids: ['t1', 't2'], last_login_at: null, created_at: t0, updated_at: t0 },
+  { id: 'u4', email: 'carla@clinica-vital.com', name: 'Carla Cliente', role: 'client', status: 'active', tenant_ids: ['t1'], last_login_at: now, created_at: t0, updated_at: t0 },
+]
+
+export const SEED = { tenants: TENANTS, projects: PROJECTS, agents: AGENTS, connections: CONNECTIONS, users: USERS }

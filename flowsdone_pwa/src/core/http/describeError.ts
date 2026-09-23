@@ -16,9 +16,15 @@ export function describeError(error: unknown): string {
     case 404:
       return 'Ese elemento ya no existe o no tienes acceso a él.'
     case 409:
-      return 'Ya existe un elemento con esos datos (por ejemplo, este canal ya está conectado).'
+      return 'Ya existe un elemento con esos datos (por ejemplo, ese email o ese identificador ya están en uso).'
     case 502:
-      return `La plataforma rechazó el registro del canal: ${error.message.replace(/^webhook registration failed:\s*/i, '')}`
+      // Se guardó del lado del gateway pero un paso externo falló (registro de
+      // webhook de un canal, o el email de activación de un usuario/tenant) -
+      // se despoja el prefijo técnico en inglés del detail y se deja el motivo.
+      return `Se guardó, pero un paso externo falló: ${error.message.replace(
+        /^(webhook registration failed|user created but the activation email could not be sent|tenant created but the client's activation email could not be sent):\s*/i,
+        '',
+      )}`
     default:
       return error.message
   }

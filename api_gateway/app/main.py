@@ -13,6 +13,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.adapters.inbound.http.admin import router as admin_router
 from app.adapters.inbound.http.auth import router as auth_router
+from app.adapters.inbound.http.me import router as me_router
 from app.adapters.inbound.http.errors import register_error_handlers
 from app.adapters.inbound.http.channels import router as channels_router
 from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
@@ -29,8 +30,13 @@ from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelApp
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
 from app.adapters.outbound.db.langflow_account_repository import SqlAlchemyLangflowAccountRepository
 from app.adapters.outbound.db.project_repository import SqlAlchemyProjectRepository
+from app.adapters.outbound.db.tenant_billing_profile_repository import (
+    SqlAlchemyTenantBillingProfileRepository,
+)
 from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
 from app.adapters.outbound.db.user_repository import SqlAlchemyUserRepository
+from app.adapters.outbound.email.resend_client import ResendEmailAdapter
+from app.adapters.outbound.session.redis_account_token_store import RedisAccountTokenStore
 from app.adapters.outbound.session.redis_auth_session_repository import RedisAuthSessionRepository
 from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
 from app.adapters.outbound.session.redis_sso_ticket_store import RedisSsoTicketStore
@@ -50,7 +56,9 @@ from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProvide
 from app.application.services.switchboard import Switchboard
 from app.application.services.ws_registry import WSRegistry
 from app.application.services.access_control import AccessControl
+from app.application.use_cases.activate_account import ActivateAccountUseCase
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
+from app.application.use_cases.create_tenant import CreateTenantUseCase
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
 from app.application.use_cases.delete_channel_connection import DeleteChannelConnectionUseCase
@@ -60,6 +68,9 @@ from app.application.use_cases.ingest_message import IngestMessageUseCase
 from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
 from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
+from app.application.use_cases.provision_user import ProvisionUserUseCase
+from app.application.use_cases.request_password_reset import RequestPasswordResetUseCase
+from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
@@ -235,6 +246,7 @@ async def lifespan(app: FastAPI):
     app.state.db_engine = db_engine
 
     app.state.tenant_repo = SqlAlchemyTenantRepository(db_sessionmaker)
+    app.state.tenant_billing_profile_repo = SqlAlchemyTenantBillingProfileRepository(db_sessionmaker)
     app.state.project_repo = SqlAlchemyProjectRepository(db_sessionmaker)
     app.state.agent_repo = SqlAlchemyAgentRepository(db_sessionmaker)
     app.state.workflow_config_repo = SqlAlchemyWorkflowConfigRepository(db_sessionmaker)
@@ -254,13 +266,19 @@ async def lifespan(app: FastAPI):
     user_repo = SqlAlchemyUserRepository(db_sessionmaker)
     auth_sessions = RedisAuthSessionRepository(redis_client)
     password_hasher = ScryptPasswordHasher()
+    # Shared with /auth/forgot-password and the IP throttle on
+    # /auth/activate|reset-password (see auth.py) - same counters, own key
+    # prefixes per caller, so exposed on app.state instead of being private
+    # to the login use case.
+    login_throttle = RedisLoginThrottle(redis_client)
+    app.state.login_throttle = login_throttle
     app.state.user_repo = user_repo
     app.state.authenticate_user_use_case = AuthenticateUserUseCase(
         user_repo=user_repo,
         tenant_repo=app.state.tenant_repo,
         hasher=password_hasher,
         sessions=auth_sessions,
-        throttle=RedisLoginThrottle(redis_client),
+        throttle=login_throttle,
         session_ttl_seconds=settings.AUTH_SESSION_TTL_SECONDS,
         window_seconds=settings.AUTH_LOGIN_WINDOW_SECONDS,
         max_failures_per_email=settings.AUTH_LOGIN_MAX_FAILURES_PER_EMAIL,
@@ -289,6 +307,56 @@ async def lifespan(app: FastAPI):
     )
     app.state.delete_user_use_case = DeleteUserUseCase(user_repo=user_repo, sessions=auth_sessions)
     logger.info("auth.dependencies.initialized")
+
+    # Account activation by email (see application/use_cases/provision_user.py)
+    # and "forgot my password" - Resend (HTTPS API, not SMTP: the VPS has
+    # outbound SMTP blocked) plus two single-use Redis token stores that can
+    # never be redeemed as one another (different key prefixes).
+    email_sender = ResendEmailAdapter()
+    app.state.email_sender = email_sender
+    activation_tokens = RedisAccountTokenStore(redis_client, prefix="auth:activate:")
+    reset_tokens = RedisAccountTokenStore(redis_client, prefix="auth:reset:")
+    app.state.provision_user_use_case = ProvisionUserUseCase(
+        create_user=app.state.create_user_use_case,
+        user_repo=user_repo,
+        tokens=activation_tokens,
+        mailer=email_sender,
+        ttl_seconds=settings.ACCOUNT_ACTIVATION_TTL_SECONDS,
+        activation_base_url=settings.PUBLIC_BASE_URL,
+    )
+    app.state.activate_account_use_case = ActivateAccountUseCase(
+        tokens=activation_tokens,
+        user_repo=user_repo,
+        tenant_repo=app.state.tenant_repo,
+        hasher=password_hasher,
+        sessions=auth_sessions,
+        session_ttl_seconds=settings.AUTH_SESSION_TTL_SECONDS,
+    )
+    app.state.request_password_reset_use_case = RequestPasswordResetUseCase(
+        user_repo=user_repo,
+        tokens=reset_tokens,
+        mailer=email_sender,
+        throttle=login_throttle,
+        ttl_seconds=settings.PASSWORD_RESET_TTL_SECONDS,
+        reset_base_url=settings.PUBLIC_BASE_URL,
+        window_seconds=settings.AUTH_LOGIN_WINDOW_SECONDS,
+        max_requests_per_email=settings.AUTH_LOGIN_MAX_FAILURES_PER_EMAIL,
+        max_requests_per_ip=settings.AUTH_LOGIN_MAX_FAILURES_PER_IP,
+    )
+    app.state.reset_password_use_case = ResetPasswordUseCase(
+        tokens=reset_tokens,
+        user_repo=user_repo,
+        tenant_repo=app.state.tenant_repo,
+        hasher=password_hasher,
+        sessions=auth_sessions,
+        session_ttl_seconds=settings.AUTH_SESSION_TTL_SECONDS,
+    )
+    app.state.create_tenant_use_case = CreateTenantUseCase(
+        tenant_repo=app.state.tenant_repo,
+        user_repo=user_repo,
+        provision_user=app.state.provision_user_use_case,
+    )
+    logger.info("account_activation.dependencies.initialized")
 
     # Channel connection create/update (auto-generate webhook secrets
     # and keep external platform registration in sync for channels
@@ -408,6 +476,10 @@ async def lifespan(app: FastAPI):
     if langflow_admin_client:
         await langflow_admin_client.aclose()
 
+    email_sender = getattr(app.state, "email_sender", None)
+    if email_sender:
+        await email_sender.aclose()
+
     db_engine = getattr(app.state, "db_engine", None)
     if db_engine:
         await db_engine.dispose()
@@ -482,4 +554,5 @@ app.include_router(voice_router)
 app.include_router(voice_demo_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(me_router)
 app.include_router(langflow_sso_router)

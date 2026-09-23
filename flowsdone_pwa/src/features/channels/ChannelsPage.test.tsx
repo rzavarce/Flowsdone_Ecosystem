@@ -160,7 +160,7 @@ describe('conectar un canal', () => {
     await userEvent.selectOptions(within(dialog).getByLabelText('Canal'), 'telegram')
     await userEvent.type(within(dialog).getByLabelText('Token del bot'), 'mal-token')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Conectar canal' }))
-    expect(await within(dialog).findByText(/rechazó el registro del canal: Unauthorized/)).toBeInTheDocument()
+    expect(await within(dialog).findByText(/paso externo falló: Unauthorized/)).toBeInTheDocument()
   })
 
   it('en un tenant sin proyectos ofrece crear el primero y luego avisa que faltan agentes', async () => {

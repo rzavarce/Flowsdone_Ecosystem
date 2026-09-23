@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import { createMockAdminApi } from '@/core/admin/mockAdminApi'
+import { SEED } from '@/test/adminFixtures'
 import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 import type { Role } from '@/core/auth/types'
 
@@ -21,10 +23,11 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
+    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Usuarios', 'Agentes', 'Ajustes']],
     ['tenant_manager', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
-    ['botmaster', ['Agentes', 'Ajustes']],
-    ['client', ['Dashboard', 'Ajustes']],
+    ['botmaster', ['Conversaciones', 'Canales', 'Agentes', 'Ajustes']],
+    ['client', ['Dashboard', 'Mi empresa', 'Ajustes']],
+    ['consultant', ['Dashboard', 'Ajustes']],
   ])('%s ve el menú esperado', async (role, expected) => {
     renderApp('/dashboard', fakeAuthApi(makeUser(role)))
     await screen.findAllByRole('navigation', { name: 'Principal' })
@@ -51,31 +54,64 @@ describe('menú y acceso por perfil', () => {
     expect(screen.queryByText('Tiempo de respuesta')).not.toBeInTheDocument()
   })
 
-  it('el botmaster cae directamente en Agentes (la lista de su tenant, sin editor de Langflow)', async () => {
-    renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')))
+  it('el botmaster cae directamente en Agentes, con el editor de Langflow de su (único) tenant', async () => {
+    // El tenant de este usuario (t1, de renderApp.tsx) tiene que existir de
+    // verdad en la API admin para que createLangflowSession no falle con 404 -
+    // el mock por defecto usa otros ids (t-vital…), por eso el seed explícito.
+    renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
     expect(await h1('Agentes')).toBeInTheDocument()
-    // El botmaster no recibe el editor de Langflow (ver AgentsPage): solo la lista de su tenant.
-    expect(screen.queryByText(/se embeberá Langflow/)).not.toBeInTheDocument()
-    expect(await screen.findByText(/es solo para el equipo de la plataforma/)).toBeInTheDocument()
+    // Un solo tenant asignado: se auto-selecciona (TenantProvider), sin pedir elegir uno.
+    expect(await screen.findByText(/se embeberá Langflow/)).toBeInTheDocument()
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Principal' })
     expect(within(sidebar!).getByRole('link', { name: 'Agentes' })).toHaveAttribute('aria-current', 'page')
   })
 
+  it('el consultor cae en Reportes (placeholder de los futuros dashboards de Metabase)', async () => {
+    renderApp('/dashboard', fakeAuthApi(makeUser('consultant')))
+    expect(await h1('Reportes')).toBeInTheDocument()
+    expect(screen.getByText(/dashboards de Metabase/)).toBeInTheDocument()
+  })
+
   it.each<[Role, string]>([
-    ['botmaster', '/canales'],
-    ['botmaster', '/conversaciones'],
     ['client', '/canales'],
     ['client', '/agentes'],
     ['client', '/conversaciones'],
     ['botmaster', '/tenants'],
     ['client', '/tenants'],
+    ['tenant_manager', '/usuarios'],
+    ['botmaster', '/usuarios'],
+    ['client', '/usuarios'],
+    ['consultant', '/canales'],
+    ['consultant', '/agentes'],
+    ['consultant', '/conversaciones'],
+    ['consultant', '/tenants'],
+    ['consultant', '/usuarios'],
+    // "Mi empresa" es exclusivo de client (ni siquiera el admin la ve - la edita desde Tenants).
+    ['admin', '/mi-empresa'],
+    ['botmaster', '/mi-empresa'],
+    ['consultant', '/mi-empresa'],
   ])('%s recibe 403 al abrir %s por URL directa', async (role, path) => {
     renderApp(path, fakeAuthApi(makeUser(role)))
     expect(await h1('Sin acceso')).toBeInTheDocument()
   })
 
+  it('el client puede abrir Mi empresa', async () => {
+    renderApp('/mi-empresa', fakeAuthApi(makeUser('client')))
+    expect(await h1('Mi empresa')).toBeInTheDocument()
+  })
+
+  it.each(['/canales', '/conversaciones'])('el botmaster sí puede abrir %s (gestiona canales y conversaciones de sus tenants)', async (path) => {
+    renderApp(path, fakeAuthApi(makeUser('botmaster')))
+    expect(await h1(path === '/canales' ? 'Canales' : 'Conversaciones')).toBeInTheDocument()
+  })
+
+  it('solo el admin puede abrir /usuarios', async () => {
+    renderApp('/usuarios', fakeAuthApi(makeUser('admin')))
+    expect(await h1('Usuarios')).toBeInTheDocument()
+  })
+
   it('todos los perfiles pueden abrir Ajustes', async () => {
-    for (const role of ['admin', 'tenant_manager', 'botmaster', 'client'] as const) {
+    for (const role of ['admin', 'tenant_manager', 'botmaster', 'client', 'consultant'] as const) {
       const { unmount } = renderApp('/ajustes', fakeAuthApi(makeUser(role)))
       expect(await h1('Ajustes')).toBeInTheDocument()
       unmount()
@@ -188,6 +224,7 @@ describe('ruta raíz', () => {
     ['tenant_manager', 'Dashboard'],
     ['client', 'Mi panel'],
     ['botmaster', 'Agentes'],
+    ['consultant', 'Reportes'],
   ])('con sesión %s lleva a su inicio (%s)', async (role, title) => {
     renderApp('/', fakeAuthApi(makeUser(role)))
     expect(await h1(title)).toBeInTheDocument()

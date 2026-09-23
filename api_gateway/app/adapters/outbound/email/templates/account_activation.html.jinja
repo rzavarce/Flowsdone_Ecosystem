@@ -1,0 +1,20 @@
+{# Context: name (str), link (str), ttl_hours (int). #}
+{% extends "base.html.jinja" %}
+{% block title %}Activa tu cuenta en Flowsdone{% endblock %}
+{% block content %}
+  <p style="margin:0 0 16px 0;font-size:17px;font-weight:600;color:#0f172a;">Hola {{ name }},</p>
+  <p style="margin:0 0 20px 0;">
+    Se creó una cuenta para ti en Flowsdone. Para activarla, crea tu contraseña
+    en el siguiente enlace:
+  </p>
+  <p style="margin:0 0 24px 0;text-align:center;">
+    <a href="{{ link }}" style="display:inline-block;background-color:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 28px;border-radius:9999px;">
+      Crear mi contraseña
+    </a>
+  </p>
+  <p style="margin:0 0 8px 0;font-size:13px;color:#64748b;">
+    Este enlace vence en {{ ttl_hours }} horas y solo puede usarse una vez.
+    Si no puedes hacer clic, copia y pega esta dirección en tu navegador:
+  </p>
+  <p style="margin:0;font-size:13px;word-break:break-all;color:#0ea5a2;">{{ link }}</p>
+{% endblock %}

@@ -11,10 +11,15 @@ describe('describeError', () => {
     expect(describeError(new ApiError(status, 'x'))).toMatch(pattern)
   })
 
-  it('en un 502 explica que la plataforma rechazó el registro, sin el prefijo técnico', () => {
-    const message = describeError(new ApiError(502, 'webhook registration failed: Unauthorized'))
-    expect(message).toContain('rechazó el registro')
-    expect(message).toContain('Unauthorized')
+  it.each([
+    ['webhook registration failed: Unauthorized', 'Unauthorized'],
+    ['user created but the activation email could not be sent: resend is down', 'resend is down'],
+    ["tenant created but the client's activation email could not be sent: resend is down", 'resend is down'],
+  ])('en un 502 explica que un paso externo falló, sin el prefijo técnico en inglés (%s)', (detail, reason) => {
+    const message = describeError(new ApiError(502, detail))
+    expect(message).toContain('paso externo falló')
+    expect(message).toContain(reason)
+    expect(message.toLowerCase()).not.toContain('activation email')
     expect(message).not.toContain('webhook registration failed')
   })
 

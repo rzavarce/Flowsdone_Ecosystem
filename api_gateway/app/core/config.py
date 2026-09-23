@@ -100,6 +100,19 @@ class Settings(BaseModel):
     # the proxy's IP. Only affects the per-IP bucket.
     AUTH_TRUST_FORWARDED_FOR: bool = True
 
+    # Account activation / password reset by email (see
+    # application/use_cases/provision_user.py, activate_account.py,
+    # request_password_reset.py, reset_password.py). Emailed via Resend
+    # (HTTPS API - the VPS has outbound SMTP blocked), links built as
+    # f"{PUBLIC_BASE_URL}/activar-cuenta/{token}" etc. RESEND_API_KEY has no
+    # default: sending fails clearly (EmailSendError) if it's missing,
+    # instead of the app refusing to start.
+    RESEND_API_KEY: Optional[str] = None
+    EMAIL_FROM_ADDRESS: str = "no-reply@flowsdone.com"
+    EMAIL_FROM_NAME: str = "Flowsdone"
+    ACCOUNT_ACTIVATION_TTL_SECONDS: int = 86400  # 24h
+    PASSWORD_RESET_TTL_SECONDS: int = 3600  # 1h - more sensitive than activation, shorter-lived
+
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
     # per-bot Telegram secret_token no longer live here - they are
@@ -223,6 +236,13 @@ settings = Settings(
     AUTH_LOGIN_MAX_FAILURES_PER_EMAIL=int(os.getenv("AUTH_LOGIN_MAX_FAILURES_PER_EMAIL", "10")),
     AUTH_LOGIN_MAX_FAILURES_PER_IP=int(os.getenv("AUTH_LOGIN_MAX_FAILURES_PER_IP", "30")),
     AUTH_TRUST_FORWARDED_FOR=_bool(os.getenv("AUTH_TRUST_FORWARDED_FOR"), True),
+
+    RESEND_API_KEY=os.getenv("RESEND_API_KEY"),
+    EMAIL_FROM_ADDRESS=os.getenv("EMAIL_FROM_ADDRESS", "no-reply@flowsdone.com"),
+    EMAIL_FROM_NAME=os.getenv("EMAIL_FROM_NAME", "Flowsdone"),
+    ACCOUNT_ACTIVATION_TTL_SECONDS=int(os.getenv("ACCOUNT_ACTIVATION_TTL_SECONDS", "86400")),
+    PASSWORD_RESET_TTL_SECONDS=int(os.getenv("PASSWORD_RESET_TTL_SECONDS", "3600")),
+
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 
     EVOLUTION_API_KEY=os.getenv("EVOLUTION_API_KEY"),

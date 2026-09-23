@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '@/core/auth/AuthProvider'
 import { useAuth } from '@/core/auth/useAuth'
 import { ApiError } from '@/core/http/apiFetch'
-import { makeUser } from '@/test/renderApp'
+import { fakeAuthApi, makeUser } from '@/test/renderApp'
 import type { AuthApi } from '@/core/auth/AuthApi'
 import type { AdminApi } from './AdminApi'
 import { AdminApiProvider } from './AdminApiProvider'
@@ -47,7 +47,7 @@ describe('shouldRetry', () => {
 describe('AdminApiProvider', () => {
   it('un 401 cierra la sesión; un 403 o 404 no', async () => {
     for (const [status, expected] of [[401, 'anonymous'], [403, 'authenticated'], [404, 'authenticated']] as const) {
-      const authApi: AuthApi = { restore: async () => makeUser('admin'), login: async () => makeUser('admin'), logout: async () => {} }
+      const authApi: AuthApi = { ...fakeAuthApi(null), restore: async () => makeUser('admin'), login: async () => makeUser('admin') }
       const { unmount } = render(
         <AuthProvider api={authApi}>
           <AdminApiProvider api={stubAdmin(() => Promise.reject(new ApiError(status, 'x')))}>
@@ -71,7 +71,7 @@ describe('AdminApiProvider', () => {
   it('un 4xx se pide una sola vez (sin reintentos)', async () => {
     const list = vi.fn().mockRejectedValue(new ApiError(403, 'no'))
     render(
-      <AuthProvider api={{ restore: async () => makeUser('admin'), login: async () => makeUser('admin'), logout: async () => {} }}>
+      <AuthProvider api={{ ...fakeAuthApi(null), restore: async () => makeUser('admin'), login: async () => makeUser('admin') }}>
         <AdminApiProvider api={stubAdmin(list)}>
           <Gate>
             <Probe />
@@ -88,6 +88,7 @@ describe('AdminApiProvider', () => {
     const userB = { ...makeUser('client'), id: 'u-b' }
     let session: typeof userA | null = userA
     const authApi: AuthApi = {
+      ...fakeAuthApi(null),
       restore: async () => session,
       login: async () => (session = userB),
       logout: async () => void (session = null),

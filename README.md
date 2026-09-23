@@ -26,6 +26,9 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 18. [Canal de voz (Twilio ConversationRelay)](#18-canal-de-voz-twilio-conversationrelay)
 19. [Softphone de prueba (demo)](#19-softphone-de-prueba-demo)
 20. [Switchboard + Session (centralita de conmutación)](#20-switchboard--session-centralita-de-conmutación)
+21. [Agente de onboarding interno (Langflow → admin API)](#21-agente-de-onboarding-interno-langflow--admin-api)
+22. [Activación de cuentas por email + Usuarios en la PWA](#22-activación-de-cuentas-por-email--usuarios-en-la-pwa)
+23. [Editor de Langflow para todo el staff, rol `consultant`, Reportes y facturación del cliente](#23-editor-de-langflow-para-todo-el-staff-rol-consultant-reportes-y-facturación-del-cliente)
 
 ---
 
@@ -261,14 +264,21 @@ Diseño (decisiones que conviene conocer):
 - **Mismo origen, sin CORS:** la PWA y la API comparten dominio; nginx (contenedor `pwa`) reenvía `/api/auth/*` a `api:8000` quitando el prefijo. Es una lista blanca: `/api/*` restante devuelve 404.
 - **Roles:** `admin` (todos los tenants), `tenant_manager`, `botmaster`, `client` (los tres últimos acotados a sus tenants en `user_tenants`).
 
-**Crear usuarios** (no hay registro público; el primer admin sale de aquí):
+**Crear usuarios** (no hay registro público). Dos caminos:
 
-```bash
-docker compose exec api python -m app.cli.create_user --email ana@empresa.com --name "Ana Pérez" --role admin
-docker compose exec api python -m app.cli.create_user --email carla@cliente.com --name "Carla" --role client --tenant acme
-```
+1. **El primer admin, por CLI** (único que hace falta bootstrapear a mano, porque todavía no hay nadie que pueda mandar el email de activación):
+   ```bash
+   docker compose exec api python -m app.cli.create_user --email ana@empresa.com --name "Ana Pérez" --role admin
+   ```
+   La contraseña se pide por prompt oculto (o `--password-stdin`); mínimo 10 caracteres. Es la única vía que sigue pidiendo contraseña directamente.
 
-La contraseña se pide por prompt oculto (o `--password-stdin`); mínimo 10 caracteres. Todos los roles salvo `admin` requieren al menos un `--tenant` (slug).
+2. **Todo lo demás, sin contraseña, por activación de cuenta vía email** (`POST /internal/admin/users`, o crear un tenant — ver abajo): el usuario se crea `pending`, con una contraseña aleatoria e inservible, y `ProvisionUserUseCase` le manda un correo (Resend) con un link de un solo uso (`ACCOUNT_ACTIVATION_TTL_SECONDS`, 24 h por defecto) a `POST /auth/activate`, donde crea su propia contraseña y queda logueado. Nadie — ni el admin que lo crea — ve o transmite una contraseña en texto plano. Si el correo se pierde o cae en spam dentro del plazo: `POST /internal/admin/users/{id}/resend-activation`.
+
+   `tenant_manager` y `botmaster` se crean así desde la pantalla **Usuarios** de la consola (solo admin). Los `client` NO se crean ahí: nacen automáticamente al crear un **tenant** (`POST /internal/admin/tenants`, campos `client_email`/`client_name`) — cada tenant siempre trae su propio usuario `client`, con el mismo mecanismo de activación.
+
+   "Olvidé mi contraseña" sigue el mismo patrón: `POST /auth/forgot-password` (siempre responde igual, exista o no la cuenta) emite un link de `PASSWORD_RESET_TTL_SECONDS` (1 h) a `POST /auth/reset-password`.
+
+   Requiere `RESEND_API_KEY` en `.env` (cuenta en resend.com — capa gratuita) y `PUBLIC_BASE_URL` apuntando al dominio donde la PWA sirve `/activar-cuenta` y `/restablecer-password` (no solo la API); si `RESEND_API_KEY` falta, la creación del usuario queda hecha pero el email falla con 502 (reintentable con el resend-activation de arriba).
 
 **Proteger un endpoint con la sesión** (bloques listos en `adapters/inbound/http/auth_deps.py`): `Depends(get_current_user)`, `Depends(require_roles("admin", "tenant_manager"))` y `ensure_tenant_access(user, tenant_id)`. Migrar `/internal/admin/*` de la API key a estas dependencias es el paso siguiente para que la consola gestione tenants y canales.
 
@@ -278,15 +288,19 @@ La API admin acepta **dos tipos de llamante**: una máquina con `X-Admin-Api-Key
 
 1. **Rol × recurso × acción** (`POLICY`, única fuente de verdad):
 
-| Recurso | admin | tenant_manager | botmaster | client |
+| Recurso | admin | tenant_manager | botmaster | client / consultant |
 |---|---|---|---|---|
 | tenants | leer + escribir | leer (los suyos) | leer (los suyos) | — |
 | projects | leer + escribir | leer + escribir | leer | — |
 | agents | leer + escribir | leer + escribir | leer + escribir | — |
 | workflows | leer + escribir | leer + escribir | leer | — |
-| channel-connections | leer + escribir | leer + escribir | — | — |
+| channel-connections | leer + escribir | leer + escribir | leer + escribir | — |
 | channel-apps (secretos globales) | leer + escribir | — | — | — |
 | users | leer + escribir | — | — | — |
+| langflow (editor embebido) | leer + escribir | leer + escribir | leer + escribir | — |
+| tenant-billing (facturación) | leer + escribir | leer + escribir | — | — (`client` lo ve por `GET /me/billing-profile`, fuera de `POLICY`) |
+
+`consultant` no aparece nunca en `POLICY` (como `client`): cero acceso al admin API, solo reportes (sección 23).
 
 2. **Alcance por tenant:** todo cuelga de un proyecto y este de un tenant; un no-admin solo ve y toca lo de sus tenants. Lo que queda fuera de alcance responde **404** (no 403), igual que un id inexistente, para no revelar qué ids existen en otros tenants. Los listados sin filtro devuelven solo lo visible.
 
@@ -1210,4 +1224,83 @@ Herramienta de uso interno (equipo Flowsdone, no cliente final): un agente de La
 | `GATEWAY_ADMIN_API_KEY` | Mismo valor que `ADMIN_API_KEY`, inyectado al contenedor `langflow` bajo otro nombre para que la tool distinga "credencial que uso para llamarme a mí mismo" del resto de la config de Langflow. |
 
 Tras actualizar `docker-compose.yml`, hace falta `docker compose up -d langflow` para que el contenedor tome las variables nuevas.
+
+---
+
+## 22. Activación de cuentas por email + Usuarios en la PWA
+
+Nadie recibe una contraseña en texto plano: todo usuario nuevo (`admin`/`tenant_manager`/`botmaster` desde la pantalla **Usuarios**, o el `client` que se crea junto a cada tenant) nace `pending`, con una contraseña aleatoria e inservible, y recibe un email con un link de un solo uso para crear la suya propia — eso es lo que activa la cuenta y verifica que el email es real. Ver "Crear usuarios" en la sección 7 ("Autenticación de la consola (PWA)") para el flujo completo.
+
+### Piezas nuevas
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `AccountTokenStorePort` → `RedisAccountTokenStore` | `domain/ports/outbound/auth.py`, `adapters/outbound/session/redis_account_token_store.py` | Token de un solo uso (256 bits, solo se guarda su SHA-256, `GETDEL` atómico) — mismo patrón que `SsoTicketStorePort` de Langflow. Dos instancias (`auth:activate:`, `auth:reset:`) para que un token de activación nunca sirva como reset. |
+| `EmailSenderPort` → `ResendEmailAdapter` | `domain/ports/outbound/email.py`, `adapters/outbound/email/` | Envía un template Jinja2 renderizado vía la API HTTPS de Resend (no SMTP: el VPS tiene el puerto saliente bloqueado). Templates en `adapters/outbound/email/templates/` (`base.html.jinja` + uno por correo). |
+| `ProvisionUserUseCase` | `application/use_cases/provision_user.py` | Crea el usuario `pending` (contraseña aleatoria) + emite el token + manda el email. Lo usan tanto `POST /internal/admin/users` como `CreateTenantUseCase` (para el `client`), para no duplicar la lógica. |
+| `ActivateAccountUseCase` / `RequestPasswordResetUseCase` / `ResetPasswordUseCase` | `application/use_cases/` | Canjean el token, fijan la contraseña, cierran sesiones previas y abren una nueva (auto-login) — mismo patrón que `AuthenticateUserUseCase`. |
+| `CreateTenantUseCase` | `application/use_cases/create_tenant.py` | Crea el tenant y su `client` en un paso; valida que `client_email` no exista **antes** de crear el tenant (evita el caso más probable de tenant huérfano — `tenant_repo`/`user_repo` son transacciones Postgres independientes, sin atomicidad cross-repo). |
+| `POST /auth/activate`, `POST /auth/forgot-password`, `POST /auth/reset-password` | `adapters/inbound/http/auth.py` | Públicos (sin `POLICY`, como `/auth/login`). `forgot-password` siempre responde 202 exista o no la cuenta. `activate`/`reset-password` tienen throttle por IP reusando `LoginThrottlePort` (defensa en profundidad; el token en sí es imposible de adivinar). |
+| `POST /internal/admin/users/{id}/resend-activation` | `adapters/inbound/http/admin/users.py` | Reenvía el email si el usuario sigue `pending` — cubre un link perdido o caído en spam dentro de las 24h. |
+| Pantalla **Usuarios** (PWA) | `flowsdone_pwa/src/features/users/` | CRUD de `admin`/`tenant_manager`/`botmaster` (solo admin, permiso `users:manage`). Los `client` no aparecen: se gestionan desde Tenants. |
+| `/activar-cuenta/:token`, `/recuperar-password`, `/restablecer-password/:token` (PWA) | `flowsdone_pwa/src/features/auth/` | Pantallas públicas (bajo `PublicOnly`), mismo `AuthLayout` que `/login`. |
+
+### Cambios en Tenants y en `botmaster`
+
+- `POST /internal/admin/tenants` ahora exige `client_email`/`client_name`: cada tenant siempre trae su usuario `client`.
+- `POLICY["channel_connections"]` incluye ahora a `botmaster` (leer + escribir), además de `agents` que ya tenía — gestiona canales de los tenants que un admin le asignó (`user_tenants`), junto con conversaciones (sin backend propio todavía; el permiso de la PWA ya está listo para cuando lo tenga).
+
+### Variables de entorno nuevas
+
+| Variable | Para qué |
+|---|---|
+| `RESEND_API_KEY` | API key de [resend.com](https://resend.com/api-keys) (capa gratuita). Sin ella, `ResendEmailAdapter` falla con `EmailSendError` al enviar — la creación del usuario/tenant queda hecha igual (502 en la respuesta, reintentable con `resend-activation`). |
+| `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | Remitente de los correos. Default `no-reply@flowsdone.com` / `Flowsdone`. |
+| `ACCOUNT_ACTIVATION_TTL_SECONDS` | Vigencia del link de activación (default `86400`, 24h). |
+| `PASSWORD_RESET_TTL_SECONDS` | Vigencia del link de "olvidé mi contraseña" (default `3600`, 1h — más corto que la activación por ser más sensible). |
+
+`PUBLIC_BASE_URL` (ya existía) se reusa para construir ambos links (`{PUBLIC_BASE_URL}/activar-cuenta/{token}`, `.../restablecer-password/{token}`) — debe apuntar al dominio donde la PWA sirve esas rutas, no solo la API.
+
+### Fuera de alcance (a propósito, por ahora)
+
+- Reenvío de reset (si el link de "olvidé mi contraseña" se pierde, hay que pedir uno nuevo desde `/recuperar-password` — no hay un endpoint admin equivalente al `resend-activation`, no hace falta: cualquiera puede pedirlo solo).
+- Plantillas de email en un idioma configurable — hoy siempre en español.
+- Un mecanismo para que un `tenant_manager` gestione usuarios de sus propios tenants (quedó decidido en una sesión anterior pero no se construyó en esta tarea) — hoy `users` en `POLICY` sigue siendo admin-only.
+
+---
+
+## 23. Editor de Langflow para todo el staff, rol `consultant`, Reportes y facturación del cliente
+
+### Editor de Langflow para `tenant_manager`/`botmaster`
+
+Antes solo `admin` recibía el editor de Langflow embebido (`platform:manage`); el resto veía una lista plana de agentes (`TenantAgents`, ya eliminado). Ahora lo reciben `admin`, `tenant_manager` y `botmaster` por igual (`agents:edit`, `POLICY["langflow"]` ampliado a `_ALL_STAFF`) - como reunir esta permission con la de la ruta hace que la lista plana quede inalcanzable, se borró (`features/agents/TenantAgents.tsx`).
+
+⚠️ **Riesgo aceptado a sabiendas, no resuelto**: separar por usuario/carpeta en Langflow es una separación de **vista**, no de seguridad - un componente de código Python corre en el contenedor `langflow` compartido y desde ahí alcanza `GATEWAY_ADMIN_API_KEY` y las credenciales de Langfuse/Weaviate. Aceptable porque `tenant_manager`/`botmaster` son personal de Flowsdone, nunca de un cliente.
+
+### Rol `consultant`
+
+Cuarto rol "de staff visible" (se crea desde Usuarios, con tenant(s) asignados), pero sin ningún acceso al admin API - mismo alcance que `client` (`POLICY` no lo lista en ningún recurso). Solo ve **Reportes** (`features/reports/ReportsPlaceholder.tsx`, el mismo placeholder "Próximamente" que `ConversationsPage`, pensado para embeber Metabase) y Ajustes. `client` sigue viendo su "Mi panel" (`ClientPanel`) de siempre - son pantallas distintas aunque ambas cuelguen de `/dashboard` (`DashboardRoute.tsx` bifurca por el rol `consultant` antes de caer en el chequeo genérico de `reports:view`).
+
+### Perfil de facturación del tenant
+
+`Tenant` ya es la organización cliente en este sistema (sus nombres son nombres de empresa) - no se creó una entidad "Cliente" paralela, se le agregó un perfil de facturación 1:1 (`tenant_billing_profiles`, migración `0008`): razón social, identificación fiscal, contacto y dirección de facturación, moneda, plan/ciclo (texto libre) y notas. Pura captura de datos - no hay motor de cobro ni sistema de suscripciones detrás.
+
+- **Admin/tenant_manager** lo editan desde Tenants (`BillingProfileCard`/`BillingProfileDialog`, sección nueva junto a Proyectos) - `POLICY["tenant_billing"]`, `_MANAGERS`. `botmaster` no lo ve (gestiona agentes/canales, no facturación).
+- **`client`** lo ve, solo lectura, en una pantalla nueva "Mi empresa" (`GET /me/billing-profile`, `adapters/inbound/http/me.py`) - el primer endpoint de "autoservicio" del proyecto: resuelve el tenant desde la propia sesión, sin pasar por `POLICY`/`/internal/admin/*`, para no romper el invariante de que `client` nunca toca el admin API. Ruta nueva en nginx (`location ^~ /api/me/`, mismo patrón que `/api/auth/`).
+
+### Piezas nuevas
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `TenantBillingProfile` / `TenantBillingProfileRepositoryPort` → `SqlAlchemyTenantBillingProfileRepository` | `domain/models/`, `domain/ports/outbound/`, `adapters/outbound/db/` | Perfil 1:1 con un tenant; `upsert` crea la fila vacía en el primer `GET` si no existía. |
+| `GET/PUT /internal/admin/tenants/{id}/billing` | `adapters/inbound/http/admin/tenant_billing.py` | Admin/tenant_manager, alcance por tenant como el resto (`access.tenant()` + verificación de existencia - ver el comentario de `_existing_tenant`: `access.tenant()` sola no alcanza para un caller sin restricción). |
+| `GET /me/billing-profile` | `adapters/inbound/http/me.py` (router nuevo, `/me/*`) | Autoservicio: cualquier sesión válida, sin `POLICY`, tenant resuelto de la propia sesión. |
+| `ReportsPlaceholder` | `features/reports/` | Placeholder de `consultant`, mismo patrón que `ConversationsPage`. |
+| `CompanyPage` + `core/company/` | `features/company/`, `core/company/` | "Mi empresa": solo lectura, vía `companyApi.ts` (mismo patrón `credentials:'include'` que `httpAuthApi.ts`, nunca `AdminApi`). |
+
+### Fuera de alcance (a propósito, por ahora)
+
+- Motor de cobro/pasarela de pago, sistema real de planes y precios - `plan`/`billing_cycle` son texto libre, sin validar contra un catálogo.
+- Embeber Metabase de verdad en `ReportsPlaceholder` - queda para cuando se integre.
+- Que `client` también pueda editar sus propios datos de facturación (hoy es de solo lectura; lo edita admin/tenant_manager).
 

@@ -14,6 +14,7 @@ import { can } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 import { describeError } from '@/core/http/describeError'
 import { useTenant } from '@/core/tenant/useTenant'
+import { BillingProfileCard } from './BillingProfileCard'
 import { ProjectDialog } from './ProjectDialog'
 import { ProjectsCard } from './ProjectsCard'
 import { TenantDialog } from './TenantDialog'
@@ -48,6 +49,9 @@ export function TenantsPage() {
   const { user } = useAuth()
   const { current } = useTenant()
   const canManageTenants = can(user, 'tenants:manage')
+  // admin + tenant_manager (POLICY["tenant_billing"] en el gateway); botmaster
+  // gestiona agentes/canales, no facturación.
+  const canManageBilling = can(user, 'projects:manage')
   const updateTenant = useUpdateTenant()
   const deleteTenant = useDeleteTenant()
   const updateProject = useUpdateProject()
@@ -216,6 +220,8 @@ export function TenantsPage() {
               void confirmDeletion({ kind: 'delete-project', project })
             }}
           />
+
+          {canManageBilling && <BillingProfileCard tenantId={tenant.id} tenantName={tenant.name} />}
         </div>
       </div>
 

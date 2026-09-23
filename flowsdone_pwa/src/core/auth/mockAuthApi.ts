@@ -29,6 +29,12 @@ export const DEMO_ACCOUNTS: readonly { email: string; password: string; role: Ro
 
 export const MOCK_SESSION_KEY = 'fd-mock-session'
 
+/** Tokens de maqueta para probar `/activar-cuenta/:token` y `/restablecer-password/:token`
+ * en modo mock sin backend; cualquier otro valor se rechaza como inválido/vencido. */
+export const DEMO_ACTIVATION_TOKEN = 'demo-activate-token'
+export const DEMO_RESET_TOKEN = 'demo-reset-token'
+const INVALID_TOKEN = 'El enlace no es válido o ya venció. Pide uno nuevo.'
+
 /** Opciones de {@link createMockAuthApi}. */
 export interface MockAuthOptions {
   /** Latencia simulada por llamada, en ms. */
@@ -79,6 +85,31 @@ export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() 
 
     async logout() {
       remember(() => storage?.removeItem(MOCK_SESSION_KEY))
+    },
+
+    async activateAccount(token, password) {
+      await wait()
+      if (token !== DEMO_ACTIVATION_TOKEN || password.length < 10) {
+        throw new AuthError('invalid_token', INVALID_TOKEN)
+      }
+      const user = USERS[0]
+      remember(() => storage?.setItem(MOCK_SESSION_KEY, user.id))
+      return user
+    },
+
+    async requestPasswordReset() {
+      await wait()
+      // Siempre "éxito", exista o no la cuenta - mismo comportamiento que el adaptador real.
+    },
+
+    async resetPassword(token, password) {
+      await wait()
+      if (token !== DEMO_RESET_TOKEN || password.length < 10) {
+        throw new AuthError('invalid_token', INVALID_TOKEN)
+      }
+      const user = USERS[0]
+      remember(() => storage?.setItem(MOCK_SESSION_KEY, user.id))
+      return user
     },
   }
 }

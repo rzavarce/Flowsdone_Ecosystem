@@ -68,7 +68,7 @@ describe('AuthProvider', () => {
     const before = makeUser('admin')
     const after = { ...before, tenants: [...before.tenants, { id: 't-new', name: 'Tenant Nuevo' }] }
     let current = before
-    const api = { restore: async () => current, login: async () => current, logout: async () => {} }
+    const api = { ...fakeAuthApi(null), restore: async () => current, login: async () => current }
     render(<AuthProvider api={api}><Probe /></AuthProvider>)
     await waitFor(() => expect(screen.getByTestId('s')).toHaveTextContent('authenticated'))
     expect(screen.getByTestId('tenants').textContent).not.toContain('Tenant Nuevo')
@@ -81,7 +81,7 @@ describe('AuthProvider', () => {
 
   it('refreshUser ignora un resultado vacío (fallo de red) en vez de cerrar la sesión', async () => {
     let calls = 0
-    const api = { restore: async () => (calls++ === 0 ? makeUser('client') : null), login: async () => makeUser('client'), logout: async () => {} }
+    const api = { ...fakeAuthApi(null), restore: async () => (calls++ === 0 ? makeUser('client') : null), login: async () => makeUser('client') }
     render(<AuthProvider api={api}><Probe /></AuthProvider>)
     await waitFor(() => expect(screen.getByTestId('s')).toHaveTextContent('authenticated|client'))
 

@@ -10,13 +10,18 @@ from fastapi import APIRouter, Depends
 from app.adapters.inbound.http.auth import router
 from app.adapters.inbound.http.auth_deps import ensure_tenant_access, get_current_user, require_roles
 from app.application.dto.auth_dto import AuthenticatedUser
+from app.application.use_cases.activate_account import ActivateAccountUseCase
 from app.application.use_cases.authenticate_user import AuthenticateUserUseCase
 from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
+from app.application.use_cases.request_password_reset import RequestPasswordResetUseCase
+from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.core.config import settings
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import (
+    FakeAccountTokenStore,
     FakeAuthSessionRepo,
+    FakeEmailSender,
     FakeLoginThrottle,
     FakePasswordHasher,
     FakeTenantRepo,
@@ -28,6 +33,7 @@ from api_gateway.tests.support.fakes import (
 pytestmark = pytest.mark.anyio
 
 PASSWORD = "correct-horse-battery"
+NEW_PASSWORD = "z" * 10
 COOKIE = settings.AUTH_COOKIE_NAME
 
 
@@ -37,8 +43,16 @@ def _state(users=(), tenants=(), max_email=3, max_ip=50):
         user_repo.add(u, PASSWORD)
     tenant_repo = FakeTenantRepo(list(tenants))
     sessions = FakeAuthSessionRepo()
+    login_throttle = FakeLoginThrottle()
+    activation_tokens = FakeAccountTokenStore()
+    reset_tokens = FakeAccountTokenStore()
+    mailer = FakeEmailSender()
     return dict(
         sessions=sessions,
+        login_throttle=login_throttle,
+        activation_tokens=activation_tokens,
+        reset_tokens=reset_tokens,
+        mailer=mailer,
         authenticate_user_use_case=AuthenticateUserUseCase(
             user_repo=user_repo,
             tenant_repo=tenant_repo,
@@ -54,6 +68,33 @@ def _state(users=(), tenants=(), max_email=3, max_ip=50):
             sessions=sessions, user_repo=user_repo, tenant_repo=tenant_repo, session_ttl_seconds=3600
         ),
         logout_user_use_case=LogoutUserUseCase(sessions=sessions),
+        activate_account_use_case=ActivateAccountUseCase(
+            tokens=activation_tokens,
+            user_repo=user_repo,
+            tenant_repo=tenant_repo,
+            hasher=FakePasswordHasher(),
+            sessions=sessions,
+            session_ttl_seconds=3600,
+        ),
+        request_password_reset_use_case=RequestPasswordResetUseCase(
+            user_repo=user_repo,
+            tokens=reset_tokens,
+            mailer=mailer,
+            throttle=login_throttle,
+            ttl_seconds=3600,
+            reset_base_url="https://app.flowsdone.com",
+            window_seconds=900,
+            max_requests_per_email=max_email,
+            max_requests_per_ip=max_ip,
+        ),
+        reset_password_use_case=ResetPasswordUseCase(
+            tokens=reset_tokens,
+            user_repo=user_repo,
+            tenant_repo=tenant_repo,
+            hasher=FakePasswordHasher(),
+            sessions=sessions,
+            session_ttl_seconds=3600,
+        ),
     )
 
 
@@ -212,6 +253,101 @@ async def test_a_user_disabled_after_login_loses_access_immediately():
         repo = state["get_current_user_use_case"]._user_repo
         repo.users[user.id] = make_user(id=user.id, email=user.email, status="disabled")
         assert (await client.get("/auth/me", headers=_cookie(token))).status_code == 401
+
+
+# ------------------------------ activation / reset ------------------------------
+
+
+async def test_activate_sets_the_password_and_signs_the_user_in():
+    user = make_user(status="pending")
+    state = _state([user])
+    token = await state["activation_tokens"].issue(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        resp = await client.post("/auth/activate", json={"token": token, "password": NEW_PASSWORD})
+
+    assert resp.status_code == 200
+    assert resp.json()["email"] == user.email
+    cookie = resp.headers["set-cookie"]
+    assert cookie.startswith(f"{COOKIE}=") and "HttpOnly" in cookie
+
+
+async def test_activate_rejects_an_unknown_or_already_used_token():
+    user = make_user(status="pending")
+    state = _state([user])
+    token = await state["activation_tokens"].issue(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        await client.post("/auth/activate", json={"token": token, "password": NEW_PASSWORD})
+        again = await client.post("/auth/activate", json={"token": token, "password": NEW_PASSWORD})
+        unknown = await client.post("/auth/activate", json={"token": "nope", "password": NEW_PASSWORD})
+
+    assert again.status_code == unknown.status_code == 400
+    assert "set-cookie" not in again.headers
+
+
+async def test_activate_rejects_a_too_short_password():
+    user = make_user(status="pending")
+    state = _state([user])
+    token = await state["activation_tokens"].issue(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        resp = await client.post("/auth/activate", json={"token": token, "password": "short"})
+    assert resp.status_code == 400
+
+
+async def test_forgot_password_always_answers_202_known_or_not():
+    user = make_user(status="active")
+    state = _state([user])
+    async with client_for_router(router, **state) as client:
+        known = await client.post("/auth/forgot-password", json={"email": user.email})
+        unknown = await client.post("/auth/forgot-password", json={"email": "ghost@x.com"})
+
+    assert known.status_code == unknown.status_code == 202
+    assert len(state["mailer"].sent) == 1  # only the real account got one
+
+
+async def test_forgot_password_is_throttled_per_ip():
+    state = _state(max_ip=2)
+    async with client_for_router(router, **state) as client:
+        for _ in range(2):
+            await client.post("/auth/forgot-password", json={"email": "ghost@x.com"})
+        resp = await client.post("/auth/forgot-password", json={"email": "ghost@x.com"})
+    assert resp.status_code == 429
+
+
+async def test_reset_password_sets_the_new_password_and_signs_the_user_in():
+    user = make_user(status="active")
+    state = _state([user])
+    token = await state["reset_tokens"].issue(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        resp = await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
+
+    assert resp.status_code == 200
+    assert resp.json()["email"] == user.email
+    assert resp.headers["set-cookie"].startswith(f"{COOKIE}=")
+
+
+async def test_reset_password_rejects_an_unknown_or_already_used_token():
+    user = make_user(status="active")
+    state = _state([user])
+    token = await state["reset_tokens"].issue(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
+        again = await client.post("/auth/reset-password", json={"token": token, "password": NEW_PASSWORD})
+
+    assert again.status_code == 400
+
+
+async def test_reset_password_is_throttled_per_ip(monkeypatch):
+    # _check_ip_throttle reads settings.AUTH_LOGIN_MAX_FAILURES_PER_IP directly
+    # (shared with login's own IP limit, not the reset-request-specific one
+    # RequestPasswordResetUseCase takes as a constructor arg) - patch it here.
+    monkeypatch.setattr(settings, "AUTH_LOGIN_MAX_FAILURES_PER_IP", 2)
+    user = make_user(status="active")
+    state = _state([user])
+    async with client_for_router(router, **state) as client:
+        for _ in range(2):
+            await client.post("/auth/reset-password", json={"token": "nope", "password": NEW_PASSWORD})
+        resp = await client.post("/auth/reset-password", json={"token": "nope", "password": NEW_PASSWORD})
+    assert resp.status_code == 429
 
 
 # --------------------------- dependencias reutilizables ---------------------------

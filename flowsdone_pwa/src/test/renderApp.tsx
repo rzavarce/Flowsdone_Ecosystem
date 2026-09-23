@@ -24,13 +24,17 @@ export function makeUser(role: Role): User {
 
 /** Adaptador falso: `restore` devuelve el usuario dado (o null = sin sesión). */
 export function fakeAuthApi(user: User | null): AuthApi {
+  const requireUser = () => {
+    if (!user) throw new Error('sin usuario')
+    return user
+  }
   return {
     restore: async () => user,
-    login: async () => {
-      if (!user) throw new Error('sin usuario')
-      return user
-    },
+    login: async () => requireUser(),
     logout: async () => {},
+    activateAccount: async () => requireUser(),
+    requestPasswordReset: async () => {},
+    resetPassword: async () => requireUser(),
   }
 }
 

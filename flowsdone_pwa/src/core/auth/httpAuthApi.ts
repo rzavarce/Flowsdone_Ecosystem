@@ -5,15 +5,32 @@ import { ROLES, type Role, type Tenant, type User } from './types'
  * Adaptador contra el gateway real (api_gateway, `/auth/*`, servido bajo `/api`
  * por nginx en el contenedor o por el proxy de Vite en desarrollo). Contrato:
  *
- * - `POST {base}/auth/login`  body `{email, password}` -> 200 `User` | 401 | 429
- * - `GET  {base}/auth/me`     -> 200 `User` | 401
- * - `POST {base}/auth/logout` -> 204
+ * - `POST {base}/auth/login`            body `{email, password}` -> 200 `User` | 401 | 429
+ * - `GET  {base}/auth/me`                -> 200 `User` | 401
+ * - `POST {base}/auth/logout`            -> 204
+ * - `POST {base}/auth/activate`          body `{token, password}` -> 200 `User` | 400
+ * - `POST {base}/auth/forgot-password`   body `{email}`           -> 202 | 429
+ * - `POST {base}/auth/reset-password`    body `{token, password}` -> 200 `User` | 400
  *
  * La sesión viaja en una cookie httpOnly (`credentials: 'include'`): el
  * frontend nunca ve ni guarda el token, lo que lo deja fuera del alcance de XSS.
+ * Lo mismo aplica al token de activación/reset: solo viaja en la URL del link
+ * (nunca en una cookie ni en localStorage) y el servidor lo consume una sola vez.
  */
 
 const UNAVAILABLE = 'No se pudo contactar con el servidor. Inténtalo de nuevo.'
+const RATE_LIMITED = 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
+const INVALID_TOKEN_FALLBACK = 'El enlace no es válido o ya venció. Pide uno nuevo.'
+
+/** Extrae el `detail` de un cuerpo de error de FastAPI, si lo hay. */
+async function detailOf(res: Response): Promise<string | undefined> {
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    return typeof body.detail === 'string' ? body.detail : undefined
+  } catch {
+    return undefined
+  }
+}
 
 function isTenant(value: unknown): value is Tenant {
   const t = value as Tenant
@@ -92,6 +109,61 @@ export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...
       } catch {
         // Mejor esfuerzo: la UI cierra la sesión local igualmente.
       }
+    },
+
+    async activateAccount(token, password) {
+      let res: Response
+      try {
+        res = await request('/auth/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        })
+      } catch {
+        throw new AuthError('unavailable', UNAVAILABLE)
+      }
+      if (res.status === 400) {
+        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK)
+      }
+      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      return parseUser(await res.json())
+    },
+
+    async requestPasswordReset(email) {
+      let res: Response
+      try {
+        res = await request('/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+      } catch {
+        throw new AuthError('unavailable', UNAVAILABLE)
+      }
+      if (res.status === 429) {
+        throw new AuthError('rate_limited', RATE_LIMITED)
+      }
+      // Cualquier otra respuesta (incluida un correo desconocido) se trata
+      // como éxito a propósito: el backend nunca revela si la cuenta existe.
+      if (res.status !== 202 && !res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+    },
+
+    async resetPassword(token, password) {
+      let res: Response
+      try {
+        res = await request('/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, password }),
+        })
+      } catch {
+        throw new AuthError('unavailable', UNAVAILABLE)
+      }
+      if (res.status === 400) {
+        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK)
+      }
+      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      return parseUser(await res.json())
     },
   }
 }

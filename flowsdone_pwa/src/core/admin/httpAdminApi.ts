@@ -1,6 +1,6 @@
 import { apiFetch } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
-import type { Agent, ChannelApp, ChannelConnection, Project, TenantRecord } from './types'
+import type { Agent, ChannelApp, ChannelConnection, Project, TenantBillingProfile, TenantRecord, UserRecord } from './types'
 
 /**
  * Adaptador contra el gateway real. En el navegador las rutas van por
@@ -20,6 +20,8 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     createTenant: (input) => call<TenantRecord>('/tenants', 'POST', input),
     updateTenant: (id, patch) => call<TenantRecord>(`/tenants/${id}`, 'PATCH', patch),
     deleteTenant: (id) => call<void>(`/tenants/${id}`, 'DELETE'),
+    getTenantBilling: (tenantId) => call<TenantBillingProfile>(`/tenants/${tenantId}/billing`),
+    updateTenantBilling: (tenantId, patch) => call<TenantBillingProfile>(`/tenants/${tenantId}/billing`, 'PUT', patch),
 
     listProjects: (tenantId) => call<Project[]>(`/projects${query({ tenant_id: tenantId })}`),
     createProject: (input) => call<Project>('/projects', 'POST', input),
@@ -42,5 +44,11 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
 
     revealChannelAppCredentials: async (provider) =>
       (await call<{ credentials: Record<string, unknown> }>(`/channel-apps/${provider}/credentials`)).credentials,
+
+    listUsers: () => call<UserRecord[]>('/users'),
+    createUser: (input) => call<UserRecord>('/users', 'POST', input),
+    updateUser: (id, patch) => call<UserRecord>(`/users/${id}`, 'PATCH', patch),
+    deleteUser: (id) => call<void>(`/users/${id}`, 'DELETE'),
+    resendUserActivation: (id) => call<void>(`/users/${id}/resend-activation`, 'POST'),
   }
 }

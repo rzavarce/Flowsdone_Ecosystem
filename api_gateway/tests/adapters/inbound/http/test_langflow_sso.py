@@ -52,12 +52,25 @@ async def test_admin_gets_a_sso_url_with_an_encoded_ticket(monkeypatch):
     assert prepare.calls == [(world.tenant_b.id, None)]
 
 
-@pytest.mark.parametrize("role", ["tenant_manager", "botmaster", "client"])
-async def test_only_platform_staff_may_open_langflow(role):
+@pytest.mark.parametrize("role", ["tenant_manager", "botmaster"])
+async def test_any_staff_role_may_open_langflow(role):
+    # Aceptado a sabiendas: tenant_manager/botmaster son personal de Flowsdone,
+    # no de clientes (ver POLICY["langflow"] en access_control.py).
     world, prepare = World.build(), FakePrepare()
     async with _client(world, prepare) as client:
         response = await client.post(
             URL, json={"tenant_id": str(world.tenant_a.id)}, headers={**cookie(await world.token(role)), **CSRF}
+        )
+
+    assert response.status_code == 200
+    assert prepare.calls == [(world.tenant_a.id, None)]
+
+
+async def test_client_role_may_not_open_langflow():
+    world, prepare = World.build(), FakePrepare()
+    async with _client(world, prepare) as client:
+        response = await client.post(
+            URL, json={"tenant_id": str(world.tenant_a.id)}, headers={**cookie(await world.token("client")), **CSRF}
         )
 
     assert response.status_code == 403

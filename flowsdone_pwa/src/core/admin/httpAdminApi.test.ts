@@ -77,9 +77,9 @@ describe('httpAdminApi', () => {
     expect(list.call()[0]).toBe('/api/admin/tenants')
 
     const create = setup({ id: 't' })
-    await create.api.createTenant({ name: 'N', slug: 'n' })
+    await create.api.createTenant({ name: 'N', slug: 'n', client_email: 'c@x.com', client_name: 'C' })
     expect(create.call()[1].method).toBe('POST')
-    expect(JSON.parse(create.call()[1].body as string)).toEqual({ name: 'N', slug: 'n' })
+    expect(JSON.parse(create.call()[1].body as string)).toEqual({ name: 'N', slug: 'n', client_email: 'c@x.com', client_name: 'C' })
 
     const patch = setup({ id: 't' })
     await patch.api.updateTenant('t-9', { status: 'suspended' })
@@ -90,6 +90,34 @@ describe('httpAdminApi', () => {
     const del = setup(undefined, 204)
     await expect(del.api.deleteTenant('t-9')).resolves.toBeUndefined()
     expect(del.call()[1].method).toBe('DELETE')
+  })
+
+  it('usuarios: GET/POST/PATCH/DELETE sobre /api/admin/users, y el resend de activación', async () => {
+    const list = setup([])
+    await list.api.listUsers()
+    expect(list.call()[0]).toBe('/api/admin/users')
+
+    const create = setup({ id: 'u' })
+    await create.api.createUser({ email: 'a@x.com', name: 'A', role: 'botmaster', tenant_ids: ['t-1'] })
+    expect(create.call()[0]).toBe('/api/admin/users')
+    expect(create.call()[1].method).toBe('POST')
+    expect(JSON.parse(create.call()[1].body as string)).toEqual({
+      email: 'a@x.com', name: 'A', role: 'botmaster', tenant_ids: ['t-1'],
+    })
+
+    const patch = setup({ id: 'u' })
+    await patch.api.updateUser('u-9', { status: 'disabled' })
+    expect(patch.call()[0]).toBe('/api/admin/users/u-9')
+    expect(patch.call()[1].method).toBe('PATCH')
+
+    const del = setup(undefined, 204)
+    await expect(del.api.deleteUser('u-9')).resolves.toBeUndefined()
+    expect(del.call()[1].method).toBe('DELETE')
+
+    const resend = setup(undefined, 204)
+    await expect(resend.api.resendUserActivation('u-9')).resolves.toBeUndefined()
+    expect(resend.call()[0]).toBe('/api/admin/users/u-9/resend-activation')
+    expect(resend.call()[1].method).toBe('POST')
   })
 
   it('proyectos: PATCH y DELETE sobre /api/admin/projects/{id}', async () => {

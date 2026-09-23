@@ -25,6 +25,7 @@ class UserRepositoryPort(Protocol):
         role: str,
         password_hash: str,
         tenant_ids: List[UUID],
+        status: str = "active",
     ) -> User:
         """Create a user.
 
@@ -33,7 +34,12 @@ class UserRepositoryPort(Protocol):
             name (str): Display name.
             role (str): One of `USER_ROLES`.
             password_hash (str): Hash produced by `PasswordHasherPort.hash`.
+                For a `pending` user this is an unusable, randomly generated
+                password (see `ProvisionUserUseCase`) - the real one is set
+                when the user activates their account.
             tenant_ids (List[UUID]): Tenants the user belongs to.
+            status (str): One of `UserStatus`; defaults to `active` so
+                existing callers (scripts, tests) keep working unchanged.
 
         Returns:
             User: The created user.
@@ -229,5 +235,40 @@ class LoginThrottlePort(Protocol):
 
         Args:
             key (str): Bucket key.
+        """
+        ...
+
+
+class AccountTokenStorePort(Protocol):
+    """Single-use tokens that prove control of a user's account.
+
+    Used for both the account-activation link (`ProvisionUserUseCase`) and
+    the password-reset link (`RequestPasswordResetUseCase`); two separate
+    instances (different key prefixes) keep one kind from being redeemed as
+    the other. Same shape and guarantees as `SsoTicketStorePort`: opaque
+    token, single redemption, TTL.
+    """
+
+    async def issue(self, user_id: UUID, *, ttl_seconds: int) -> str:
+        """Create a token for a user.
+
+        Args:
+            user_id (UUID): The user the token is for.
+            ttl_seconds (int): Lifetime before it expires unused.
+
+        Returns:
+            str: A random, URL-safe, single-use token.
+        """
+        ...
+
+    async def redeem(self, token: str) -> Optional[UUID]:
+        """Consume a token atomically.
+
+        Args:
+            token (str): The value presented by the browser.
+
+        Returns:
+            Optional[UUID]: The user it was issued for, or None if the
+            token is unknown, already used or expired.
         """
         ...

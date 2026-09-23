@@ -60,9 +60,32 @@ export function AuthProvider({ children, api }: AuthProviderProps) {
     if (user) setSession({ status: 'authenticated', user })
   }, [client])
 
+  const activateAccount = useCallback(
+    async (token: string, password: string) => {
+      const user = await client.activateAccount(token, password)
+      setSession({ status: 'authenticated', user })
+      return user
+    },
+    [client],
+  )
+
+  const requestPasswordReset = useCallback(
+    (email: string) => client.requestPasswordReset(email),
+    [client],
+  )
+
+  const resetPassword = useCallback(
+    async (token: string, password: string) => {
+      const user = await client.resetPassword(token, password)
+      setSession({ status: 'authenticated', user })
+      return user
+    },
+    [client],
+  )
+
   const value = useMemo<AuthContextValue>(
-    () => ({ ...session, login, logout, refreshUser }),
-    [session, login, logout, refreshUser],
+    () => ({ ...session, login, logout, refreshUser, activateAccount, requestPasswordReset, resetPassword }),
+    [session, login, logout, refreshUser, activateAccount, requestPasswordReset, resetPassword],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>
