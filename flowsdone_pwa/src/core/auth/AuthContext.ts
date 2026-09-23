@@ -1,25 +1,27 @@
 import { createContext } from 'react'
 import type { Credentials, User } from './types'
 
+/** Session lifecycle: `loading` while restoring, then `authenticated` or `anonymous`. */
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 
-/** Valor expuesto por {@link AuthProvider}. */
+/** Value exposed by {@link AuthProvider}. */
 export interface AuthContextValue {
   status: AuthStatus
   user: User | null
   login: (credentials: Credentials) => Promise<User>
   logout: () => Promise<void>
   /**
-   * Vuelve a pedir el usuario al servidor (sus tenants pueden haber cambiado).
-   * No cierra la sesión si falla: un 401 ya lo gestiona la capa de datos.
+   * Re-fetches the user from the server (their tenants may have changed).
+   * Doesn't log out on failure: a 401 is already handled by the data layer.
    */
   refreshUser: () => Promise<void>
-  /** Canjea el link de activación, crea la contraseña y deja la sesión iniciada. */
+  /** Redeems the activation link, sets the password and leaves the session logged in. */
   activateAccount: (token: string, password: string) => Promise<User>
-  /** Pide el email de "olvidé mi contraseña" (nunca revela si la cuenta existe). */
+  /** Requests the "forgot my password" email (never reveals whether the account exists). */
   requestPasswordReset: (email: string) => Promise<void>
-  /** Canjea el link de recuperación, fija la contraseña nueva y deja la sesión iniciada. */
+  /** Redeems the recovery link, sets the new password and leaves the session logged in. */
   resetPassword: (token: string, password: string) => Promise<User>
 }
 
+/** React context carrying the current {@link AuthContextValue}; `null` outside `<AuthProvider>`. */
 export const AuthContext = createContext<AuthContextValue | null>(null)

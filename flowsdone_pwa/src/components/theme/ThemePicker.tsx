@@ -10,9 +10,9 @@ const MODES: { id: ColorMode; label: string; icon: typeof Sun }[] = [
 ]
 
 /**
- * Selector de template: grilla de presets con vista previa en vivo y control
- * segmentado de modo. Cada tarjeta lleva su propio `data-theme`, así muestra
- * los colores de ese preset sin importar cuál esté activo.
+ * Template selector: a grid of presets with a live preview plus a segmented
+ * mode control. Each card carries its own `data-theme`, so it shows that
+ * preset's colors regardless of which one is currently active.
  */
 export function ThemePicker() {
   const { theme, mode, setTheme, setMode } = useTheme()

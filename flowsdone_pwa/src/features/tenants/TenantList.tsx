@@ -4,14 +4,14 @@ import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { summarize, type TenantEntry } from './useTenantsView'
 
-/** Props de {@link TenantList}. */
+/** Props for {@link TenantList}. */
 export interface TenantListProps {
   entries: TenantEntry[]
   selectedId: string
   onSelect: (id: string) => void
 }
 
-/** Lista de tenants (selección única) con su estado y lo que contiene cada uno. */
+/** List of tenants (single selection) with their status and what each one contains. */
 export function TenantList({ entries, selectedId, onSelect }: TenantListProps) {
   return (
     <Card className="overflow-hidden">

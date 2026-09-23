@@ -2,13 +2,13 @@ import { useMemo } from 'react'
 import { useAgents, useChannelConnections, useProjects, useTenants } from '@/core/admin/hooks'
 import type { Project, TenantRecord } from '@/core/admin/types'
 
-/** Cuántos elementos cuelgan de un proyecto. */
+/** How many items hang off a project. */
 export interface ProjectCounts {
   agents: number
   channels: number
 }
 
-/** Un tenant con lo que hay dentro, para pintar la lista y avisar de borrados en cascada. */
+/** A tenant with what it contains, to render the list and warn about cascading deletes. */
 export interface TenantEntry {
   tenant: TenantRecord
   projects: Project[]
@@ -16,27 +16,28 @@ export interface TenantEntry {
   channels: number
 }
 
-/** Datos de la pantalla Tenants ya combinados. */
+/** Tenants screen data, already combined. */
 export interface TenantsView {
   isLoading: boolean
   error: Error | null
   refetch: () => void
   /**
-   * Vuelve a pedir proyectos, agentes y canales y espera el resultado. Se usa antes de
-   * confirmar un borrado en cascada, para que el aviso cuente lo que hay AHORA y no lo
-   * que había en la caché (que puede tener hasta 30 s).
+   * Re-fetches projects, agents and channels and awaits the result. Used
+   * before confirming a cascading delete, so the warning counts what's
+   * there NOW rather than what was in the cache (which can be up to 30 s stale).
    */
   refreshContents: () => Promise<void>
   entries: TenantEntry[]
-  /** Agentes y canales de cada proyecto (por id de proyecto). */
+  /** Agents and channels of each project (keyed by project id). */
   projectCounts: Map<string, ProjectCounts>
 }
 
 /**
- * Reúne tenants, proyectos, agentes y canales y calcula los recuentos.
+ * Combines tenants, projects, agents and channels and computes the counts.
  *
- * El gateway ya devuelve solo lo visible para el perfil (un gestor solo ve sus
- * tenants); los recuentos salen de las mismas listas, sin peticiones extra.
+ * The gateway already returns only what's visible to the role (a manager
+ * only sees their own tenants); the counts come from those same lists,
+ * without extra requests.
  */
 export function useTenantsView(): TenantsView {
   const tenantsQ = useTenants()
@@ -82,7 +83,7 @@ export function useTenantsView(): TenantsView {
   }, [tenantsQ, projectsQ, agentsQ, connectionsQ])
 }
 
-/** Frase con los recuentos, en singular/plural correctos (p. ej. "1 proyecto · 3 canales"). */
+/** Phrase with the counts, correctly singular/plural (e.g. "1 project · 3 channels"). */
 export function summarize({ projects, agents, channels }: { projects?: number; agents: number; channels: number }): string {
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   return [

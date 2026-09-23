@@ -6,15 +6,15 @@ import { ClientPanel } from '@/features/reports/ClientPanel'
 import { ReportsPlaceholder } from '@/features/reports/ReportsPlaceholder'
 
 /**
- * Contenido de /dashboard según el perfil: dashboard operativo, panel de solo
- * lectura del cliente, el placeholder de reportes del consultor, o
- * redirección a la sección propia (botmaster).
+ * Content for /dashboard based on the profile: operational dashboard, the
+ * client's read-only panel, the consultant's reports placeholder, or a
+ * redirect to the user's own section (botmaster).
  *
- * `consultant` se resuelve por ROL, no por permiso, antes del chequeo
- * genérico de `reports:view`: comparte ese permiso con `client` (ambos "ven
- * reportes"), pero cada uno cae en una pantalla distinta - `client` sigue en
- * `ClientPanel` (su panel de siempre); `consultant` es exclusivo de
- * `ReportsPlaceholder`, el hueco pensado para los dashboards de Metabase.
+ * `consultant` is resolved by ROLE, not by permission, ahead of the generic
+ * `reports:view` check: it shares that permission with `client` (both "view
+ * reports"), but each lands on a different screen - `client` stays on
+ * `ClientPanel` (its usual panel); `consultant` is exclusive to
+ * `ReportsPlaceholder`, the placeholder reserved for the Metabase dashboards.
  */
 export function DashboardRoute() {
   const { user } = useAuth()

@@ -2,12 +2,12 @@ import { DEMO_ACCOUNTS } from '@/core/auth/mockAuthApi'
 import { ROLE_META } from '@/core/auth/permissions'
 import type { Credentials } from '@/core/auth/types'
 
-/** Props de {@link DemoAccounts}. */
+/** Props for {@link DemoAccounts}. */
 export interface DemoAccountsProps {
   onPick: (credentials: Credentials) => void
 }
 
-/** Atajos para rellenar el login con una cuenta de cada perfil (solo modo mock). */
+/** Shortcuts to fill the login form with an account of each role (mock mode only). */
 export function DemoAccounts({ onPick }: DemoAccountsProps) {
   return (
     <section aria-labelledby="demo-title" className="mt-8 rounded-xl border border-dashed border-border p-4">

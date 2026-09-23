@@ -4,7 +4,7 @@ import { ActivityChart } from '@/components/charts/ActivityChart'
 import { RecentConversations } from './RecentConversations'
 import { StatCard } from '@/components/charts/StatCard'
 
-/** Vista de resumen: KPIs, actividad semanal y conversaciones recientes. */
+/** Overview screen: KPIs, weekly activity and recent conversations. */
 export function DashboardPage() {
   return (
     <>

@@ -11,17 +11,17 @@ const STATUS: Record<UserRecord['status'], { label: string; tone: BadgeTone }> =
   disabled: { label: 'Deshabilitado', tone: 'neutral' },
 }
 
-/** Props de {@link UserList}. */
+/** Props for {@link UserList}. */
 export interface UserListProps {
   users: UserRecord[]
   onEdit: (user: UserRecord) => void
   onDelete: (user: UserRecord) => void
   onResendActivation: (user: UserRecord) => void
-  /** Id del usuario cuya activación se está reenviando (deshabilita ese botón). */
+  /** Id of the user whose activation is being resent (disables that button). */
   resendingId?: string
 }
 
-/** Lista de usuarios de consola (admin, gestores y botmasters) con sus acciones. */
+/** List of console users (admin, managers and botmasters) with their actions. */
 export function UserList({ users, onEdit, onDelete, onResendActivation, resendingId }: UserListProps) {
   return (
     <Card className="overflow-hidden">

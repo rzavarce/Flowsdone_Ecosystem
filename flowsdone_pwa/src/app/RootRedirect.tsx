@@ -4,8 +4,8 @@ import { homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 
 /**
- * Ruta raíz (`/`): sin sesión lleva al login; con sesión, a la página de
- * inicio del perfil. No muestra contenido propio.
+ * Root route (`/`): without a session it goes to login; with a session, to
+ * the profile's home page. Renders no content of its own.
  */
 export function RootRedirect() {
   const { status, user } = useAuth()

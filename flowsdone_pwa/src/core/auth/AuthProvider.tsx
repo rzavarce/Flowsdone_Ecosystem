@@ -4,17 +4,17 @@ import { AuthContext, type AuthContextValue, type AuthStatus } from './AuthConte
 import { createAuthApi } from './createAuthApi'
 import type { Credentials, User } from './types'
 
-/** Props de {@link AuthProvider}. */
+/** Props for {@link AuthProvider}. */
 export interface AuthProviderProps {
   children: ReactNode
-  /** Adaptador a usar; por defecto el que indique `VITE_AUTH_MODE`. Inyectable en tests. */
+  /** Adapter to use; defaults to whichever `VITE_AUTH_MODE` selects. Injectable in tests. */
   api?: AuthApi
 }
 
 /**
- * Mantiene la sesión: al montar intenta restaurarla y expone login/logout.
- * Mientras restaura, `status` es `loading` (los guards muestran un spinner en
- * vez de redirigir a /login por error).
+ * Keeps the session: attempts to restore it on mount and exposes login/logout.
+ * While restoring, `status` is `loading` (guards show a spinner instead of
+ * redirecting to /login by mistake).
  */
 export function AuthProvider({ children, api }: AuthProviderProps) {
   const [client] = useState<AuthApi>(() => api ?? createAuthApi())

@@ -9,21 +9,21 @@ const HIGHLIGHTS = [
   { icon: ShieldCheck, text: 'Acceso segmentado por perfil y por tenant.' },
 ]
 
-/** Props de {@link AuthLayout}. */
+/** Props for {@link AuthLayout}. */
 export interface AuthLayoutProps {
-  /** Título de la pantalla (p. ej. "Inicia sesión", "Activa tu cuenta"). */
+  /** Screen title (e.g. "Log in", "Activate your account"). */
   title: string
-  /** Texto breve bajo el título. */
+  /** Short text under the title. */
   description: string
-  /** El formulario de la pantalla. */
+  /** The screen's form. */
   children: ReactNode
 }
 
 /**
- * Layout compartido por las pantallas públicas de autenticación (login,
- * activación de cuenta, recuperar/restablecer contraseña): panel de marca
- * (solo escritorio) + un formulario centrado. Extraído de `LoginPage`, que
- * fue la primera en usarlo - mismo diseño para las tres pantallas nuevas.
+ * Shared layout for the public authentication screens (login, account
+ * activation, forgot/reset password): a brand panel (desktop only) plus a
+ * centered form. Extracted from `LoginPage`, which used it first - same
+ * design reused for the three newer screens.
  */
 export function AuthLayout({ title, description, children }: AuthLayoutProps) {
   return (

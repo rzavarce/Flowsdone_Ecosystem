@@ -4,10 +4,10 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { useTenant } from '@/core/tenant/useTenant'
 import { ACTIVITY, STATS } from '@/mocks/data'
 
-/** IDs de los indicadores que ve el perfil cliente (subconjunto de solo lectura). */
+/** IDs of the stats the client role sees (a read-only subset). */
 const CLIENT_STAT_IDS = ['conversations', 'resolution']
 
-/** Panel de solo lectura del perfil cliente: indicadores y actividad de su organización. */
+/** Read-only panel for the client role: stats and activity of their organization. */
 export function ClientPanel() {
   const { current } = useTenant()
   return (

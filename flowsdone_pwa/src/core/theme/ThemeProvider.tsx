@@ -10,6 +10,7 @@ import {
 
 const DARK_QUERY = '(prefers-color-scheme: dark)'
 
+/** Resolves `localStorage`, falling back to `null` if it's unavailable. */
 function getStorage(): Storage | null {
   try {
     return window.localStorage
@@ -19,11 +20,11 @@ function getStorage(): Storage | null {
 }
 
 /**
- * Provee el template activo y el modo claro/oscuro.
+ * Provides the active template and the light/dark mode.
  *
- * Aplica `data-theme` y la clase `dark` sobre `<html>` (los tokens de
- * `index.css` reaccionan a ambos), persiste la elección y sigue los
- * cambios del SO mientras el modo sea `system`.
+ * Applies `data-theme` and the `dark` class on `<html>` (the `index.css`
+ * tokens react to both), persists the choice and follows OS changes while
+ * the mode is `system`.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [stored, setStored] = useState(() => readStoredTheme(getStorage()))

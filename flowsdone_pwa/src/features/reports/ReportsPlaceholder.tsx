@@ -2,7 +2,7 @@ import { LineChart } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 
-/** Placeholder para el perfil `consultant`: dashboards de Metabase embebidos (siguiente feature). */
+/** Placeholder for the `consultant` role: embedded Metabase dashboards (upcoming feature). */
 export function ReportsPlaceholder() {
   return (
     <>

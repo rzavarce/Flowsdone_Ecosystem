@@ -3,15 +3,15 @@ import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 're
 import { createPortal } from 'react-dom'
 import { Button } from './Button'
 
-/** Props de {@link Dialog}. */
+/** Props for {@link Dialog}. */
 export interface DialogProps {
   open: boolean
-  /** Se llama al pulsar Escape, la X o el fondo. */
+  /** Called on Escape, the X button, or clicking the backdrop. */
   onClose: () => void
   title: string
   description?: string
   children: ReactNode
-  /** Botones de acción, alineados a la derecha al pie. */
+  /** Action buttons, right-aligned in the footer. */
   footer?: ReactNode
 }
 
@@ -19,12 +19,12 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /**
- * Diálogo modal accesible.
+ * Accessible modal dialog.
  *
- * - `role="dialog"` + `aria-modal`, nombrado por su título y descripción.
- * - Al abrir enfoca el primer campo; Tab queda atrapado dentro; Escape cierra.
- * - Al cerrar devuelve el foco a quien lo abrió y restaura el scroll del fondo.
- * - Se pinta en un portal para que ningún `overflow` del layout lo recorte.
+ * - `role="dialog"` + `aria-modal`, named by its title and description.
+ * - On open, focuses the first field; Tab is trapped inside; Escape closes it.
+ * - On close, returns focus to whatever opened it and restores background scroll.
+ * - Rendered into a portal so no layout `overflow` can clip it.
  */
 export function Dialog({ open, onClose, title, description, children, footer }: DialogProps) {
   const titleId = useId()

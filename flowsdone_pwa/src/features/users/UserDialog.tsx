@@ -11,12 +11,12 @@ import { ROLE_META } from '@/core/auth/permissions'
 import type { Role } from '@/core/auth/types'
 import { describeError } from '@/core/http/describeError'
 
-/** Roles que se gestionan desde esta pantalla; `client` se crea desde Tenants. */
+/** Roles managed from this screen; `client` is created from Tenants. */
 const ASSIGNABLE_ROLES: Role[] = ['admin', 'tenant_manager', 'botmaster', 'consultant']
 
-/** Props de {@link UserDialog}. */
+/** Props for {@link UserDialog}. */
 export interface UserDialogProps {
-  /** `null` = crear un usuario; un usuario = editarlo. */
+  /** `null` = create a user; a user = edit it. */
   user: UserRecord | null
   onClose: () => void
   onSaved?: () => void
@@ -25,11 +25,11 @@ export interface UserDialogProps {
 const FORM_ID = 'user-form'
 
 /**
- * Alta y edición de un usuario `admin`/`tenant_manager`/`botmaster` (solo admin).
+ * Create and edit an `admin`/`tenant_manager`/`botmaster` user (admin only).
  *
- * Sin campo de contraseña: al crear, el usuario queda `pending` y recibe un
- * email para activarse y elegir la suya (ver `ProvisionUserUseCase`). El
- * email tampoco se edita una vez creado (el backend no lo permite).
+ * No password field: on creation, the user is left `pending` and gets an
+ * email to activate and choose their own (see `ProvisionUserUseCase`). The
+ * email also can't be edited once created (the backend doesn't allow it).
  */
 export function UserDialog({ user, onClose, onSaved }: UserDialogProps) {
   const editing = user !== null

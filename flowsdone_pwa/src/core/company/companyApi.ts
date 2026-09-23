@@ -1,17 +1,17 @@
 import type { TenantBillingProfile } from '@/core/admin/types'
 
 /**
- * Cliente para `GET /me/billing-profile` (autoservicio: nunca pasa por
- * `/internal/admin/*` ni por `AdminApi` - un `client` no tiene acceso al
- * admin API en absoluto, ver `access_control.py`). Mismo patrón de
- * `credentials: 'include'` que `httpAuthApi.ts`.
+ * Client for `GET /me/billing-profile` (self-service: never goes through
+ * `/internal/admin/*` nor `AdminApi` - a `client` has no access to the admin
+ * API whatsoever, see `access_control.py`). Same `credentials: 'include'`
+ * pattern as `httpAuthApi.ts`.
  */
 export interface CompanyApi {
-  /** Datos de facturación del tenant del usuario logueado; `null` si todavía no se cargó nada. */
+  /** Billing data for the logged-in user's tenant; `null` if nothing has been saved yet. */
   getMyCompany(): Promise<TenantBillingProfile | null>
 }
 
-/** Crea el adaptador HTTP. `fetchFn` es inyectable para tests. */
+/** Creates the HTTP adapter. `fetchFn` is injectable for tests. */
 export function createHttpCompanyApi(baseUrl = '/api', fetchFn: typeof fetch = (...args) => fetch(...args)): CompanyApi {
   return {
     async getMyCompany() {

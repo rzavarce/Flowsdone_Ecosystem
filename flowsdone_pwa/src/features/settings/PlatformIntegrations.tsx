@@ -11,16 +11,16 @@ import { describeError } from '@/core/http/describeError'
 import { CHANNEL_APPS, type ChannelAppConfig } from './channelApps'
 import { ChannelAppDialog } from './ChannelAppDialog'
 
-/** Segundos que el token de verificación queda visible antes de ocultarse solo. */
+/** Seconds the verification token stays visible before it hides itself. */
 const REVEAL_SECONDS = 30
 
 /**
- * Integraciones de plataforma: las credenciales de la app de cada proveedor
- * (Meta, X, TikTok, Twilio), compartidas por todos los tenants. Solo admin.
+ * Platform integrations: each provider's app credentials (Meta, X, TikTok,
+ * Twilio), shared across all tenants. Admin only.
  *
- * Los secretos guardados nunca se muestran. La única excepción es el token de
- * verificación del webhook de Meta, que hace falta pegar en el panel de Meta y
- * que se oculta solo a los {@link REVEAL_SECONDS} s.
+ * Saved secrets are never shown. The one exception is Meta's webhook
+ * verification token, which needs to be pasted into Meta's panel and hides
+ * itself after {@link REVEAL_SECONDS} s.
  */
 export function PlatformIntegrations() {
   const apps = useChannelApps()

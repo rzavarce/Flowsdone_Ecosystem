@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { AuthLayout } from './AuthLayout'
 import { ResetPasswordForm } from './ResetPasswordForm'
 
-/** Pantalla pública: fijar la contraseña nueva desde el link del email. */
+/** Public screen: set the new password from the email link. */
 export function ResetPasswordPage() {
   const { token = '' } = useParams<{ token: string }>()
   return (

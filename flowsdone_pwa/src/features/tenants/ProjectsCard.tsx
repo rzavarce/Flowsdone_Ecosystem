@@ -6,18 +6,18 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import type { Project } from '@/core/admin/types'
 import { summarize, type ProjectCounts } from './useTenantsView'
 
-/** Props de {@link ProjectsCard}. */
+/** Props for {@link ProjectsCard}. */
 export interface ProjectsCardProps {
   projects: Project[]
   counts: Map<string, ProjectCounts>
   onCreate: () => void
   onEdit: (project: Project) => void
-  /** Suspende o reactiva (alterna según el estado actual). */
+  /** Suspends or reactivates (toggles based on the current status). */
   onToggleStatus: (project: Project) => void
   onDelete: (project: Project) => void
 }
 
-/** Proyectos del tenant seleccionado, con estado, contenido y acciones. */
+/** Projects of the selected tenant, with status, content and actions. */
 export function ProjectsCard({ projects, counts, onCreate, onEdit, onToggleStatus, onDelete }: ProjectsCardProps) {
   return (
     <Card>

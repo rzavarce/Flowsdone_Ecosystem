@@ -5,7 +5,7 @@ import { can } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 import { PlatformIntegrations } from './PlatformIntegrations'
 
-/** Ajustes: apariencia (todos) e integraciones de plataforma (solo admin). */
+/** Settings: appearance (everyone) and platform integrations (admin only). */
 export function SettingsPage() {
   const { user } = useAuth()
   return (

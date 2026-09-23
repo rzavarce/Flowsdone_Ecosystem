@@ -7,20 +7,21 @@ import { AdminApiContext } from './AdminApiContext'
 import { createAdminApi } from './createAdminApi'
 import { shouldRetry } from './retry'
 
-/** Props de {@link AdminApiProvider}. */
+/** Props for {@link AdminApiProvider}. */
 export interface AdminApiProviderProps {
   children: ReactNode
-  /** Adaptador a usar; por defecto el que indique `VITE_AUTH_MODE`. Inyectable en tests. */
+  /** Adapter to use; defaults to whichever `VITE_AUTH_MODE` selects. Injectable in tests. */
   api?: AdminApi
 }
 
+/** Whether an error is a 401 response from the admin API. */
 const isUnauthorized = (error: unknown) => error instanceof ApiError && error.status === 401
 
 /**
- * Vigila la caché: un 401 en cualquier consulta o mutación significa sesión
- * vencida, así que cierra la sesión local y `RequireAuth` lleva al login. Y
- * vacía la caché cuando cambia la persona autenticada, para que la siguiente
- * sesión nunca vea datos de la anterior.
+ * Watches the cache: a 401 on any query or mutation means the session has
+ * expired, so it logs out locally and `RequireAuth` redirects to login. It
+ * also clears the cache whenever the authenticated user changes, so the next
+ * session never sees the previous one's data.
  */
 function SessionGuard() {
   const client = useQueryClient()
@@ -48,7 +49,7 @@ function SessionGuard() {
   return null
 }
 
-/** Provee la API admin y la caché de datos (TanStack Query). */
+/** Provides the admin API and the data cache (TanStack Query). */
 export function AdminApiProvider({ children, api }: AdminApiProviderProps) {
   const [adapter] = useState<AdminApi>(() => api ?? createAdminApi())
   const [client] = useState(

@@ -14,7 +14,7 @@ import type {
 } from './types'
 import { useAdminApi } from './useAdminApi'
 
-/** Claves de caché. Agrupadas para invalidar de forma coherente tras una mutación. */
+/** Cache keys. Grouped so mutations can invalidate related data consistently. */
 export const adminKeys = {
   tenants: ['tenants'] as const,
   tenantBilling: ['tenant-billing'] as const,
@@ -26,27 +26,27 @@ export const adminKeys = {
   langflowSession: ['langflow-session'] as const,
 }
 
-/** Tenants visibles con todos sus datos (slug, estado…). */
+/** Visible tenants with all of their data (slug, status…). */
 export function useTenants() {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.tenants, queryFn: () => api.listTenants() })
 }
 
-/** Proyectos visibles; con `tenantId` solo los de ese tenant. */
+/** Visible projects; with `tenantId`, only that tenant's. */
 export function useProjects(tenantId?: string) {
   const api = useAdminApi()
   return useQuery({ queryKey: [...adminKeys.projects, tenantId ?? 'all'], queryFn: () => api.listProjects(tenantId) })
 }
 
 /**
- * Invalida lo que un borrado en cascada pudo dejar obsoleto (proyectos, agentes y canales).
- * @param qc - El cliente de caché.
+ * Invalidates whatever a cascade delete may have left stale (projects, agents and channels).
+ * @param qc - The cache client.
  */
 function invalidateTree(qc: ReturnType<typeof useQueryClient>) {
   return Promise.all([adminKeys.projects, adminKeys.agents, adminKeys.connections].map((queryKey) => qc.invalidateQueries({ queryKey })))
 }
 
-/** Crea un tenant, refresca la lista y el selector de tenant de la sesión. */
+/** Creates a tenant, then refreshes the list and the session's tenant selector. */
 export function useCreateTenant() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -59,7 +59,7 @@ export function useCreateTenant() {
   })
 }
 
-/** Edita o suspende/reactiva un tenant. */
+/** Edits or suspends/reactivates a tenant. */
 export function useUpdateTenant() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -72,7 +72,7 @@ export function useUpdateTenant() {
   })
 }
 
-/** Borra un tenant (en cascada) y refresca todo lo que colgaba de él. */
+/** Deletes a tenant (cascading) and refreshes everything that hung off it. */
 export function useDeleteTenant() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -85,7 +85,7 @@ export function useDeleteTenant() {
   })
 }
 
-/** Perfil de facturación de un tenant (admin/tenant_manager). Vacío (no error) si nunca se cargó nada. */
+/** A tenant's billing profile (admin/tenant_manager). Empty (not an error) if nothing was ever saved. */
 export function useTenantBilling(tenantId?: string) {
   const api = useAdminApi()
   return useQuery({
@@ -95,7 +95,7 @@ export function useTenantBilling(tenantId?: string) {
   })
 }
 
-/** Crea o actualiza el perfil de facturación de un tenant. */
+/** Creates or updates a tenant's billing profile. */
 export function useUpdateTenantBilling() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -107,13 +107,13 @@ export function useUpdateTenantBilling() {
   })
 }
 
-/** Usuarios de consola (incluye los `client`; la pantalla de Usuarios los filtra). */
+/** Console users (includes `client` accounts; the Users screen filters them out). */
 export function useUsers() {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.users, queryFn: () => api.listUsers() })
 }
 
-/** Crea un usuario: queda `pending` y se le manda el email de activación. */
+/** Creates a user: stays `pending` and gets sent the activation email. */
 export function useCreateUser() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -123,7 +123,7 @@ export function useCreateUser() {
   })
 }
 
-/** Edita rol, tenants o estado de un usuario. */
+/** Edits a user's role, tenants or status. */
 export function useUpdateUser() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -133,7 +133,7 @@ export function useUpdateUser() {
   })
 }
 
-/** Borra un usuario y cierra todas sus sesiones. */
+/** Deletes a user and closes all of their sessions. */
 export function useDeleteUser() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -143,13 +143,13 @@ export function useDeleteUser() {
   })
 }
 
-/** Reenvía el email de activación de un usuario que sigue `pending`. */
+/** Resends the activation email for a user that's still `pending`. */
 export function useResendUserActivation() {
   const api = useAdminApi()
   return useMutation({ mutationFn: (id: string) => api.resendUserActivation(id) })
 }
 
-/** Edita o suspende/reactiva un proyecto. */
+/** Edits or suspends/reactivates a project. */
 export function useUpdateProject() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -159,7 +159,7 @@ export function useUpdateProject() {
   })
 }
 
-/** Borra un proyecto (en cascada: agentes y canales). */
+/** Deletes a project (cascading: agents and channels). */
 export function useDeleteProject() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -169,19 +169,19 @@ export function useDeleteProject() {
   })
 }
 
-/** Agentes visibles para el perfil. */
+/** Agents visible to the current profile. */
 export function useAgents() {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.agents, queryFn: () => api.listAgents() })
 }
 
-/** Conexiones de canal visibles para el perfil. */
+/** Channel connections visible to the current profile. */
 export function useChannelConnections() {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.connections, queryFn: () => api.listChannelConnections() })
 }
 
-/** Crea un proyecto y refresca la lista. */
+/** Creates a project and refreshes the list. */
 export function useCreateProject() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -191,7 +191,7 @@ export function useCreateProject() {
   })
 }
 
-/** Crea una conexión de canal y refresca la lista. */
+/** Creates a channel connection and refreshes the list. */
 export function useCreateConnection() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -201,7 +201,7 @@ export function useCreateConnection() {
   })
 }
 
-/** Edita una conexión de canal y refresca la lista. */
+/** Edits a channel connection and refreshes the list. */
 export function useUpdateConnection() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -212,7 +212,7 @@ export function useUpdateConnection() {
   })
 }
 
-/** Borra una conexión de canal y refresca la lista. */
+/** Deletes a channel connection and refreshes the list. */
 export function useDeleteConnection() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -222,13 +222,13 @@ export function useDeleteConnection() {
   })
 }
 
-/** Apps compartidas de los proveedores. `enabled` evita pedirlas a perfiles sin permiso. */
+/** Providers' shared apps. `enabled` avoids requesting them for profiles without permission. */
 export function useChannelApps(enabled = true) {
   const api = useAdminApi()
   return useQuery({ queryKey: adminKeys.apps, queryFn: () => api.listChannelApps(), enabled })
 }
 
-/** Crea o reemplaza las credenciales de un proveedor. */
+/** Creates or replaces a provider's credentials. */
 export function useUpsertChannelApp() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -239,7 +239,7 @@ export function useUpsertChannelApp() {
   })
 }
 
-/** Elimina las credenciales de un proveedor. */
+/** Removes a provider's credentials. */
 export function useDeleteChannelApp() {
   const api = useAdminApi()
   const qc = useQueryClient()
@@ -250,9 +250,9 @@ export function useDeleteChannelApp() {
 }
 
 /**
- * Revela las credenciales en claro de un proveedor. Es una mutación (no una
- * consulta) a propósito: no se cachea ni se repite sola; el resultado vive solo
- * en el estado del componente que la pidió.
+ * Reveals a provider's credentials in plaintext. It's deliberately a mutation
+ * (not a query): it isn't cached or refetched on its own; the result lives
+ * only in the state of the component that requested it.
  */
 export function useRevealChannelApp() {
   const api = useAdminApi()
@@ -260,11 +260,12 @@ export function useRevealChannelApp() {
 }
 
 /**
- * URL de inicio de sesión única de Langflow para un tenant (y, opcional, un proyecto).
+ * Single-sign-on Langflow URL for a tenant (and, optionally, a project).
  *
- * El ticket que lleva se consume una sola vez y caduca en segundos, por eso nunca se
- * reutiliza desde la caché (`gcTime: 0`) ni se refresca solo mientras el editor está
- * abierto (`staleTime: Infinity`): recargarlo dejaría el iframe con un enlace ya usado.
+ * The ticket it carries is consumed once and expires within seconds, so it's
+ * never reused from the cache (`gcTime: 0`) nor refetched on its own while the
+ * editor stays open (`staleTime: Infinity`): reloading it would leave the
+ * iframe with an already-used link.
  */
 export function useLangflowSession(tenantId?: string, projectId?: string) {
   const api = useAdminApi()

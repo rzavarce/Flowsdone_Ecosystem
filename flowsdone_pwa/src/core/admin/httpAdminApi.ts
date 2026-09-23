@@ -3,9 +3,9 @@ import type { AdminApi } from './AdminApi'
 import type { Agent, ChannelApp, ChannelConnection, Project, TenantBillingProfile, TenantRecord, UserRecord } from './types'
 
 /**
- * Adaptador contra el gateway real. En el navegador las rutas van por
- * `/api/admin/...`, que nginx (o el proxy de Vite) reenvía a
- * `/internal/admin/...` del gateway.
+ * Adapter against the real gateway. In the browser, routes go through
+ * `/api/admin/...`, which nginx (or the Vite proxy) forwards to the
+ * gateway's `/internal/admin/...`.
  */
 export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): AdminApi {
   const call = <T>(path: string, method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown) =>

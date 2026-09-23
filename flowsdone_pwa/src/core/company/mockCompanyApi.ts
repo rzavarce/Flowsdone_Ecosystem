@@ -3,7 +3,7 @@ import type { CompanyApi } from './companyApi'
 
 const NOW = '2026-09-01T10:00:00Z'
 
-/** Perfil de maqueta, coherente con "Clínica Vital" (el primer tenant de `mockAdminApi.ts`). */
+/** Demo profile, consistent with "Clínica Vital" (the first tenant in `mockAdminApi.ts`). */
 const MOCK_PROFILE: TenantBillingProfile = {
   id: 'bp-mock',
   tenant_id: 't-vital',
@@ -26,7 +26,7 @@ const MOCK_PROFILE: TenantBillingProfile = {
   updated_at: NOW,
 }
 
-/** Adaptador de MAQUETA: siempre devuelve el mismo perfil, sin backend. */
+/** MOCK adapter: always returns the same profile, with no backend. */
 export function createMockCompanyApi({ latencyMs = 250 }: { latencyMs?: number } = {}): CompanyApi {
   return {
     async getMyCompany() {

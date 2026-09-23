@@ -9,17 +9,17 @@ import type { Project, TenantRecord } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { slugify } from '@/lib/slug'
 
-/** Props de {@link ProjectDialog}. */
+/** Props for {@link ProjectDialog}. */
 export interface ProjectDialogProps {
   tenant: TenantRecord
-  /** `null` = crear un proyecto en `tenant`; un proyecto = editarlo. */
+  /** `null` = create a project under `tenant`; a project = edit it. */
   project: Project | null
   onClose: () => void
 }
 
 const FORM_ID = 'project-form'
 
-/** Alta y edición de un proyecto de un tenant. El slug se deriva del nombre hasta que se toca. */
+/** Create and edit a tenant's project. The slug is derived from the name until it's touched. */
 export function ProjectDialog({ tenant, project, onClose }: ProjectDialogProps) {
   const editing = project !== null
   const create = useCreateProject()

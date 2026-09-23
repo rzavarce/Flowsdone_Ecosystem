@@ -9,18 +9,18 @@ import type { TenantRecord } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { slugify } from '@/lib/slug'
 
-/** Props de {@link TenantDialog}. */
+/** Props for {@link TenantDialog}. */
 export interface TenantDialogProps {
-  /** `null` = crear un tenant; un tenant = editarlo. */
+  /** `null` = create a tenant; a tenant = edit it. */
   tenant: TenantRecord | null
   onClose: () => void
-  /** Se llama con el tenant creado (para seleccionarlo). */
+  /** Called with the created tenant (to select it). */
   onSaved?: (tenant: TenantRecord) => void
 }
 
 const FORM_ID = 'tenant-form'
 
-/** Alta y edición de un tenant (solo admin). El slug se deriva del nombre hasta que se toca. */
+/** Create and edit a tenant (admin only). The slug is derived from the name until it's touched. */
 export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
   const editing = tenant !== null
   const create = useCreateTenant()

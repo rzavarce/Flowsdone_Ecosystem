@@ -3,10 +3,10 @@ import { useAuth } from '@/core/auth/useAuth'
 import { ALL_TENANTS, TenantContext, type TenantContextValue } from './TenantContext'
 
 /**
- * Tenant sobre el que trabaja la persona usuaria. Los administradores pueden
- * ver "todos"; el resto queda acotado a sus tenants asignados. Si la
- * selección deja de ser válida (p. ej. otro usuario inicia sesión) se
- * recalcula el valor por defecto sin efectos.
+ * Tenant the user is currently working on. Admins can view "all"; everyone
+ * else is scoped to their assigned tenants. If the selection stops being
+ * valid (e.g. a different user logs in), the default value is recomputed
+ * with no side effects.
  */
 export function TenantProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()

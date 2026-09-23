@@ -1,38 +1,40 @@
 /**
- * Catálogo de templates (presets de color) y helpers puros del sistema de
- * temas. Sin React: se puede testear y reutilizar en el script anti-flash.
+ * Catalog of templates (color presets) and pure helpers for the theme
+ * system. No React: it can be tested and reused in the anti-flash script.
  */
 
-/** Identificadores de los templates disponibles. */
+/** Identifiers of the available templates. */
 export type ThemeId = 'flowsdone' | 'agentic' | 'corporate'
 
-/** Preferencia de modo elegida por la persona usuaria. */
+/** Mode preference chosen by the user. */
 export type ColorMode = 'light' | 'dark' | 'system'
 
-/** Modo efectivo una vez resuelto `system`. */
+/** Effective mode once `system` has been resolved. */
 export type ResolvedMode = 'light' | 'dark'
 
-/** Metadatos de un template para mostrarlo en el selector. */
+/** A template's metadata for display in the selector. */
 export interface ThemePreset {
   id: ThemeId
   name: string
   description: string
 }
 
-/** Templates en el orden en que se muestran. Los colores viven en index.css. */
+/** Templates in display order. Their colors live in index.css. */
 export const THEMES: readonly ThemePreset[] = [
   { id: 'flowsdone', name: 'Flowsdone', description: 'Identidad de marca: Deep Space, cian eléctrico y verde "done".' },
   { id: 'agentic', name: 'Agentic', description: 'Violeta y menta, la estética de las herramientas de agentes.' },
   { id: 'corporate', name: 'Corporate', description: 'Azul cobalto y coral, sobrio para entornos B2B.' },
 ]
 
+/** Template used when nothing has been chosen yet. */
 export const DEFAULT_THEME: ThemeId = 'flowsdone'
+/** Color mode used when nothing has been chosen yet: follows the OS. */
 export const DEFAULT_MODE: ColorMode = 'system'
 
-/** Clave de localStorage. Debe coincidir con el script anti-flash de index.html. */
+/** localStorage key. Must match the anti-flash script in index.html. */
 export const THEME_STORAGE_KEY = 'fd-theme'
 
-/** Estado de tema que se persiste. */
+/** Theme state that gets persisted. */
 export interface StoredTheme {
   theme: ThemeId
   mode: ColorMode
@@ -42,11 +44,11 @@ const THEME_IDS = new Set<string>(THEMES.map((t) => t.id))
 const MODES = new Set<string>(['light', 'dark', 'system'])
 
 /**
- * Resuelve el modo efectivo.
+ * Resolves the effective mode.
  *
- * @param mode - Preferencia guardada (`system` delega en el SO).
- * @param systemPrefersDark - Valor actual de `prefers-color-scheme: dark`.
- * @returns `light` o `dark`.
+ * @param mode - Saved preference (`system` defers to the OS).
+ * @param systemPrefersDark - Current value of `prefers-color-scheme: dark`.
+ * @returns `light` or `dark`.
  */
 export function resolveMode(mode: ColorMode, systemPrefersDark: boolean): ResolvedMode {
   if (mode === 'system') return systemPrefersDark ? 'dark' : 'light'
@@ -54,11 +56,11 @@ export function resolveMode(mode: ColorMode, systemPrefersDark: boolean): Resolv
 }
 
 /**
- * Lee el tema persistido, tolerando storage ausente, JSON roto o valores
- * que ya no existen (p. ej. un preset eliminado).
+ * Reads the persisted theme, tolerating missing storage, broken JSON or
+ * values that no longer exist (e.g. a removed preset).
  *
- * @param storage - `localStorage` o un doble de test; `null` si no hay.
- * @returns El tema guardado, con defaults en lo que falte o sea inválido.
+ * @param storage - `localStorage` or a test double; `null` if there is none.
+ * @returns The saved theme, defaulting whatever is missing or invalid.
  */
 export function readStoredTheme(storage: Pick<Storage, 'getItem'> | null): StoredTheme {
   const fallback: StoredTheme = { theme: DEFAULT_THEME, mode: DEFAULT_MODE }

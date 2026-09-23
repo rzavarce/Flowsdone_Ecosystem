@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/core/auth/useAuth'
 import { Spinner } from '@/components/ui/Spinner'
 
-/** Deja pasar solo con sesión; sin ella redirige a /login recordando el destino. */
+/** Only lets the request through with a session; without one, redirects to /login, remembering the destination. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth()
   const location = useLocation()

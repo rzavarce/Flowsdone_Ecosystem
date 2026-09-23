@@ -1,6 +1,6 @@
 import type { ChannelAppProvider } from '@/core/admin/types'
 
-/** Un dato secreto de la app compartida (se envía en `credentials`). */
+/** A secret value of the shared app (sent inside `credentials`). */
 export interface AppCredentialField {
   key: string
   label: string
@@ -8,7 +8,7 @@ export interface AppCredentialField {
   required?: boolean
 }
 
-/** Qué necesita la app compartida de cada proveedor; verificado contra los webhooks del gateway. */
+/** What the shared app needs from each provider; checked against the gateway's webhooks. */
 export interface ChannelAppConfig {
   provider: ChannelAppProvider
   label: string
@@ -16,6 +16,11 @@ export interface ChannelAppConfig {
   fields: AppCredentialField[]
 }
 
+/**
+ * Platform-wide app credentials, one entry per provider (Meta, X, TikTok,
+ * Twilio), shared across all tenants and configured once by an admin from
+ * `PlatformIntegrations`.
+ */
 export const CHANNEL_APPS: readonly ChannelAppConfig[] = [
   {
     provider: 'meta',

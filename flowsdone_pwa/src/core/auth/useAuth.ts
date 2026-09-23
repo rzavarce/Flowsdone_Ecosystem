@@ -2,9 +2,9 @@ import { useContext } from 'react'
 import { AuthContext, type AuthContextValue } from './AuthContext'
 
 /**
- * Accede a la sesión actual.
+ * Accesses the current session.
  *
- * @throws Error si se usa fuera de `<AuthProvider>`.
+ * @throws Error if used outside `<AuthProvider>`.
  */
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext)

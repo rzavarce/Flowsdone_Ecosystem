@@ -15,14 +15,14 @@ import { ConnectionDialog } from './ConnectionDialog'
 import { describeError } from '@/core/http/describeError'
 import { useChannelsView } from './useChannelsView'
 
-/** Qué diálogo está abierto: crear, editar una conexión, o ninguno. */
+/** Which dialog is open: create, edit a connection, or none. */
 type DialogState = { kind: 'create' } | { kind: 'edit'; connection: ChannelConnection } | null
 
 /**
- * Canales conectados del tenant activo: lista, alta, edición y baja.
+ * Connected channels of the active tenant: list, create, edit and delete.
  *
- * Los datos vienen del gateway ya limitados a lo que el perfil puede ver; acá
- * se recorta además por el tenant elegido en el selector.
+ * The data comes from the gateway already scoped to what the role can see;
+ * this component further narrows it by the tenant chosen in the selector.
  */
 export function ChannelsPage() {
   const view = useChannelsView()

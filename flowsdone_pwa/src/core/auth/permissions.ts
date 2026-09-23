@@ -1,6 +1,6 @@
 import type { Permission, Role, User } from './types'
 
-/** Nombre visible y descripción corta de cada perfil. */
+/** Display name and short description of each profile. */
 export const ROLE_META: Record<Role, { label: string; description: string }> = {
   admin: { label: 'Administrador', description: 'Gestiona toda la plataforma y todos los tenants.' },
   tenant_manager: { label: 'Gestor de tenant', description: 'Gestiona por completo los tenants asignados.' },
@@ -9,7 +9,7 @@ export const ROLE_META: Record<Role, { label: string; description: string }> = {
   consultant: { label: 'Consultor', description: 'Consultor externo de un cliente: solo ve reportes.' },
 }
 
-/** Matriz rol -> permisos. Única fuente de verdad del control de acceso en la UI. */
+/** Role -> permissions matrix. The single source of truth for access control in the UI. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   admin: [
     'dashboard:view',
@@ -43,14 +43,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
 }
 
 /**
- * Indica si el usuario tiene al menos uno de los permisos pedidos.
+ * Whether the user has at least one of the requested permissions.
  *
- * Solo controla la **visibilidad en la UI**: la autorización real debe
- * imponerla el backend en cada endpoint.
+ * Only controls **visibility in the UI**: real authorization must be
+ * enforced by the backend on each endpoint.
  *
- * @param user - Usuario actual o `null` si no hay sesión.
- * @param permissions - Permisos aceptables (basta uno).
- * @returns `true` si tiene alguno; siempre `false` sin usuario.
+ * @param user - Current user, or `null` if there is no session.
+ * @param permissions - Acceptable permissions (one is enough).
+ * @returns `true` if they have any; always `false` without a user.
  */
 export function can(user: User | null, ...permissions: Permission[]): boolean {
   if (!user) return false
@@ -59,11 +59,11 @@ export function can(user: User | null, ...permissions: Permission[]): boolean {
 }
 
 /**
- * Ruta a la que se envía al usuario tras iniciar sesión.
+ * Route the user is sent to after logging in.
  *
- * @param user - Usuario autenticado.
- * @returns `/dashboard` para quien ve dashboards, `/agents` para el
- *   botmaster y `/settings` como último recurso.
+ * @param user - Authenticated user.
+ * @returns `/dashboard` for those who can view dashboards, `/agents` for the
+ *   botmaster and `/settings` as a last resort.
  */
 export function homePathFor(user: User): string {
   if (can(user, 'dashboard:view', 'reports:view')) return '/dashboard'

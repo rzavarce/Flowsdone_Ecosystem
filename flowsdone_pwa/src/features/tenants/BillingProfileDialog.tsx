@@ -8,24 +8,24 @@ import { useUpdateTenantBilling } from '@/core/admin/hooks'
 import type { TenantBillingProfile } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 
-/** Props de {@link BillingProfileDialog}. */
+/** Props for {@link BillingProfileDialog}. */
 export interface BillingProfileDialogProps {
   tenantId: string
   tenantName: string
-  /** Perfil actual (todo puede venir `null`: se completa gradualmente). */
+  /** Current profile (any field may come back `null`: it's filled in gradually). */
   profile: TenantBillingProfile
   onClose: () => void
 }
 
 const FORM_ID = 'billing-profile-form'
 
-/** Texto -> `null` si queda vacío, para no persistir cadenas vacías. */
+/** Text -> `null` if left empty, so empty strings never get persisted. */
 const orNull = (v: string) => (v.trim() ? v.trim() : null)
 
 /**
- * Datos de facturación de un tenant (admin/tenant_manager). Pura captura de
- * datos para poder facturar - no hay motor de cobro ni plan/precio real
- * detrás; `plan`/`billing_cycle` son texto libre.
+ * A tenant's billing data (admin/tenant_manager). Pure data capture for
+ * invoicing purposes - there's no billing engine or real plan/pricing behind
+ * it; `plan`/`billing_cycle` are free text.
  */
 export function BillingProfileDialog({ tenantId, tenantName, profile, onClose }: BillingProfileDialogProps) {
   const update = useUpdateTenantBilling()

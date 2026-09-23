@@ -9,17 +9,17 @@ import type { Tenant } from '@/core/auth/types'
 import { describeError } from '@/core/http/describeError'
 import { slugify } from '@/lib/slug'
 
-/** Props de {@link NewProjectForm}. */
+/** Props for {@link NewProjectForm}. */
 export interface NewProjectFormProps {
-  /** Tenants entre los que se puede crear (uno solo = sin selector). */
+  /** Tenants it can be created under (a single one = no selector). */
   tenants: Tenant[]
   defaultTenantId?: string
   onCreated: (project: Project) => void
 }
 
 /**
- * Alta mínima de un proyecto, para no dejar un callejón sin salida cuando un
- * tenant todavía no tiene ninguno (un canal siempre cuelga de un proyecto).
+ * Minimal project creation form, so there's no dead end when a tenant
+ * doesn't have any project yet (a channel always hangs off a project).
  */
 export function NewProjectForm({ tenants, defaultTenantId, onCreated }: NewProjectFormProps) {
   const create = useCreateProject()

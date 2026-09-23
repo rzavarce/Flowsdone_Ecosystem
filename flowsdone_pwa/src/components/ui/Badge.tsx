@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
-/** Tonos semánticos disponibles para {@link Badge}. */
+/** Semantic tones available for {@link Badge}. */
 export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
 
 const TONES: Record<BadgeTone, string> = {
@@ -12,12 +12,12 @@ const TONES: Record<BadgeTone, string> = {
   danger: 'bg-danger/15 text-danger',
 }
 
-/** Props de {@link Badge}. */
+/** Props for {@link Badge}. */
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone
 }
 
-/** Etiqueta compacta para estados (canal activo, error, etc.). */
+/** Compact label for statuses (active channel, error, etc.). */
 export function Badge({ tone = 'neutral', className, ...props }: BadgeProps) {
   return (
     <span
