@@ -29,10 +29,6 @@ from app.domain.ports.outbound import (
 
 logger = logging.getLogger("usecase.onboarding")
 
-# Global variable the base agent's LLM reads its key from (managed by the
-# Flowsdone team in each tenant's Langflow, never by the gateway).
-OPENAI_VARIABLE = "OPENAI_API_KEY"
-
 CheckStatus = Literal["ok", "warning", "missing", "unknown"]
 WizardStep = Literal["company", "plan", "project", "agent", "summary"]
 
@@ -237,7 +233,8 @@ class GetOnboardingStatusUseCase:
 
     async def _langflow_checks(self, tenant_id: UUID, agent: Optional[Agent]) -> List[OnboardingCheck]:
         """The checks that need the tenant's Langflow: the default agent's
-        flow still exists, and the OpenAI key variable is configured.
+        flow still exists, and its LLM has an API key (the base agent is
+        created without one; it is set by hand per client).
 
         Args:
             tenant_id (UUID): The tenant.
@@ -246,17 +243,17 @@ class GetOnboardingStatusUseCase:
         Returns:
             List[OnboardingCheck]: The "agent" and "openai_key" checks.
         """
+        if agent is None:
+            return [OnboardingCheck("agent", "missing"), OnboardingCheck("openai_key", "missing")]
         try:
             workspace = await self._workspace.open_workspace(tenant_id)
-            variables = await self._langflow.list_variable_names(workspace.tokens.access_token)
-            key = OnboardingCheck("openai_key", "ok" if OPENAI_VARIABLE in variables else "missing", OPENAI_VARIABLE)
-            if agent is None:
-                return [OnboardingCheck("agent", "missing"), key]
             folder = workspace.folders.get(agent.project_id)
             flows = await self._langflow.list_flows(workspace.tokens.access_token, folder) if folder else []
-            found = any(f.id == agent.langflow_flow_id for f in flows)
-            return [OnboardingCheck("agent", "ok" if found else "warning", agent.name), key]
+            if not any(f.id == agent.langflow_flow_id for f in flows):
+                return [OnboardingCheck("agent", "warning", agent.name), OnboardingCheck("openai_key", "unknown")]
+            configured = await self._langflow.llm_key_configured(workspace.tokens.access_token, agent.langflow_flow_id)
+            key_status: CheckStatus = "missing" if configured is False else "ok"
+            return [OnboardingCheck("agent", "ok", agent.name), OnboardingCheck("openai_key", key_status)]
         except (LangflowSessionError, LangflowTargetNotFoundError):
             logger.warning("onboarding.langflow_unavailable", extra={"tenant_id": str(tenant_id)})
-            agent_check = OnboardingCheck("agent", "unknown" if agent else "missing", agent.name if agent else None)
-            return [agent_check, OnboardingCheck("openai_key", "unknown", OPENAI_VARIABLE)]
+            return [OnboardingCheck("agent", "unknown", agent.name), OnboardingCheck("openai_key", "unknown")]

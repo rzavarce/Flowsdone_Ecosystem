@@ -51,7 +51,7 @@ export function OnboardingChecklist({
               <span className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-medium">{t(`onboarding.checks.${check.key}.label`)}</span>
                 <span className={cn('text-xs', tone)}>{t(`onboarding.status.${check.status}`)}</span>
-                {check.status === 'ok' && check.detail && check.key !== 'openai_key' && (
+                {check.status === 'ok' && check.detail && (
                   <span className="truncate text-xs text-muted">· {check.detail}</span>
                 )}
               </span>

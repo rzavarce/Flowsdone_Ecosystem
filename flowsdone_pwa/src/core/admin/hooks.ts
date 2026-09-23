@@ -32,15 +32,19 @@ export const adminKeys = {
 }
 
 /** Visible tenants with all of their data (slug, status…). */
-export function useTenants() {
+export function useTenants(enabled = true) {
   const api = useAdminApi()
-  return useQuery({ queryKey: adminKeys.tenants, queryFn: () => api.listTenants() })
+  return useQuery({ queryKey: adminKeys.tenants, queryFn: () => api.listTenants(), enabled })
 }
 
 /** Visible projects; with `tenantId`, only that tenant's. */
-export function useProjects(tenantId?: string) {
+export function useProjects(tenantId?: string, enabled = true) {
   const api = useAdminApi()
-  return useQuery({ queryKey: [...adminKeys.projects, tenantId ?? 'all'], queryFn: () => api.listProjects(tenantId) })
+  return useQuery({
+    queryKey: [...adminKeys.projects, tenantId ?? 'all'],
+    queryFn: () => api.listProjects(tenantId),
+    enabled,
+  })
 }
 
 /**
@@ -186,9 +190,9 @@ export function useDeleteProject() {
 }
 
 /** Agents visible to the current profile. */
-export function useAgents() {
+export function useAgents(enabled = true) {
   const api = useAdminApi()
-  return useQuery({ queryKey: adminKeys.agents, queryFn: () => api.listAgents() })
+  return useQuery({ queryKey: adminKeys.agents, queryFn: () => api.listAgents(), enabled })
 }
 
 /** Flows in a project's Langflow folder, each with the agent registered for it (if any). */
@@ -251,9 +255,9 @@ export function useOnboarding(tenantId?: string) {
 }
 
 /** Channel connections visible to the current profile. */
-export function useChannelConnections() {
+export function useChannelConnections(enabled = true) {
   const api = useAdminApi()
-  return useQuery({ queryKey: adminKeys.connections, queryFn: () => api.listChannelConnections() })
+  return useQuery({ queryKey: adminKeys.connections, queryFn: () => api.listChannelConnections(), enabled })
 }
 
 /** Creates a project and refreshes the list. */

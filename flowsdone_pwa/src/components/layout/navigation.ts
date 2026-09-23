@@ -24,11 +24,11 @@ const item = (to: string, key: string, icon: LucideIcon, anyOf: Permission[]): N
 /** Main navigation menu, in display order, filtered per profile by {@link useNavItems}. */
 export const NAV_ITEMS: readonly NavItem[] = [
   item('/dashboard', 'dashboard', LayoutDashboard, ['dashboard:view', 'reports:view']),
-  item('/conversations', 'conversations', MessageSquare, ['conversations:manage']),
-  item('/channels', 'channels', Plug, ['channels:manage']),
   item('/tenants', 'tenants', Building2, ['projects:manage']),
-  item('/users', 'users', Users, ['users:manage']),
+  item('/conversations', 'conversations', MessageSquare, ['conversations:manage']),
   item('/agents', 'agents', Bot, ['agents:edit']),
+  item('/channels', 'channels', Plug, ['channels:manage']),
+  item('/users', 'users', Users, ['users:manage']),
   item('/company', 'company', Store, ['company:view']),
   item('/plans', 'plans', Receipt, ['platform:manage']),
   item('/settings', 'settings', Settings, ['settings:view']),

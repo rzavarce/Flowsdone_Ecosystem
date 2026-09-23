@@ -23,9 +23,8 @@ from app.domain.ports.outbound import (
 
 
 # Langflow 1.4's "Memory Chatbot" starter project (without its notes): chat
-# input -> memory -> prompt -> OpenAI (api_key = the OPENAI_API_KEY global
-# variable, load_from_db) -> chat output. Kept in the repo so what gets
-# created does not depend on which starter projects a Langflow ships.
+# input -> memory -> prompt -> OpenAI -> chat output. Kept in the repo so what
+# gets created does not depend on which starter projects a Langflow ships.
 _BASE_AGENT_TEMPLATE = Path(__file__).parent / "templates" / "base_agent.json"
 # Conversation turns fed back to the model: enough context for a chat,
 # bounded so a long conversation does not grow the LLM cost per message.
@@ -33,8 +32,32 @@ _BASE_AGENT_MEMORY_MESSAGES = 20
 _BASE_AGENT_TEMPERATURE = 0.3
 
 
+def _handle_id(handle: Dict[str, Any]) -> str:
+    """Serialize an edge handle exactly like Langflow's editor does.
+
+    The editor rebuilds every edge's handle string from the nodes when it
+    opens a flow and DROPS any edge whose stored string differs character
+    for character: JSON with sorted keys and no spaces, `"` replaced by `œ`
+    (its `scapedJSONStringfy`). Handles serialized any other way (e.g. with
+    the `", "`/`": "` separators the starter-projects API returns) make the
+    flow open with no connections.
+
+    Args:
+        handle (Dict[str, Any]): The handle (edge `data.sourceHandle` or
+            `data.targetHandle`).
+
+    Returns:
+        str: The handle string.
+    """
+    return json.dumps(handle, sort_keys=True, separators=(",", ":"), ensure_ascii=False).replace('"', "œ")
+
+
 def build_base_agent_flow(name: str, system_prompt: str) -> Dict[str, Any]:
     """The request body that creates a base agent flow.
+
+    The OpenAI component is left WITHOUT an API key (no value, no global
+    variable): each client's key is set by hand in the editor, and the
+    onboarding checklist flags the agent until it is.
 
     Args:
         name (str): Flow name.
@@ -54,6 +77,13 @@ def build_base_agent_flow(name: str, system_prompt: str) -> Dict[str, Any]:
             fields["n_messages"]["value"] = _BASE_AGENT_MEMORY_MESSAGES
         elif kind == "OpenAIModel":
             fields["temperature"]["value"] = _BASE_AGENT_TEMPERATURE
+            fields["api_key"]["value"] = ""
+            fields["api_key"]["load_from_db"] = False
+    for edge in flow["data"]["edges"]:
+        source = _handle_id(edge["data"]["sourceHandle"])
+        target = _handle_id(edge["data"]["targetHandle"])
+        edge["sourceHandle"], edge["targetHandle"] = source, target
+        edge["id"] = f"reactflow__edge-{edge['source']}{source}-{edge['target']}{target}"
     flow["name"] = name
     flow["description"] = "Agente base creado por el alta de cliente de Flowsdone."
     flow["endpoint_name"] = None
@@ -290,22 +320,33 @@ class LangflowAdminClient(LangflowAdminPort):
             raise LangflowSessionError(f"langflow rejected create flow (HTTP {response.status_code})")
         return str(self._json(response, "create flow")["id"])
 
-    async def list_variable_names(self, access_token: str) -> List[str]:
-        """Names of the logged-in user's global variables.
+    async def llm_key_configured(self, access_token: str, flow_id: str) -> Optional[bool]:
+        """Whether a flow's LLM components have an API key set (a value or
+        a global variable name) - never reads the key itself.
 
         Args:
-            access_token (str): The user's access token.
+            access_token (str): The owner's access token.
+            flow_id (str): The flow.
 
         Returns:
-            List[str]: The names (values are never read).
+            Optional[bool]: True if every component with an `api_key` field
+            has one, False if any is empty, None if the flow has none.
 
         Raises:
             LangflowSessionError: If Langflow rejects the request.
         """
         response = await self._request(
-            "GET", "/api/v1/variables/", headers={"Authorization": f"Bearer {access_token}"}
+            "GET", f"/api/v1/flows/{flow_id}", headers={"Authorization": f"Bearer {access_token}"}
         )
         if response.status_code != 200:
-            raise LangflowSessionError(f"langflow rejected list variables (HTTP {response.status_code})")
-        return [str(v["name"]) for v in self._json(response, "list variables")]
+            raise LangflowSessionError(f"langflow rejected get flow (HTTP {response.status_code})")
+        nodes = ((self._json(response, "get flow").get("data") or {}).get("nodes")) or []
+        keys = [
+            node["data"]["node"]["template"]["api_key"].get("value")
+            for node in nodes
+            if "api_key" in ((node.get("data") or {}).get("node") or {}).get("template", {})
+        ]
+        if not keys:
+            return None
+        return all(isinstance(k, str) and k.strip() for k in keys)
 

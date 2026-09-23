@@ -187,7 +187,7 @@ class LangflowAdminPort(Protocol):
     async def create_base_flow(self, access_token: str, folder_id: str, *, name: str, system_prompt: str) -> str:
         """Create the platform's base chat agent flow in one of the
         logged-in user's folders (chat input, conversation memory, the
-        prompt, an LLM reading the `OPENAI_API_KEY` global variable, and
+        prompt, an OpenAI LLM with NO API key - set by hand per client - and
         chat output).
 
         Args:
@@ -204,14 +204,16 @@ class LangflowAdminPort(Protocol):
         """
         ...
 
-    async def list_variable_names(self, access_token: str) -> List[str]:
-        """Names of the logged-in user's global variables (never their values).
+    async def llm_key_configured(self, access_token: str, flow_id: str) -> Optional[bool]:
+        """Whether a flow's LLM components have an API key set (never the key itself).
 
         Args:
-            access_token (str): The user's access token.
+            access_token (str): The owner's access token.
+            flow_id (str): The flow.
 
         Returns:
-            List[str]: The names.
+            Optional[bool]: True if all have one, False if any is empty,
+            None if the flow has no LLM component with a key.
 
         Raises:
             LangflowSessionError: If Langflow rejects the request.

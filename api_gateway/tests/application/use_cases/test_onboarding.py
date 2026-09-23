@@ -28,7 +28,7 @@ class OnboardingLangflow(FlowsLangflow):
     def __init__(self) -> None:
         super().__init__()
         self.created: list = []
-        self.variables: list = []
+        self.keys: dict = {}
         self.fail = False
 
     async def create_base_flow(self, access_token, folder_id, *, name, system_prompt):
@@ -37,10 +37,15 @@ class OnboardingLangflow(FlowsLangflow):
         self.flows_by_folder.setdefault(folder_id, []).append(LangflowFlowSummary(id=flow_id, name=name))
         return flow_id
 
-    async def list_variable_names(self, access_token):
+    async def list_flows(self, access_token, folder_id):
         if self.fail:
             raise LangflowSessionError("down")
-        return list(self.variables)
+        return await super().list_flows(access_token, folder_id)
+
+    async def llm_key_configured(self, access_token, flow_id):
+        if self.fail:
+            raise LangflowSessionError("down")
+        return self.keys.get(flow_id, False)
 
 
 def _world():
@@ -112,7 +117,7 @@ async def test_the_wizard_resumes_at_each_missing_step_and_ends_in_summary():
 
     await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="cercano", instructions="")
     x["users"].add(make_user(role="client", status="pending", tenant_ids=[tenant.id]))
-    x["w"].langflow.variables = ["OPENAI_API_KEY"]
+    x["w"].langflow.keys = {f["id"]: True for f in x["w"].langflow.created}  # key set in the editor
     x["connections"].add(make_channel_connection(project_id=project.id))
 
     status = await x["status"].execute(tenant.id)
@@ -123,6 +128,16 @@ async def test_the_wizard_resumes_at_each_missing_step_and_ends_in_summary():
     assert (_check(status, "client_account").status, _check(status, "client_account").detail) == ("warning", "pending")
     assert _check(status, "agent").status == "ok" and _check(status, "openai_key").status == "ok"
     assert _check(status, "channel").status == "ok"
+
+
+async def test_a_base_agent_without_api_key_is_flagged():
+    x = _world()
+    project = await x["w"].add_project("Atención")
+    await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="cercano", instructions="")
+
+    status = await x["status"].execute(x["w"].tenant.id)
+
+    assert _check(status, "agent").status == "ok" and _check(status, "openai_key").status == "missing"
 
 
 async def test_an_agent_whose_flow_is_gone_is_a_warning_and_langflow_down_is_unknown():
