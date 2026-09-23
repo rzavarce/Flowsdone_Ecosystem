@@ -6,6 +6,7 @@ import type {
   ChannelConnection,
   Conversation,
   ConversationDetail,
+  LangflowFlow,
   CostRate,
   Plan,
   PricingInsight,
@@ -46,6 +47,10 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     deleteProject: (id) => call<void>(`/projects/${id}`, 'DELETE'),
 
     listAgents: (projectId) => call<Agent[]>(`/agents${query({ project_id: projectId })}`),
+    createAgent: (input) => call<Agent>('/agents', 'POST', input),
+    updateAgent: (id, patch) => call<Agent>(`/agents/${id}`, 'PATCH', patch),
+    deleteAgent: (id) => call<void>(`/agents/${id}`, 'DELETE'),
+    listLangflowFlows: (projectId) => call<LangflowFlow[]>(`/langflow/flows${query({ project_id: projectId })}`),
 
     listChannelConnections: (projectId) =>
       call<ChannelConnection[]>(`/channel-connections${query({ project_id: projectId })}`),

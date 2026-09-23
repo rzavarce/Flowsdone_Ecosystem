@@ -6,12 +6,17 @@ users, and each tenant user's own login token to create their folders.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
 from app.core.config import settings
-from app.domain.ports.outbound import LangflowAdminPort, LangflowSessionError, LangflowTokens
+from app.domain.ports.outbound import (
+    LangflowAdminPort,
+    LangflowFlowSummary,
+    LangflowSessionError,
+    LangflowTokens,
+)
 
 
 class LangflowAdminClient(LangflowAdminPort):
@@ -179,3 +184,43 @@ class LangflowAdminClient(LangflowAdminPort):
         if response.status_code != 201:
             raise LangflowSessionError(f"langflow rejected create project (HTTP {response.status_code})")
         return str(self._json(response, "create project")["id"])
+
+    async def list_flows(self, access_token: str, folder_id: str) -> List[LangflowFlowSummary]:
+        """Flows (not components) in one of the logged-in user's folders.
+
+        Uses `header_flows=true` so Langflow answers without each flow's
+        graph (which can be large).
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): The folder.
+
+        Returns:
+            List[LangflowFlowSummary]: The flows, by name.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "GET",
+            "/api/v1/flows/",
+            params={"folder_id": folder_id, "get_all": "true", "header_flows": "true", "remove_example_flows": "true"},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 200:
+            raise LangflowSessionError(f"langflow rejected list flows (HTTP {response.status_code})")
+        body = self._json(response, "list flows")
+        items = body.get("items", []) if isinstance(body, dict) else body
+        flows = [
+            LangflowFlowSummary(
+                id=str(f["id"]),
+                name=f.get("name") or "",
+                description=f.get("description"),
+                updated_at=f.get("updated_at"),
+            )
+            for f in items
+            # folder_id is also checked here: never list another folder's flows.
+            if not f.get("is_component") and str(f.get("folder_id")) == folder_id
+        ]
+        return sorted(flows, key=lambda f: f.name.lower())
+

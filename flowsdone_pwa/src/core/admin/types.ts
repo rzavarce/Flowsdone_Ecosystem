@@ -100,6 +100,34 @@ export interface Agent {
   status: string
 }
 
+/** Input for registering a Langflow flow of a project as an agent. */
+export interface CreateAgentInput {
+  project_id: string
+  name: string
+  /** Must be one of the flows in the project's Langflow folder (see `listLangflowFlows`). */
+  langflow_flow_id: string
+  /** The project's first agent is always the default one, whatever this says. */
+  is_default?: boolean
+}
+
+/** Editable fields of an agent; omitted ones stay unchanged. */
+export interface UpdateAgentInput {
+  name?: string
+  langflow_flow_id?: string
+  /** Setting it makes this the project's only default agent. */
+  is_default?: boolean
+  /** `suspended` stops its channels from answering, without deleting anything. */
+  status?: LifecycleStatus
+}
+
+/** A flow in a project's Langflow folder, with the agent already registered for it (if any). */
+export interface LangflowFlow {
+  id: string
+  name: string
+  description: string | null
+  agent_id: string | null
+}
+
 /** A client's connected channel. Credentials never come back in plaintext. */
 export interface ChannelConnection {
   id: string

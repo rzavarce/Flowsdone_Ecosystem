@@ -92,6 +92,7 @@ from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.application.use_cases.ingest_message import IngestMessageUseCase
 from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
+from app.application.use_cases.manage_agents import ListProjectFlowsUseCase, ManageAgentsUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
 from app.application.use_cases.manage_profile import (
     RemoveAvatarUseCase,
@@ -475,6 +476,19 @@ async def lifespan(app: FastAPI):
         secret_generator=secret_generator,
         tickets=langflow_tickets,
         ticket_ttl_seconds=settings.LANGFLOW_SSO_TICKET_TTL_SECONDS,
+    )
+    # Agents: register the flows of a project's Langflow folder (reuses the
+    # SSO use case to open the tenant's Langflow as its own user).
+    app.state.list_project_flows_use_case = ListProjectFlowsUseCase(
+        project_repo=app.state.project_repo,
+        agent_repo=app.state.agent_repo,
+        workspace=app.state.prepare_langflow_session_use_case,
+        langflow=langflow_admin,
+    )
+    app.state.manage_agents_use_case = ManageAgentsUseCase(
+        agent_repo=app.state.agent_repo,
+        channel_connection_repo=app.state.channel_connection_repo,
+        flows=app.state.list_project_flows_use_case,
     )
     app.state.redeem_langflow_ticket_use_case = RedeemLangflowTicketUseCase(
         accounts=langflow_accounts, langflow=langflow_admin, tickets=langflow_tickets

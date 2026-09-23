@@ -59,6 +59,19 @@ def _username_for(tenant_slug: str) -> str:
     return f"tenant-{tenant_slug}"
 
 
+@dataclass(frozen=True)
+class LangflowWorkspace:
+    """A tenant's logged-in Langflow session and its folders.
+
+    Attributes:
+        tokens (LangflowTokens): The tenant user's session.
+        folders (dict): Gateway project id -> Langflow folder id.
+    """
+
+    tokens: LangflowTokens
+    folders: dict
+
+
 class PrepareLangflowSessionUseCase:
     """Provision a tenant's Langflow user/folders and issue an SSO ticket."""
 
@@ -120,12 +133,46 @@ class PrepareLangflowSessionUseCase:
         elif projects:
             target = projects[0]
 
-        account = await self._ensure_account(tenant_id, _username_for(tenant.slug))
-        tokens = await self._langflow.login(account.username, account.password.get_secret_value())
-        folders = await self._ensure_folders(tokens, projects)
+        tokens, folders = await self._open(tenant_id, tenant.slug, projects)
 
         path = f"{_LANDING_ROOT}/folder/{folders[target.id]}" if target else _LANDING_ROOT
         return await self._tickets.issue({"tenant_id": str(tenant_id), "path": path}, ttl_seconds=self._ttl)
+
+    async def open_workspace(self, tenant_id: UUID) -> LangflowWorkspace:
+        """Log in as the tenant's Langflow user, provisioning the user and one
+        folder per project first if needed (same as opening the editor).
+
+        Args:
+            tenant_id (UUID): The tenant.
+
+        Returns:
+            LangflowWorkspace: The session and the project -> folder map.
+
+        Raises:
+            LangflowTargetNotFoundError: If the tenant does not exist.
+            LangflowSessionError: If Langflow fails.
+        """
+        tenant = await self._tenants.get_by_id(tenant_id)
+        if tenant is None:
+            raise LangflowTargetNotFoundError("tenant not found")
+        projects = await self._projects.list_by_tenant(tenant_id)
+        tokens, folders = await self._open(tenant_id, tenant.slug, projects)
+        return LangflowWorkspace(tokens=tokens, folders=folders)
+
+    async def _open(self, tenant_id: UUID, tenant_slug: str, projects) -> tuple:
+        """Ensure the account, log in and ensure the folders.
+
+        Args:
+            tenant_id (UUID): The tenant.
+            tenant_slug (str): Its slug (the Langflow username derives from it).
+            projects: The tenant's projects.
+
+        Returns:
+            tuple: (LangflowTokens, project id -> folder id).
+        """
+        account = await self._ensure_account(tenant_id, _username_for(tenant_slug))
+        tokens = await self._langflow.login(account.username, account.password.get_secret_value())
+        return tokens, await self._ensure_folders(tokens, projects)
 
     async def _ensure_account(self, tenant_id: UUID, username: str):
         """Get the tenant's Langflow account, creating it (and the Langflow user) if needed.

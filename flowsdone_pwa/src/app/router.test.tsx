@@ -54,14 +54,16 @@ describe('menú y acceso por perfil', () => {
     expect(screen.queryByText('Tiempo de respuesta')).not.toBeInTheDocument()
   })
 
-  it('el botmaster cae directamente en Agentes, con el editor de Langflow de su (único) tenant', async () => {
+  it('el botmaster cae directamente en Agentes, con los agentes de su (único) tenant', async () => {
     // El tenant de este usuario (t1, de renderApp.tsx) tiene que existir de
     // verdad en la API admin para que createLangflowSession no falle con 404 -
     // el mock por defecto usa otros ids (t-vital…), por eso el seed explícito.
     renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
     expect(await h1('Agentes')).toBeInTheDocument()
-    // Un solo tenant asignado: se auto-selecciona (TenantProvider), sin pedir elegir uno.
-    expect(await screen.findByText(/se embeberá Langflow/)).toBeInTheDocument()
+    // Un solo tenant asignado: se auto-selecciona (TenantProvider), sin pedir elegir uno,
+    // y abre en la pestaña de agentes registrados (el editor está en la otra).
+    expect(await screen.findByRole('tab', { name: 'Agentes', selected: true })).toBeInTheDocument()
+    expect(await screen.findByText('Recepción', undefined, { timeout: 5000 })).toBeInTheDocument()
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Principal' })
     expect(within(sidebar!).getByRole('link', { name: 'Agentes' })).toHaveAttribute('aria-current', 'page')
   })

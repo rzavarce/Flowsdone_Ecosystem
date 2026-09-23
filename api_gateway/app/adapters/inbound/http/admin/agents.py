@@ -2,6 +2,11 @@
 
 Agents belong to a project, and projects to a tenant, so each operation is
 checked against the caller's tenants. Botmasters may create and edit them, alongside admins and tenant managers.
+
+The rules live in `ManageAgentsUseCase`: for console users the flow must be
+in the project's Langflow folder (machine callers - API key, the internal
+onboarding agent - may register any flow id, as before); one default agent
+per project; an agent with channels cannot be deleted (409).
 """
 
 from __future__ import annotations
@@ -13,6 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate
+from app.application.use_cases.manage_agents import AgentInUseError, FlowNotInProjectError
+from app.domain.ports.outbound import LangflowSessionError
 
 router = APIRouter(prefix="/agents", tags=["admin:agents"])
 
@@ -39,6 +46,33 @@ async def _load_scoped(request: Request, access: AdminAccess, agent_id: UUID):
     return item
 
 
+def _verify_flow(access: AdminAccess) -> bool:
+    """Whether the flow must be checked against the project's Langflow folder.
+
+    Args:
+        access (AdminAccess): The caller.
+
+    Returns:
+        bool: True for console users; False for the admin API key (scripts,
+        the onboarding agent), which may register flows living anywhere.
+    """
+    return access.principal.user_id is not None
+
+
+def _flow_errors(exc: Exception) -> HTTPException:
+    """Map flow verification errors to HTTP.
+
+    Args:
+        exc (Exception): FlowNotInProjectError or LangflowSessionError.
+
+    Returns:
+        HTTPException: 400 or 502.
+    """
+    if isinstance(exc, FlowNotInProjectError):
+        return HTTPException(status_code=400, detail="flow not found in the project's Langflow folder")
+    return HTTPException(status_code=502, detail=f"langflow unavailable: {exc}")
+
+
 @router.post("", response_model=AgentOut, status_code=201)
 async def create_agent(
     body: AgentCreate,
@@ -57,16 +91,22 @@ async def create_agent(
         AgentOut: The created agent.
 
     Raises:
-        HTTPException: 404 if the project is outside the caller's tenants.
+        HTTPException: 404 if the project is outside the caller's tenants;
+            400 if the flow is not in the project's Langflow folder; 409 if
+            the name is taken in the project; 502 if Langflow fails.
     """
     await access.project(body.project_id)
-    item = await request.app.state.agent_repo.create(
-        project_id=body.project_id,
-        name=body.name,
-        langflow_flow_id=body.langflow_flow_id,
-        config=body.config,
-        is_default=body.is_default,
-    )
+    try:
+        item = await request.app.state.manage_agents_use_case.create(
+            project_id=body.project_id,
+            name=body.name,
+            langflow_flow_id=body.langflow_flow_id,
+            config=body.config,
+            is_default=body.is_default,
+            verify_flow=_verify_flow(access),
+        )
+    except (FlowNotInProjectError, LangflowSessionError) as exc:
+        raise _flow_errors(exc) from exc
     return AgentOut(**item.model_dump())
 
 
@@ -139,10 +179,17 @@ async def update_agent(
         AgentOut: The updated agent.
 
     Raises:
-        HTTPException: 404 if it does not exist or is outside the caller's tenants.
+        HTTPException: 404 if it does not exist or is outside the caller's
+            tenants; 400 if a new flow is not in the project's Langflow
+            folder; 409 if the new name is taken; 502 if Langflow fails.
     """
-    await _load_scoped(request, access, agent_id)
-    item = await request.app.state.agent_repo.update(agent_id, **body.model_dump(exclude_unset=True))
+    agent = await _load_scoped(request, access, agent_id)
+    try:
+        item = await request.app.state.manage_agents_use_case.update(
+            agent, verify_flow=_verify_flow(access), **body.model_dump(exclude_unset=True)
+        )
+    except (FlowNotInProjectError, LangflowSessionError) as exc:
+        raise _flow_errors(exc) from exc
     if not item:
         raise HTTPException(status_code=404, detail="agent not found")
     return AgentOut(**item.model_dump())
@@ -163,9 +210,13 @@ async def delete_agent(
         access (AdminAccess): The authenticated caller.
 
     Raises:
-        HTTPException: 404 if it does not exist or is outside the caller's tenants.
+        HTTPException: 404 if it does not exist or is outside the caller's
+            tenants; 409 if channels are still connected to it.
     """
-    await _load_scoped(request, access, agent_id)
-    deleted = await request.app.state.agent_repo.delete(agent_id)
+    agent = await _load_scoped(request, access, agent_id)
+    try:
+        deleted = await request.app.state.manage_agents_use_case.delete(agent)
+    except AgentInUseError as exc:
+        raise HTTPException(status_code=409, detail="agent has channels") from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="agent not found")
