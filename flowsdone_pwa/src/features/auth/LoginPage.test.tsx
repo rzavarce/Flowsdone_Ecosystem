@@ -57,7 +57,7 @@ describe('LoginPage', () => {
   it('un login correcto lleva a la página de inicio del perfil', async () => {
     const user = makeUser('botmaster')
     let session: typeof user | null = null
-    const api = { restore: async () => session, login: async () => (session = user), logout: async () => {} }
+    const api = { ...fakeAuthApi(null), restore: async () => session, login: async () => (session = user) }
     renderApp('/login', api)
     await h1('Inicia sesión')
     await userEvent.type(screen.getByLabelText('Correo electrónico'), user.email)
@@ -69,7 +69,7 @@ describe('LoginPage', () => {
   it('tras el login vuelve a la ruta que se intentó abrir', async () => {
     const user = makeUser('admin')
     let session: typeof user | null = null
-    const api = { restore: async () => session, login: async () => (session = user), logout: async () => {} }
+    const api = { ...fakeAuthApi(null), restore: async () => session, login: async () => (session = user) }
     renderApp('/canales', api) // sin sesión -> /login con from=/canales
     await h1('Inicia sesión')
     await userEvent.type(screen.getByLabelText('Correo electrónico'), user.email)

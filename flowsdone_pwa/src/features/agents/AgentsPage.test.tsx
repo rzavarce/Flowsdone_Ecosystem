@@ -18,13 +18,26 @@ async function open(role: Role, adminApi: AdminApi = api()) {
   await screen.findByRole('heading', { level: 1, name: 'Agentes' })
 }
 
-describe('editor de Langflow: solo para el equipo de la plataforma', () => {
-  it('el admin, con un tenant elegido, ve el editor con la URL de inicio de sesión que da el gateway', async () => {
+describe('editor de Langflow embebido (cualquier staff que pueda editar agentes)', () => {
+  // Antes solo el admin lo recibía; tenant_manager/botmaster ahora también
+  // (personal de Flowsdone, no de clientes - ver AgentsPage.tsx).
+  it.each(['admin', 'tenant_manager'] as const)(
+    '%s, con un tenant elegido, ve el editor con la URL de inicio de sesión que da el gateway',
+    async (role) => {
+      const createLangflowSession = session()
+      await open(role, api({ createLangflowSession }))
+      await selectTenant('t1')
+      expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
+      expect(createLangflowSession).toHaveBeenCalledWith('t1', undefined)
+    },
+  )
+
+  it('botmaster (un solo tenant asignado): se auto-selecciona, sin selector que elegir', async () => {
     const createLangflowSession = session()
-    await open('admin', api({ createLangflowSession }))
-    await selectTenant('t1')
+    await open('botmaster', api({ createLangflowSession }))
     expect(await screen.findByTitle('Editor de agentes (Langflow)')).toHaveAttribute('src', LANGFLOW_URL)
     expect(createLangflowSession).toHaveBeenCalledWith('t1', undefined)
+    expect(screen.queryByRole('combobox', { name: 'Tenant activo' })).not.toBeInTheDocument()
   })
 
   it('el botón de pantalla completa entra y sale, y cambia de icono y de etiqueta', async () => {
@@ -79,47 +92,5 @@ describe('editor de Langflow: solo para el equipo de la plataforma', () => {
     await open('admin')
     await selectTenant('t1')
     expect(await screen.findByText(/se embeberá Langflow/)).toBeInTheDocument()
-  })
-
-  // Regresión de seguridad: separar por usuario en Langflow es de vista, no un límite de seguridad.
-  it.each(['tenant_manager', 'botmaster'] as const)('%s NUNCA recibe el iframe de Langflow ni pide una sesión', async (role) => {
-    const createLangflowSession = session()
-    await open(role, api({ createLangflowSession }))
-    await screen.findByText(/es solo para el equipo de la plataforma/)
-    expect(screen.queryByTitle('Editor de agentes (Langflow)')).not.toBeInTheDocument()
-    expect(document.querySelector('iframe')).toBeNull()
-    expect(createLangflowSession).not.toHaveBeenCalled()
-    expect(document.body.innerHTML).not.toContain('langflow-sso')
-  })
-})
-
-describe('agentes del tenant (gestor y botmaster)', () => {
-  it('lista solo los agentes de su tenant activo, sin los de otros tenants', async () => {
-    await open('botmaster')
-    // t1: Recepción y Citas. "Asesor" es del proyecto de t2.
-    expect(await screen.findByRole('heading', { level: 2, name: 'Recepción' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Citas' })).toBeInTheDocument()
-    expect(screen.queryByText('Asesor')).not.toBeInTheDocument()
-    expect(screen.getAllByText('Atención')).toHaveLength(2) // el proyecto al que pertenecen
-    expect(screen.getByText('Por defecto')).toBeInTheDocument()
-  })
-
-  it('el mensaje explica por qué no hay editor y a quién pedirlo', async () => {
-    await open('tenant_manager')
-    expect(await screen.findByText(/contiene los agentes de todos los clientes/)).toBeInTheDocument()
-    expect(screen.getByText('Los agentes de tus tenants.')).toBeInTheDocument()
-  })
-
-  it('sin agentes muestra el estado vacío', async () => {
-    await open('botmaster', api({ listAgents: vi.fn().mockResolvedValue([]) }))
-    expect(await screen.findByText('Aún no hay agentes')).toBeInTheDocument()
-  })
-
-  it('si la carga falla muestra el error y "Reintentar" lo vuelve a pedir', async () => {
-    const list = vi.fn().mockRejectedValueOnce(new ApiError(400, 'boom')).mockResolvedValue([])
-    await open('botmaster', api({ listAgents: list }))
-    expect(await screen.findByText(/No se pudieron cargar los agentes: boom/)).toBeInTheDocument()
-    screen.getByRole('button', { name: 'Reintentar' }).click()
-    await waitFor(() => expect(screen.getByText('Aún no hay agentes')).toBeInTheDocument())
   })
 })

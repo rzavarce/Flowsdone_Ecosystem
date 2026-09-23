@@ -77,6 +77,22 @@ async def test_invalid_input_is_rejected(overrides, message):
         await use_case.execute(**args)
 
 
+async def test_status_defaults_to_active_but_can_be_overridden():
+    # Default keeps the CLI bootstrap (app/cli/create_user.py) working
+    # unchanged; ProvisionUserUseCase is the one that passes "pending".
+    use_case, users = _build()
+
+    default_status = await use_case.execute(
+        email="a@x.com", name="A", role="admin", password=GOOD_PASSWORD, tenant_ids=[]
+    )
+    pending = await use_case.execute(
+        email="b@x.com", name="B", role="admin", password=GOOD_PASSWORD, tenant_ids=[], status="pending"
+    )
+
+    assert default_status.status == "active"
+    assert pending.status == "pending"
+
+
 async def test_duplicate_email_raises_user_already_exists():
     use_case, _ = _build()
     args = dict(email="a@x.com", name="A", role="admin", password=GOOD_PASSWORD, tenant_ids=[])

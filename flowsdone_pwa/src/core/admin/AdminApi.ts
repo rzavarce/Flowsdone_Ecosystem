@@ -6,11 +6,16 @@ import type {
   CreateChannelConnectionInput,
   CreateProjectInput,
   CreateTenantInput,
+  CreateUserInput,
   Project,
+  TenantBillingProfile,
   TenantRecord,
   UpdateChannelConnectionInput,
   UpdateProjectInput,
+  UpdateTenantBillingInput,
   UpdateTenantInput,
+  UpdateUserInput,
+  UserRecord,
   LangflowSession,
 } from './types'
 
@@ -30,6 +35,13 @@ export interface AdminApi {
   updateTenant(id: string, patch: UpdateTenantInput): Promise<TenantRecord>
   /** Solo admin. Borra EN CASCADA sus proyectos, agentes y canales. */
   deleteTenant(id: string): Promise<void>
+
+  /**
+   * Perfil de facturación del tenant (admin/tenant_manager). Devuelve uno
+   * vacío (todos los campos `null`) si nunca se cargó nada - nunca 404.
+   */
+  getTenantBilling(tenantId: string): Promise<TenantBillingProfile>
+  updateTenantBilling(tenantId: string, patch: UpdateTenantBillingInput): Promise<TenantBillingProfile>
 
   /** Proyectos visibles, opcionalmente de un tenant. */
   listProjects(tenantId?: string): Promise<Project[]>
@@ -61,4 +73,17 @@ export interface AdminApi {
    * la carpeta de ese proyecto; sin él, la del primero.
    */
   createLangflowSession(tenantId: string, projectId?: string): Promise<LangflowSession>
+
+  /**
+   * Usuarios de consola (solo admin). Incluye los `client` de cada tenant -
+   * la pantalla de Usuarios los filtra, se gestionan desde Tenants.
+   */
+  listUsers(): Promise<UserRecord[]>
+  /** Sin password: queda `pending` y se le manda el email de activación. */
+  createUser(input: CreateUserInput): Promise<UserRecord>
+  updateUser(id: string, patch: UpdateUserInput): Promise<UserRecord>
+  /** Cierra todas sus sesiones activas. */
+  deleteUser(id: string): Promise<void>
+  /** Reenvía el email de activación (solo si sigue `pending`). */
+  resendUserActivation(id: string): Promise<void>
 }

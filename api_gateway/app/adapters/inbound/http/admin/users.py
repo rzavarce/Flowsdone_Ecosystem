@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import UserCreate, UserOut, UserUpdate
 from app.application.use_cases.manage_users import SelfLockoutError
-from app.domain.ports.outbound import UserAlreadyExistsError
+from app.domain.ports.outbound import EmailSendError, UserAlreadyExistsError
 
 router = APIRouter(prefix="/users", tags=["admin:users"])
 
@@ -18,32 +18,41 @@ router = APIRouter(prefix="/users", tags=["admin:users"])
 async def create_user(
     body: UserCreate, request: Request, access: AdminAccess = Depends(admin_access("users", "write"))
 ) -> UserOut:
-    """Create a console user.
+    """Create a console user and start their email-activation flow.
+
+    No password is set here: the user is created `pending` and emailed an
+    activation link to choose their own (see `ProvisionUserUseCase`).
 
     Args:
         body (UserCreate): The new user's fields.
-        request (Request): Used to reach `request.app.state.create_user_use_case`.
+        request (Request): Used to reach `request.app.state.provision_user_use_case`.
         access (AdminAccess): The authenticated caller (admin only).
 
     Returns:
-        UserOut: The created user (no password hash).
+        UserOut: The created (pending) user.
 
     Raises:
-        HTTPException: 400 on invalid input (role, password length, tenants…),
-            409 if the email is already registered.
+        HTTPException: 400 on invalid input (role, tenants…), 409 if the
+            email is already registered, 502 if the user was created but
+            the activation email could not be sent (retry via
+            `POST /users/{id}/resend-activation`).
     """
     try:
-        user = await request.app.state.create_user_use_case.execute(
+        user = await request.app.state.provision_user_use_case.execute(
             email=body.email,
             name=body.name,
             role=body.role,
-            password=body.password,
             tenant_ids=body.tenant_ids,
         )
     except UserAlreadyExistsError as exc:
         raise HTTPException(status_code=409, detail="a user with that email already exists") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except EmailSendError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"user created but the activation email could not be sent: {exc}",
+        ) from exc
     return UserOut(**user.model_dump())
 
 
@@ -145,3 +154,30 @@ async def delete_user(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="user not found")
+
+
+@router.post("/{user_id}/resend-activation", status_code=204)
+async def resend_activation(
+    user_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("users", "write"))
+) -> None:
+    """Re-send the activation email to a user still `pending`.
+
+    Covers a link lost or caught by spam within its lifetime, without
+    having to delete and recreate the user.
+
+    Args:
+        user_id (UUID): Id of the user.
+        request (Request): Used to reach `request.app.state.provision_user_use_case`.
+        access (AdminAccess): The authenticated caller (admin only).
+
+    Raises:
+        HTTPException: 404 if the user does not exist or is no longer
+            `pending` (already active/disabled - indistinguishable on
+            purpose), 502 if the email could not be sent.
+    """
+    try:
+        sent = await request.app.state.provision_user_use_case.resend_activation(user_id)
+    except EmailSendError as exc:
+        raise HTTPException(status_code=502, detail=f"could not send the activation email: {exc}") from exc
+    if not sent:
+        raise HTTPException(status_code=404, detail="user not found or not pending")

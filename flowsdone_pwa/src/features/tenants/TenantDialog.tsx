@@ -28,6 +28,8 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
   const [name, setName] = useState(tenant?.name ?? '')
   const [slug, setSlug] = useState(tenant?.slug ?? '')
   const [slugTouched, setSlugTouched] = useState(editing)
+  const [clientEmail, setClientEmail] = useState('')
+  const [clientName, setClientName] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   const effectiveSlug = slugTouched ? slug : slugify(name)
@@ -36,16 +38,24 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
   const errors = {
     name: name.trim() ? '' : 'El nombre es obligatorio.',
     slug: effectiveSlug ? '' : 'El identificador es obligatorio.',
+    // Solo al crear: al editar no se toca el usuario `client` del tenant.
+    clientEmail: editing || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail.trim()) ? '' : 'Escribe un email válido.',
+    clientName: editing || clientName.trim() ? '' : 'El nombre del cliente es obligatorio.',
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setSubmitted(true)
-    if (errors.name || errors.slug) return
+    if (errors.name || errors.slug || errors.clientEmail || errors.clientName) return
     try {
       const saved = editing
         ? await update.mutateAsync({ id: tenant.id, patch: { name: name.trim(), slug: effectiveSlug } })
-        : await create.mutateAsync({ name: name.trim(), slug: effectiveSlug })
+        : await create.mutateAsync({
+            name: name.trim(),
+            slug: effectiveSlug,
+            client_email: clientEmail.trim(),
+            client_name: clientName.trim(),
+          })
       onSaved?.(saved)
       onClose()
     } catch {
@@ -89,6 +99,22 @@ export function TenantDialog({ tenant, onClose, onSaved }: TenantDialogProps) {
             autoComplete="off"
           />
         </Field>
+        {!editing && (
+          <>
+            <Field label="Email del cliente" hint="Le llegará un correo para crear su contraseña y activar su cuenta." error={submitted ? errors.clientEmail : undefined}>
+              <Input
+                type="email"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                placeholder="cliente@empresa.com"
+                autoComplete="off"
+              />
+            </Field>
+            <Field label="Nombre del cliente" error={submitted ? errors.clientName : undefined}>
+              <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="María Cliente" />
+            </Field>
+          </>
+        )}
         {error && <Alert tone="danger">{describeError(error)}</Alert>}
       </form>
     </Dialog>

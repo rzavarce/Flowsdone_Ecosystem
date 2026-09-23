@@ -21,10 +21,12 @@ describe('can', () => {
     }
   })
 
-  it('el botmaster solo edita agentes', () => {
+  it('el botmaster edita agentes, canales y conversaciones de sus tenants, pero no ve dashboards', () => {
     const u = makeUser('botmaster')
     expect(can(u, 'agents:edit')).toBe(true)
-    expect(can(u, 'dashboard:view', 'reports:view', 'conversations:manage', 'channels:manage')).toBe(false)
+    expect(can(u, 'channels:manage')).toBe(true)
+    expect(can(u, 'conversations:manage')).toBe(true)
+    expect(can(u, 'dashboard:view', 'reports:view')).toBe(false)
   })
 
   it('el cliente solo ve reportes', () => {

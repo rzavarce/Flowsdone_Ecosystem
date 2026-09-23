@@ -1,5 +1,6 @@
 import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
 import { useId, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { AuthError } from '@/core/auth/AuthApi'
@@ -51,9 +52,14 @@ export function LoginForm() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor={ids.password} className="text-sm font-medium">
-            Contraseña
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor={ids.password} className="text-sm font-medium">
+              Contraseña
+            </label>
+            <Link to="/recuperar-password" className="text-sm font-medium text-primary-ink hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
           <div className="relative">
             <Input
               id={ids.password}

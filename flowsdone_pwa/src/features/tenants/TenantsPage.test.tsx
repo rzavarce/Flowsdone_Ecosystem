@@ -71,13 +71,15 @@ describe('gestión de tenants (admin)', () => {
   it('crea un tenant: el slug sale del nombre, queda seleccionado y avisa a la sesión', async () => {
     const restore = vi.fn()
     const user = makeUser('admin')
-    await open('admin', mock(), { restore: async () => (restore(), user), login: async () => user, logout: async () => {} })
+    await open('admin', mock(), { ...fakeAuthApi(user), restore: async () => (restore(), user), login: async () => user })
     const before = restore.mock.calls.length
 
     await userEvent.click(screen.getByRole('button', { name: /Nuevo tenant/ }))
     const dialog = screen.getByRole('dialog', { name: 'Nuevo tenant' })
     await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Óptica Ñandú')
     expect(within(dialog).getByLabelText(/Identificador/)).toHaveValue('optica-nandu')
+    await userEvent.type(within(dialog).getByLabelText('Email del cliente'), 'cliente@optica.com')
+    await userEvent.type(within(dialog).getByLabelText('Nombre del cliente'), 'Nora Óptica')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Crear tenant' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -93,8 +95,12 @@ describe('gestión de tenants (admin)', () => {
     const dialog = screen.getByRole('dialog', { name: 'Nuevo tenant' })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Crear tenant' }))
     expect(within(dialog).getByText('El nombre es obligatorio.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Escribe un email válido.')).toBeInTheDocument()
+    expect(within(dialog).getByText('El nombre del cliente es obligatorio.')).toBeInTheDocument()
 
     await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Clínica Vital')
+    await userEvent.type(within(dialog).getByLabelText('Email del cliente'), 'nueva@clinica.com')
+    await userEvent.type(within(dialog).getByLabelText('Nombre del cliente'), 'Otra Clínica')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Crear tenant' }))
     expect(await within(dialog).findByText(/Ya existe un elemento con esos datos/)).toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Nuevo tenant' })).toBeInTheDocument()
@@ -263,5 +269,33 @@ describe('gestor de tenant', () => {
     await open('tenant_manager')
     // El gestor de prueba tiene t1 y t2; el activo por defecto es el primero.
     expect(tenantButton(/Clínica Vital/)).toHaveAttribute('aria-current', 'true')
+  })
+})
+
+describe('datos de facturación', () => {
+  it('sin nada cargado, muestra el aviso de vacío; admin y gestor la ven', async () => {
+    for (const role of ['admin', 'tenant_manager'] as const) {
+      const { unmount } = renderApp('/tenants', fakeAuthApi(makeUser(role)), mock(role))
+      await screen.findByRole('heading', { level: 1, name: 'Tenants' })
+      expect(await screen.findByText(/Todavía no se cargaron los datos de facturación/)).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it('el admin carga los datos y quedan guardados', async () => {
+    await open('admin')
+    // Sin aria-label propio (a diferencia de "Editar {tenant}" del header): nombre accesible exacto "Editar".
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Datos de facturación' })
+    await userEvent.type(within(dialog).getByLabelText('Razón social'), 'Clínica Vital S.A. de C.V.')
+    await userEvent.type(within(dialog).getByLabelText('Identificación fiscal'), 'CVI010203AB4')
+    await userEvent.type(within(dialog).getByLabelText('Moneda'), 'MXN')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByText('Clínica Vital S.A. de C.V.')).toBeInTheDocument()
+    expect(screen.getByText('CVI010203AB4')).toBeInTheDocument()
+    expect(screen.getByText('MXN')).toBeInTheDocument()
+    expect(screen.queryByText(/Todavía no se cargaron/)).not.toBeInTheDocument()
   })
 })

@@ -5,19 +5,24 @@ import type {
   CreateChannelConnectionInput,
   CreateProjectInput,
   CreateTenantInput,
+  CreateUserInput,
   UpdateChannelConnectionInput,
   UpdateProjectInput,
+  UpdateTenantBillingInput,
   UpdateTenantInput,
+  UpdateUserInput,
 } from './types'
 import { useAdminApi } from './useAdminApi'
 
 /** Claves de caché. Agrupadas para invalidar de forma coherente tras una mutación. */
 export const adminKeys = {
   tenants: ['tenants'] as const,
+  tenantBilling: ['tenant-billing'] as const,
   projects: ['projects'] as const,
   agents: ['agents'] as const,
   connections: ['channel-connections'] as const,
   apps: ['channel-apps'] as const,
+  users: ['users'] as const,
   langflowSession: ['langflow-session'] as const,
 }
 
@@ -78,6 +83,70 @@ export function useDeleteTenant() {
       await Promise.all([qc.invalidateQueries({ queryKey: adminKeys.tenants }), invalidateTree(qc), refreshUser()])
     },
   })
+}
+
+/** Perfil de facturación de un tenant (admin/tenant_manager). Vacío (no error) si nunca se cargó nada. */
+export function useTenantBilling(tenantId?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.tenantBilling, tenantId],
+    queryFn: () => api.getTenantBilling(tenantId as string),
+    enabled: Boolean(tenantId),
+  })
+}
+
+/** Crea o actualiza el perfil de facturación de un tenant. */
+export function useUpdateTenantBilling() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tenantId, patch }: { tenantId: string; patch: UpdateTenantBillingInput }) =>
+      api.updateTenantBilling(tenantId, patch),
+    onSuccess: (_data, { tenantId }) =>
+      qc.invalidateQueries({ queryKey: [...adminKeys.tenantBilling, tenantId] }),
+  })
+}
+
+/** Usuarios de consola (incluye los `client`; la pantalla de Usuarios los filtra). */
+export function useUsers() {
+  const api = useAdminApi()
+  return useQuery({ queryKey: adminKeys.users, queryFn: () => api.listUsers() })
+}
+
+/** Crea un usuario: queda `pending` y se le manda el email de activación. */
+export function useCreateUser() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateUserInput) => api.createUser(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+  })
+}
+
+/** Edita rol, tenants o estado de un usuario. */
+export function useUpdateUser() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateUserInput }) => api.updateUser(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+  })
+}
+
+/** Borra un usuario y cierra todas sus sesiones. */
+export function useDeleteUser() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteUser(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+  })
+}
+
+/** Reenvía el email de activación de un usuario que sigue `pending`. */
+export function useResendUserActivation() {
+  const api = useAdminApi()
+  return useMutation({ mutationFn: (id: string) => api.resendUserActivation(id) })
 }
 
 /** Edita o suspende/reactiva un proyecto. */

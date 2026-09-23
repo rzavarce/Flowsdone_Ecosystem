@@ -17,13 +17,21 @@ from app.domain.models.channel_connection import ChannelType
 class TenantCreate(BaseModel):
     """Request body for POST /tenants.
 
+    A tenant always ships with its `client` user (see `CreateTenantUseCase`):
+    created `pending`, activated by the same email flow as any other user -
+    nobody, including the tenant's own client, gets a plaintext password.
+
     Attributes:
         name (str): Display name of the tenant.
         slug (str): Unique URL-safe identifier for the tenant.
+        client_email (str): Login email for the tenant's `client` user.
+        client_name (str): Display name for that user.
     """
 
     name: str
     slug: str
+    client_email: str = Field(min_length=3, max_length=254)
+    client_name: str = Field(min_length=1, max_length=200)
 
 
 class TenantUpdate(BaseModel):
@@ -56,6 +64,77 @@ class TenantOut(BaseModel):
     name: str
     slug: str
     status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class TenantBillingUpdate(BaseModel):
+    """Request body for `PUT /tenants/{tenant_id}/billing`. Every field is
+    optional and `None` leaves it unchanged - pure data capture, filled in
+    gradually as it becomes available.
+
+    Attributes:
+        legal_name (Optional[str]): Registered/legal company name.
+        tax_id (Optional[str]): Tax identification number (RFC/NIF/VAT/EIN...).
+        billing_email (Optional[str]): Where invoices/receipts are sent.
+        billing_contact_name (Optional[str]): Person responsible for billing.
+        billing_phone (Optional[str]): Contact phone for billing matters.
+        address_line1 (Optional[str]): Street address.
+        address_line2 (Optional[str]): Suite/floor/unit, if any.
+        city (Optional[str]): City.
+        state_province (Optional[str]): State/province/region.
+        postal_code (Optional[str]): Postal/ZIP code.
+        country (Optional[str]): Country.
+        currency (Optional[str]): Billing currency (e.g. "USD", "MXN").
+        plan (Optional[str]): Subscription tier, free text.
+        billing_cycle (Optional[str]): e.g. "monthly", "annual"; free text.
+        notes (Optional[str]): Anything else worth recording about billing.
+    """
+
+    legal_name: Optional[str] = Field(default=None, max_length=300)
+    tax_id: Optional[str] = Field(default=None, max_length=100)
+    billing_email: Optional[str] = Field(default=None, max_length=254)
+    billing_contact_name: Optional[str] = Field(default=None, max_length=200)
+    billing_phone: Optional[str] = Field(default=None, max_length=50)
+    address_line1: Optional[str] = Field(default=None, max_length=300)
+    address_line2: Optional[str] = Field(default=None, max_length=300)
+    city: Optional[str] = Field(default=None, max_length=150)
+    state_province: Optional[str] = Field(default=None, max_length=150)
+    postal_code: Optional[str] = Field(default=None, max_length=30)
+    country: Optional[str] = Field(default=None, max_length=100)
+    currency: Optional[str] = Field(default=None, max_length=10)
+    plan: Optional[str] = Field(default=None, max_length=100)
+    billing_cycle: Optional[str] = Field(default=None, max_length=50)
+    notes: Optional[str] = Field(default=None, max_length=2000)
+
+
+class TenantBillingOut(BaseModel):
+    """Response body for the tenant billing profile endpoints (admin and self-service).
+
+    Attributes: same as `TenantBillingUpdate`, plus:
+        id (UUID): Unique identifier.
+        tenant_id (UUID): The tenant this profile belongs to.
+        created_at (datetime): Creation timestamp.
+        updated_at (datetime): Last update timestamp.
+    """
+
+    id: UUID
+    tenant_id: UUID
+    legal_name: Optional[str] = None
+    tax_id: Optional[str] = None
+    billing_email: Optional[str] = None
+    billing_contact_name: Optional[str] = None
+    billing_phone: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    city: Optional[str] = None
+    state_province: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = None
+    currency: Optional[str] = None
+    plan: Optional[str] = None
+    billing_cycle: Optional[str] = None
+    notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -383,19 +462,21 @@ class ChannelAppCredentialsOut(BaseModel):
 class UserCreate(BaseModel):
     """Request body for creating a console user.
 
+    No `password` field on purpose: nobody sets it for the new user anymore.
+    They're created `pending` and emailed an activation link to set their
+    own password (see `ProvisionUserUseCase`) - that's also what verifies
+    the email actually belongs to them.
+
     Attributes:
         email (str): Login email (stored lowercase).
         name (str): Display name.
         role (str): `admin`, `tenant_manager`, `botmaster` or `client`.
-        password (str): Initial password (min 10 characters, checked by the
-            use case so the rule lives in one place).
         tenant_ids (List[UUID]): Tenants to assign; required unless `admin`.
     """
 
     email: str = Field(min_length=3, max_length=254)
     name: str = Field(min_length=1, max_length=200)
     role: str
-    password: str = Field(min_length=1, max_length=1024)
     tenant_ids: List[UUID] = Field(default_factory=list)
 
 

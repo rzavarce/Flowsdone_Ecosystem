@@ -8,13 +8,18 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-UserRole = Literal["admin", "tenant_manager", "botmaster", "client"]
+UserRole = Literal["admin", "tenant_manager", "botmaster", "client", "consultant"]
 
-USER_ROLES: tuple[str, ...] = ("admin", "tenant_manager", "botmaster", "client")
+USER_ROLES: tuple[str, ...] = ("admin", "tenant_manager", "botmaster", "client", "consultant")
 """All valid roles. `admin` sees every tenant; the rest are scoped to
-the tenants listed in `User.tenant_ids`."""
+the tenants listed in `User.tenant_ids`. `consultant` is a client-side
+role scoped to reports only (no admin API access at all, same as `client`
+- see `POLICY` in `application/services/access_control.py`)."""
 
-UserStatus = Literal["active", "disabled"]
+UserStatus = Literal["pending", "active", "disabled"]
+"""`pending`: creado, esperando que el usuario active su cuenta por email
+(ver `ProvisionUserUseCase`/`ActivateAccountUseCase`) - no puede loguear.
+`disabled`: deshabilitado por un admin."""
 
 
 class User(BaseModel):

@@ -14,9 +14,11 @@ from uuid import UUID, uuid4
 
 from app.adapters.inbound.http.admin import router as admin_router
 from app.application.services.access_control import AccessControl
+from app.application.use_cases.create_tenant import CreateTenantUseCase
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
+from app.application.use_cases.provision_user import ProvisionUserUseCase
 from app.core.config import settings
 from app.domain.models.agent import Agent
 from app.domain.models.project import Project
@@ -24,8 +26,11 @@ from app.domain.models.workflow_config import WorkflowConfig
 from app.domain.ports.outbound import AlreadyExistsError
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import (
+    FakeAccountTokenStore,
     FakeAuthSessionRepo,
+    FakeEmailSender,
     FakePasswordHasher,
+    FakeTenantBillingProfileRepo,
     FakeUserRepo,
     make_channel_connection,
     make_tenant,
@@ -147,10 +152,13 @@ class World:
         self.users = FakeUserRepo()
         self.sessions = FakeAuthSessionRepo()
         self.by_role: Dict[str, Any] = {}
-        for role in ("admin", "tenant_manager", "botmaster", "client"):
+        for role in ("admin", "tenant_manager", "botmaster", "client", "consultant"):
             tenant_ids = [] if role == "admin" else [self.tenant_a.id]
             self.by_role[role] = self.users.add(make_user(email=f"{role}@x.com", role=role, tenant_ids=tenant_ids))
         self.hasher = FakePasswordHasher()
+        self.activation_tokens = FakeAccountTokenStore()
+        self.mailer = FakeEmailSender()
+        self.billing_profiles = FakeTenantBillingProfileRepo()
 
     @classmethod
     def build(cls) -> "World":
@@ -166,8 +174,10 @@ class World:
         get_current = GetCurrentUserUseCase(
             sessions=self.sessions, user_repo=self.users, tenant_repo=self.tenants, session_ttl_seconds=3600
         )
+        provision_user = self.provision_user_use_case()
         return dict(
             tenant_repo=self.tenants,
+            tenant_billing_profile_repo=self.billing_profiles,
             project_repo=self.projects,
             agent_repo=self.agents,
             workflow_config_repo=self.workflows,
@@ -182,6 +192,21 @@ class World:
             create_user_use_case=CreateUserUseCase(user_repo=self.users, tenant_repo=self.tenants, hasher=self.hasher),
             update_user_use_case=UpdateUserUseCase(user_repo=self.users, tenant_repo=self.tenants, hasher=self.hasher, sessions=self.sessions),
             delete_user_use_case=DeleteUserUseCase(user_repo=self.users, sessions=self.sessions),
+            provision_user_use_case=provision_user,
+            create_tenant_use_case=CreateTenantUseCase(
+                tenant_repo=self.tenants, user_repo=self.users, provision_user=provision_user
+            ),
+        )
+
+    def provision_user_use_case(self) -> ProvisionUserUseCase:
+        """Fresh `ProvisionUserUseCase` sharing this world's users/tokens/mailer fakes."""
+        return ProvisionUserUseCase(
+            create_user=CreateUserUseCase(user_repo=self.users, tenant_repo=self.tenants, hasher=self.hasher),
+            user_repo=self.users,
+            tokens=self.activation_tokens,
+            mailer=self.mailer,
+            ttl_seconds=86400,
+            activation_base_url="https://app.flowsdone.test",
         )
 
     def client(self):

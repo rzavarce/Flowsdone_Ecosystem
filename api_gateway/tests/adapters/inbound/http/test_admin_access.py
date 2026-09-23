@@ -30,6 +30,13 @@ async def _call(client, method, path, *, token=None, api_key=None, json=None, cs
     return await client.request(method, BASE + path, headers=headers, json=json)
 
 
+def _new_tenant(**over):
+    # A tenant always ships with its `client` user (see CreateTenantUseCase).
+    body = {"name": "N", "slug": "n", "client_email": "n@cliente.com", "client_name": "N Cliente"}
+    body.update(over)
+    return body
+
+
 @pytest.fixture
 def world():
     return World.build()
@@ -54,7 +61,7 @@ async def test_api_key_still_grants_full_unrestricted_access(world):
         resp = await _call(c, "GET", "/tenants", api_key=settings.ADMIN_API_KEY)
         assert resp.status_code == 200 and len(resp.json()) == 2  # ve todos los tenants
         assert (await _call(c, "GET", "/users", api_key=settings.ADMIN_API_KEY)).status_code == 200
-        created = await _call(c, "POST", "/tenants", api_key=settings.ADMIN_API_KEY, json={"name": "N", "slug": "n"})
+        created = await _call(c, "POST", "/tenants", api_key=settings.ADMIN_API_KEY, json=_new_tenant())
         assert created.status_code == 201
 
 
@@ -68,7 +75,7 @@ async def test_wrong_api_key_is_rejected_even_with_a_valid_session(world):
 async def test_api_key_callers_do_not_need_the_csrf_header(world):
     async with world.client() as c:
         resp = await _call(c, "POST", "/tenants", api_key=settings.ADMIN_API_KEY,
-                           json={"name": "N", "slug": "n"}, csrf=False)
+                           json=_new_tenant(), csrf=False)
     assert resp.status_code == 201
 
 
@@ -76,7 +83,7 @@ async def test_api_key_callers_do_not_need_the_csrf_header(world):
 
 
 @pytest.mark.parametrize("method,path,body", [
-    ("POST", "/tenants", {"name": "N", "slug": "n"}),
+    ("POST", "/tenants", _new_tenant()),
     ("PATCH", "/tenants/{a}", {"name": "N"}),
     ("DELETE", "/tenants/{a}", None),
 ])
@@ -91,7 +98,7 @@ async def test_a_wrong_csrf_value_is_rejected_and_reads_do_not_need_it(world):
     token = await world.token("admin")
     async with world.client() as c:
         bad = await c.post(BASE + "/tenants", headers={**cookie(token), "X-Requested-With": "XMLHttpRequest"},
-                           json={"name": "N", "slug": "n"})
+                           json=_new_tenant())
         read = await _call(c, "GET", "/tenants", token=token, csrf=False)
     assert bad.status_code == 403
     assert read.status_code == 200
@@ -112,17 +119,18 @@ def _matrix():
     staff = {"admin", "tenant_manager", "botmaster"}
     managers = {"admin", "tenant_manager"}
     add("GET", "/tenants", None, 200, staff)
-    add("POST", "/tenants", lambda w: {"name": "N", "slug": "n"}, 201, {"admin"})
+    add("POST", "/tenants", lambda w: _new_tenant(), 201, {"admin"})
     add("GET", "/projects", None, 200, staff)
     add("POST", "/projects", lambda w: {"tenant_id": str(w.tenant_a.id), "name": "P", "slug": "p"}, 201, managers)
     add("GET", "/agents", None, 200, staff)
     add("POST", "/agents", lambda w: {"project_id": str(w.project_a.id), "name": "A", "langflow_flow_id": "f"}, 201, staff)
     add("GET", "/workflows", None, 200, staff)
     add("POST", "/workflows", lambda w: {"project_id": str(w.project_a.id), "name": "W", "n8n_workflow_id": "n"}, 201, managers)
-    add("GET", "/channel-connections", None, 200, managers)
+    # botmaster ahora también gestiona canales de sus tenants (POLICY).
+    add("GET", "/channel-connections", None, 200, staff)
     add("POST", "/channel-connections",
         lambda w: {"project_id": str(w.project_a.id), "agent_id": str(w.agent_a.id), "channel_type": "telegram", "external_id": "x"},
-        201, managers)
+        201, staff)
     add("GET", "/channel-apps", None, 200, {"admin"})
     add("GET", "/users", None, 200, {"admin"})
     return rows
@@ -147,11 +155,47 @@ async def test_only_admins_can_reveal_or_change_the_shared_provider_credentials(
     assert reveal.status_code == write.status_code == delete.status_code == 403
 
 
-async def test_client_role_cannot_use_the_admin_api_at_all(world):
-    token = await world.token("client")
+@pytest.mark.parametrize("role", ["client", "consultant"])
+async def test_client_side_roles_cannot_use_the_admin_api_at_all(world, role):
+    token = await world.token(role)
     async with world.client() as c:
         for path in ("/tenants", "/projects", "/agents", "/workflows", "/channel-connections", "/channel-apps", "/users"):
             assert (await _call(c, "GET", path, token=token)).status_code == 403, path
+        billing = f"/tenants/{world.tenant_a.id}/billing"
+        assert (await _call(c, "GET", billing, token=token)).status_code == 403
+
+
+async def test_tenant_billing_managers_read_and_write_scoped_to_their_tenants(world):
+    path_a = f"/tenants/{world.tenant_a.id}/billing"
+    path_b = f"/tenants/{world.tenant_b.id}/billing"
+    admin_token = await world.token("admin")
+    manager_token = await world.token("tenant_manager")  # scoped to tenant_a (ver admin_world.py)
+    botmaster_token = await world.token("botmaster")
+
+    async with world.client() as c:
+        empty = await _call(c, "GET", path_a, token=admin_token)
+        assert empty.status_code == 200
+        assert empty.json()["legal_name"] is None  # nada cargado todavía, no 404
+
+        updated = await _call(c, "PUT", path_a, token=admin_token, json={
+            "legal_name": "Clínica Vital S.A.", "tax_id": "RFC123", "billing_email": "facturas@vital.com",
+            "currency": "MXN", "plan": "pro",
+        })
+        assert updated.status_code == 200
+        body = updated.json()
+        assert body["legal_name"] == "Clínica Vital S.A." and body["currency"] == "MXN" and body["plan"] == "pro"
+
+        again = await _call(c, "GET", path_a, token=manager_token)  # el gestor también puede leerlo
+        assert again.status_code == 200 and again.json()["legal_name"] == "Clínica Vital S.A."
+
+        out_of_scope = await _call(c, "GET", path_b, token=manager_token)
+        assert out_of_scope.status_code == 404  # tenant_b no es suyo
+
+        forbidden = await _call(c, "GET", path_a, token=botmaster_token)
+        assert forbidden.status_code == 403  # botmaster gestiona agentes/canales, no facturación
+
+        unknown_tenant = await _call(c, "GET", f"/tenants/{uuid4()}/billing", token=admin_token)
+        assert unknown_tenant.status_code == 404
 
 
 # ------------------------------------------------------- tenant isolation
@@ -293,8 +337,10 @@ async def test_api_key_is_also_subject_to_the_agent_project_check(world):
 
 
 def _new_user(world, **over):
+    # No password: users are created pending and activate via the emailed
+    # link (see ProvisionUserUseCase) - nobody sets it at creation anymore.
     body = {"email": "New@Empresa.com", "name": "Nueva", "role": "client",
-            "password": "una-clave-larga-1", "tenant_ids": [str(world.tenant_a.id)]}
+            "tenant_ids": [str(world.tenant_a.id)]}
     body.update(over)
     return body
 
@@ -307,9 +353,15 @@ async def test_admin_creates_lists_and_reads_users_without_hashes(world):
         one = await _call(c, "GET", f"/users/{created.json()['id']}", token=token)
     assert created.status_code == 201
     assert created.json()["email"] == "new@empresa.com"
+    # Created pending, not active: nobody sets a password at creation time
+    # anymore - the user activates via the emailed link.
+    assert created.json()["status"] == "pending"
     for resp in (created, one):
         assert "password" not in resp.text and "hash" not in resp.text
-    assert len(listed.json()) == 5
+    assert len(listed.json()) == 6  # 5 de World (uno por rol, incluido consultant) + el recién creado
+    # ProvisionUserUseCase sent the activation email.
+    assert world.mailer.sent[-1]["to"] == "new@empresa.com"
+    assert world.mailer.sent[-1]["template"] == "account_activation"
 
 
 async def test_user_creation_validation_and_duplicates(world):
@@ -318,12 +370,11 @@ async def test_user_creation_validation_and_duplicates(world):
         await _call(c, "POST", "/users", token=token, json=_new_user(world))
         dup = await _call(c, "POST", "/users", token=token, json=_new_user(world, email="new@empresa.com"))
         bad_role = await _call(c, "POST", "/users", token=token, json=_new_user(world, email="b@x.com", role="root"))
-        short = await _call(c, "POST", "/users", token=token, json=_new_user(world, email="c@x.com", password="short"))
         no_tenant = await _call(c, "POST", "/users", token=token, json=_new_user(world, email="d@x.com", tenant_ids=[]))
         ghost_tenant = await _call(c, "POST", "/users", token=token,
                                    json=_new_user(world, email="e@x.com", tenant_ids=[str(uuid4())]))
     assert dup.status_code == 409
-    assert bad_role.status_code == short.status_code == no_tenant.status_code == ghost_tenant.status_code == 400
+    assert bad_role.status_code == no_tenant.status_code == ghost_tenant.status_code == 400
 
 
 async def test_only_admins_manage_users(world):
@@ -403,7 +454,8 @@ async def test_duplicates_answer_409_instead_of_500(world):
     async with world.client() as c:
         first = await _call(c, "POST", "/channel-connections", token=token, json=conn)
         again = await _call(c, "POST", "/channel-connections", token=token, json=conn)
-        tenant = await _call(c, "POST", "/tenants", token=token, json={"name": "Otro A", "slug": "a"})
+        tenant = await _call(c, "POST", "/tenants", token=token,
+                            json=_new_tenant(name="Otro A", slug="a", client_email="otro-a@cliente.com"))
         project = await _call(c, "POST", "/projects", token=token,
                               json={"tenant_id": str(world.tenant_a.id), "name": "Otro", "slug": "pa"})
     assert first.status_code == 201

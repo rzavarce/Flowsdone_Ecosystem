@@ -13,11 +13,12 @@ from uuid import UUID, uuid4
 from app.domain.models.call_session import CallSession
 from app.domain.models.channel_app import ChannelApp
 from app.domain.models.channel_connection import ChannelConnection
+from app.domain.models.tenant_billing_profile import TenantBillingProfile
 from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.models.session import Session
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User, UserCredentials
-from app.domain.ports.outbound import UserAlreadyExistsError
+from app.domain.ports.outbound import AlreadyExistsError, UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
 
 
@@ -586,10 +587,17 @@ def make_user(**overrides: Any) -> User:
 
 
 class FakeTenantRepo:
-    """In-memory TenantRepositoryPort: only list/list_by_ids/get_by_id."""
+    """In-memory TenantRepositoryPort: create/list/list_by_ids/get_by_id."""
 
     def __init__(self, tenants: Optional[List[Tenant]] = None) -> None:
         self.tenants = list(tenants or [])
+
+    async def create(self, *, name: str, slug: str) -> Tenant:
+        if any(t.slug == slug for t in self.tenants):
+            raise AlreadyExistsError(slug)
+        tenant = make_tenant(name=name, slug=slug)
+        self.tenants.append(tenant)
+        return tenant
 
     async def list(self) -> List[Tenant]:
         return list(self.tenants)
@@ -629,10 +637,10 @@ class FakeUserRepo:
         self.hashes[user.id] = f"fake${password}"
         return user
 
-    async def create(self, *, email, name, role, password_hash, tenant_ids) -> User:
+    async def create(self, *, email, name, role, password_hash, tenant_ids, status="active") -> User:
         if any(u.email == email for u in self.users.values()):
             raise UserAlreadyExistsError(email)
-        user = make_user(email=email, name=name, role=role, tenant_ids=list(tenant_ids))
+        user = make_user(email=email, name=name, role=role, tenant_ids=list(tenant_ids), status=status)
         self.users[user.id] = user
         self.hashes[user.id] = password_hash
         return user
@@ -713,3 +721,57 @@ class FakeLoginThrottle:
 
     async def reset(self, key: str) -> None:
         self.counts.pop(key, None)
+
+
+class FakeAccountTokenStore:
+    """In-memory AccountTokenStorePort (no real expiry: `issue` just stores).
+
+    One instance per "kind" of token in a test, same as the real
+    `RedisAccountTokenStore` - a token issued by one instance is unknown to
+    another, mirroring the activate/reset key-prefix separation.
+    """
+
+    def __init__(self) -> None:
+        self.tokens: Dict[str, UUID] = {}
+
+    async def issue(self, user_id: UUID, *, ttl_seconds: int) -> str:
+        token = f"token-{uuid4()}"
+        self.tokens[token] = user_id
+        return token
+
+    async def redeem(self, token: str) -> Optional[UUID]:
+        return self.tokens.pop(token, None)
+
+
+class FakeEmailSender:
+    """In-memory EmailSenderPort: records every call instead of sending anything."""
+
+    def __init__(self) -> None:
+        self.sent: List[Dict[str, Any]] = []
+
+    async def send_template(self, *, to: str, template: str, context: Dict[str, Any], subject: str) -> None:
+        self.sent.append({"to": to, "template": template, "context": context, "subject": subject})
+
+
+class FakeTenantBillingProfileRepo:
+    """In-memory TenantBillingProfileRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.profiles: Dict[UUID, TenantBillingProfile] = {}
+
+    async def get_by_tenant_id(self, tenant_id: UUID) -> Optional[TenantBillingProfile]:
+        return self.profiles.get(tenant_id)
+
+    async def upsert(self, tenant_id: UUID, **fields: Any) -> TenantBillingProfile:
+        now = datetime.now(timezone.utc)
+        current = self.profiles.get(tenant_id)
+        if current is None:
+            profile = TenantBillingProfile(
+                id=uuid4(), tenant_id=tenant_id, created_at=now, updated_at=now,
+                **{k: v for k, v in fields.items() if v is not None},
+            )
+        else:
+            changes = {k: v for k, v in fields.items() if v is not None}
+            profile = current.model_copy(update={**changes, "updated_at": now})
+        self.profiles[tenant_id] = profile
+        return profile

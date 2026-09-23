@@ -6,6 +6,7 @@ export const ROLE_META: Record<Role, { label: string; description: string }> = {
   tenant_manager: { label: 'Gestor de tenant', description: 'Gestiona por completo los tenants asignados.' },
   botmaster: { label: 'Botmaster', description: 'Crea y ajusta agentes en Langflow.' },
   client: { label: 'Cliente', description: 'Consulta gráficos y paneles de su organización.' },
+  consultant: { label: 'Consultor', description: 'Consultor externo de un cliente: solo ve reportes.' },
 }
 
 /** Matriz rol -> permisos. Única fuente de verdad del control de acceso en la UI. */
@@ -20,6 +21,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'projects:manage',
     'tenants:manage',
     'platform:manage',
+    'users:manage',
   ],
   tenant_manager: [
     'dashboard:view',
@@ -30,8 +32,14 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'settings:view',
     'projects:manage',
   ],
-  botmaster: ['agents:edit', 'settings:view'],
-  client: ['reports:view', 'settings:view'],
+  // Staff de Flowsdone asignado a tenants concretos por un admin: agentes,
+  // canales y conversaciones de esos tenants (POLICY.channel_connections en
+  // el backend, ampliado junto con esto - ver access_control.py).
+  botmaster: ['agents:edit', 'settings:view', 'channels:manage', 'conversations:manage'],
+  client: ['reports:view', 'settings:view', 'company:view'],
+  // Consultor de un cliente: solo reportes (ni dashboard, ni los datos de
+  // facturación de la empresa - eso es exclusivo de client).
+  consultant: ['reports:view', 'settings:view'],
 }
 
 /**

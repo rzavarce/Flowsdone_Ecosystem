@@ -32,7 +32,15 @@ __all__ = [
 ]
 
 Resource = Literal[
-    "tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users", "langflow"
+    "tenants",
+    "projects",
+    "agents",
+    "workflows",
+    "channel_connections",
+    "channel_apps",
+    "users",
+    "langflow",
+    "tenant_billing",
 ]
 Action = Literal["read", "write"]
 
@@ -44,19 +52,30 @@ _ADMIN = frozenset({"admin"})
 #  - tenant_manager: everything inside their tenants, but cannot create or
 #    delete tenants, touch the global provider credentials (channel_apps),
 #    or manage users.
-#  - botmaster: builds and edits agents; everything else is read-only or hidden.
+#  - botmaster: Flowsdone staff assigned to specific tenants (by an admin,
+#    via user_tenants); builds/edits agents and manages those tenants'
+#    channel connections. Everything else is read-only or hidden.
 #  - client: no access to the admin API at all (dashboards only).
 POLICY: dict[str, dict[str, FrozenSet[str]]] = {
     "tenants": {"read": _ALL_STAFF, "write": _ADMIN},
     "projects": {"read": _ALL_STAFF, "write": _MANAGERS},
     "agents": {"read": _ALL_STAFF, "write": _ALL_STAFF},
     "workflows": {"read": _ALL_STAFF, "write": _MANAGERS},
-    "channel_connections": {"read": _MANAGERS, "write": _MANAGERS},
+    "channel_connections": {"read": _ALL_STAFF, "write": _ALL_STAFF},
     "channel_apps": {"read": _ADMIN, "write": _ADMIN},
     "users": {"read": _ADMIN, "write": _ADMIN},
-    # Opening the Langflow editor as a tenant's user. Platform staff only: the
-    # per-tenant separation is a view, not a security boundary (see README).
-    "langflow": {"read": _ADMIN, "write": _ADMIN},
+    # Opening the Langflow editor as a tenant's user. Any staff role, scoped
+    # to their own tenants by access.tenant() as usual - but the per-tenant
+    # separation *inside* Langflow is a view, not a security boundary: an
+    # editor can add a Python-code component that runs in the shared
+    # `langflow` container and reaches its env vars (GATEWAY_ADMIN_API_KEY,
+    # Langfuse/Weaviate credentials) and the internal network. Accepted
+    # knowingly for tenant_manager/botmaster (Flowsdone staff, not clients).
+    "langflow": {"read": _ALL_STAFF, "write": _ALL_STAFF},
+    # Billing/company data of a tenant (domain/models/tenant_billing_profile.py).
+    # A client sees their own read-only through /me/billing-profile instead
+    # of this - never through the admin API (see users, above).
+    "tenant_billing": {"read": _MANAGERS, "write": _MANAGERS},
 }
 
 

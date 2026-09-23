@@ -25,7 +25,10 @@ def _principal(role, tenant_ids=None):
 
 
 def test_policy_covers_every_resource_with_read_and_write():
-    assert set(POLICY) == {"tenants", "projects", "agents", "workflows", "channel_connections", "channel_apps", "users", "langflow"}
+    assert set(POLICY) == {
+        "tenants", "projects", "agents", "workflows", "channel_connections",
+        "channel_apps", "users", "langflow", "tenant_billing",
+    }
     for actions in POLICY.values():
         assert set(actions) == {"read", "write"}
 
@@ -36,12 +39,15 @@ def test_write_permission_never_exceeds_read_permission():
         assert actions["write"] <= actions["read"], resource
 
 
-def test_client_role_appears_nowhere_in_the_policy():
-    assert all("client" not in roles for actions in POLICY.values() for roles in actions.values())
+@pytest.mark.parametrize("role", ["client", "consultant"])
+def test_client_side_roles_appear_nowhere_in_the_policy(role):
+    # client y consultant no tocan el admin API en absoluto (ver /me/billing-profile
+    # para el equivalente de solo lectura de un client sobre su propio tenant).
+    assert all(role not in roles for actions in POLICY.values() for roles in actions.values())
 
 
-def test_only_admin_touches_global_or_platform_level_resources():
-    for resource in ("channel_apps", "users", "langflow"):
+def test_only_admin_touches_global_resources():
+    for resource in ("channel_apps", "users"):
         assert POLICY[resource]["read"] == {"admin"} == POLICY[resource]["write"]
     assert POLICY["tenants"]["write"] == {"admin"}
 
@@ -49,7 +55,13 @@ def test_only_admin_touches_global_or_platform_level_resources():
 @pytest.mark.parametrize("role,resource,action,allowed", [
     ("botmaster", "agents", "write", True),
     ("botmaster", "workflows", "write", False),
-    ("botmaster", "channel_connections", "read", False),
+    ("botmaster", "channel_connections", "read", True),
+    ("botmaster", "channel_connections", "write", True),
+    # Editor de Langflow: cualquier staff (aceptado a sabiendas - ver comentario en POLICY).
+    ("botmaster", "langflow", "read", True),
+    ("tenant_manager", "langflow", "write", True),
+    ("botmaster", "tenant_billing", "read", False),  # gestiona agentes/canales, no facturación
+    ("tenant_manager", "tenant_billing", "write", True),
     ("tenant_manager", "projects", "write", True),
     ("tenant_manager", "tenants", "write", False),
     ("client", "tenants", "read", False),

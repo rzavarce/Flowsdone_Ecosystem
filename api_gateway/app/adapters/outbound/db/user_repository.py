@@ -81,6 +81,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         role: str,
         password_hash: str,
         tenant_ids: List[UUID],
+        status: str = "active",
     ) -> User:
         """Insert a user and its tenant memberships atomically.
 
@@ -90,6 +91,8 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
             role (str): One of `USER_ROLES`.
             password_hash (str): Hash produced by `PasswordHasherPort.hash`.
             tenant_ids (List[UUID]): Tenants the user belongs to.
+            status (str): One of `UserStatus`; defaults to `active` (the
+                column's own `server_default`, kept explicit here too).
 
         Returns:
             User: The created user.
@@ -98,7 +101,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
             UserAlreadyExistsError: If the email is already registered.
         """
         async with self._sessionmaker() as session:
-            model = UserModel(email=email, name=name, role=role, password_hash=password_hash)
+            model = UserModel(email=email, name=name, role=role, password_hash=password_hash, status=status)
             session.add(model)
             try:
                 await session.flush()

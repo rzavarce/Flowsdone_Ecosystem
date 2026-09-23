@@ -1,7 +1,9 @@
-/** Perfiles de la plataforma. */
-export type Role = 'admin' | 'tenant_manager' | 'botmaster' | 'client'
+/** Perfiles de la plataforma. `consultant`: consultor de un cliente, acotado
+ * a reportes - se crea desde Usuarios como `botmaster`/`tenant_manager`,
+ * pero nunca toca el admin API (mismo alcance que `client`). */
+export type Role = 'admin' | 'tenant_manager' | 'botmaster' | 'client' | 'consultant'
 
-export const ROLES: readonly Role[] = ['admin', 'tenant_manager', 'botmaster', 'client']
+export const ROLES: readonly Role[] = ['admin', 'tenant_manager', 'botmaster', 'client', 'consultant']
 
 /**
  * Capacidades que la UI puede exigir. Son granulares a propósito: las rutas y
@@ -18,6 +20,8 @@ export type Permission =
   | 'projects:manage' // pantalla Tenants: proyectos de los tenants propios (admin y gestor)
   | 'tenants:manage' // crear, editar, suspender y borrar tenants (solo admin)
   | 'platform:manage' // credenciales compartidas de proveedores (Meta, X, TikTok, Twilio)
+  | 'users:manage' // pantalla Usuarios: alta/edición/borrado de admin, tenant_manager y botmaster (solo admin)
+  | 'company:view' // "Mi empresa": datos de facturación del propio tenant, solo lectura (solo client)
 
 /** Organización cliente de la plataforma; unidad de aislamiento de datos. */
 export interface Tenant {

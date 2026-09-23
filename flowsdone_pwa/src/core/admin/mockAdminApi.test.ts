@@ -90,9 +90,12 @@ describe('mockAdminApi', () => {
   it('tenants: lista, crea, edita y rechaza un slug repetido (409)', async () => {
     const api = make()
     expect((await api.listTenants()).map((t) => t.id)).toEqual(['t1', 't2', 't3'])
-    const created = await api.createTenant({ name: 'Nuevo', slug: 'nuevo' })
+    const created = await api.createTenant({ name: 'Nuevo', slug: 'nuevo', client_email: 'c@nuevo.com', client_name: 'Cliente Nuevo' })
     expect(created).toMatchObject({ name: 'Nuevo', slug: 'nuevo', status: 'active' })
-    await expect(api.createTenant({ name: 'Otro', slug: 'nuevo' })).rejects.toMatchObject({ status: 409 })
+    await expect(api.createTenant({ name: 'Otro', slug: 'nuevo', client_email: 'otro@x.com', client_name: 'Otro' })).rejects.toMatchObject({ status: 409 })
+    await expect(
+      api.createTenant({ name: 'Repetido', slug: 'repetido', client_email: 'c@nuevo.com', client_name: 'Y' }),
+    ).rejects.toMatchObject({ status: 409 }) // el email del cliente también es único
 
     expect((await api.updateTenant(created.id, { name: 'Renombrado', status: 'suspended' }))).toMatchObject({ name: 'Renombrado', status: 'suspended', slug: 'nuevo' })
     await expect(api.updateTenant(created.id, { slug: 'clinica-vital' })).rejects.toMatchObject({ status: 409 })
@@ -107,6 +110,27 @@ describe('mockAdminApi', () => {
     expect((await api.listAgents()).map((a) => a.id)).toEqual(['a2'])
     expect((await api.listChannelConnections()).map((c) => c.id)).toEqual(['c3'])
     await expect(api.deleteTenant('t1')).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('usuarios: lista, crea pending, edita, borra y reenvía la activación', async () => {
+    const api = make()
+    const before = await api.listUsers()
+    expect(before.length).toBeGreaterThan(0)
+
+    const created = await api.createUser({ email: 'Nuevo@X.com', name: 'Nuevo', role: 'botmaster', tenant_ids: ['t1'] })
+    expect(created).toMatchObject({ email: 'nuevo@x.com', role: 'botmaster', status: 'pending', tenant_ids: ['t1'] })
+    await expect(api.createUser({ email: 'nuevo@x.com', name: 'Otro', role: 'client', tenant_ids: ['t1'] })).rejects.toMatchObject({ status: 409 })
+
+    const admin = await api.createUser({ email: 'admin2@x.com', name: 'Otro admin', role: 'admin', tenant_ids: ['t1'] })
+    expect(admin.tenant_ids).toEqual([]) // admin no lleva tenant_ids aunque se manden
+
+    await api.resendUserActivation(created.id) // sigue pending: no tira
+    const updated = await api.updateUser(created.id, { status: 'active' })
+    expect(updated.status).toBe('active')
+    await expect(api.resendUserActivation(created.id)).rejects.toMatchObject({ status: 404 }) // ya no está pending
+
+    await api.deleteUser(created.id)
+    await expect(api.deleteUser(created.id)).rejects.toMatchObject({ status: 404 })
   })
 
   it('proyectos: editar respeta la unicidad dentro del tenant; borrar arrastra agentes y canales', async () => {

@@ -1,5 +1,7 @@
 /** Tipos de la API admin del gateway (`/internal/admin/*`) tal como los usa la consola. */
 
+import type { Role } from '@/core/auth/types'
+
 /** Canales soportados por el gateway. */
 export type ChannelType =
   | 'facebook'
@@ -29,6 +31,10 @@ export interface TenantRecord {
 export interface CreateTenantInput {
   name: string
   slug: string
+  /** Email del `client` que se crea junto al tenant (pending, activa por email). */
+  client_email: string
+  /** Nombre para mostrar de ese `client`. */
+  client_name: string
 }
 
 /** Campos editables de un tenant; los omitidos no cambian. */
@@ -37,6 +43,35 @@ export interface UpdateTenantInput {
   slug?: string
   status?: LifecycleStatus
 }
+
+/** Datos de facturación de un tenant (1:1) - pura captura de datos, sin motor
+ * de cobro detrás. Todo opcional: se completa gradualmente. */
+export interface TenantBillingProfile {
+  id: string
+  tenant_id: string
+  legal_name: string | null
+  tax_id: string | null
+  billing_email: string | null
+  billing_contact_name: string | null
+  billing_phone: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  state_province: string | null
+  postal_code: string | null
+  country: string | null
+  currency: string | null
+  plan: string | null
+  billing_cycle: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Campos editables del perfil de facturación; los omitidos no cambian. */
+export type UpdateTenantBillingInput = Partial<
+  Omit<TenantBillingProfile, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+>
 
 /** Campos editables de un proyecto; los omitidos no cambian. */
 export interface UpdateProjectInput {
@@ -110,6 +145,40 @@ export interface UpdateChannelConnectionInput {
   /** Si se envía REEMPLAZA las credenciales actuales. */
   credentials?: Record<string, string>
   status?: string
+}
+
+/** Estado de una cuenta de consola. `pending`: creada, esperando que active
+ * su cuenta por el link que le llegó por email - no puede loguear todavía. */
+export type UserAccountStatus = 'pending' | 'active' | 'disabled'
+
+/** Un usuario de consola tal como lo devuelve la API admin. Nunca trae el hash. */
+export interface UserRecord {
+  id: string
+  email: string
+  name: string
+  role: Role
+  status: UserAccountStatus
+  tenant_ids: string[]
+  last_login_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Alta de un usuario. Sin password: se crea `pending` y activa por email
+ * (ver `ProvisionUserUseCase` en el backend). */
+export interface CreateUserInput {
+  email: string
+  name: string
+  role: Role
+  tenant_ids: string[]
+}
+
+/** Campos editables de un usuario; los omitidos no cambian. */
+export interface UpdateUserInput {
+  name?: string
+  role?: Role
+  status?: 'active' | 'disabled'
+  tenant_ids?: string[]
 }
 
 /** Sesión para abrir Langflow como el usuario de un tenant. */
