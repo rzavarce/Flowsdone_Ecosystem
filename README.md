@@ -29,7 +29,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 21. [Agente de onboarding interno (Langflow → admin API)](#21-agente-de-onboarding-interno-langflow--admin-api)
 22. [Activación de cuentas por email + Usuarios en la PWA](#22-activación-de-cuentas-por-email--usuarios-en-la-pwa)
 23. [Editor de Langflow para todo el staff, rol `consultant`, Reportes y facturación del cliente](#23-editor-de-langflow-para-todo-el-staff-rol-consultant-reportes-y-facturación-del-cliente)
-24. [Conversaciones y archivo de mensajes (ClickHouse)](#24-conversaciones-y-archivo-de-mensajes-clickhouse)
+24. [Conversaciones, consumo y planes (ClickHouse)](#24-conversaciones-consumo-y-planes-clickhouse)
 
 ---
 
@@ -1316,7 +1316,7 @@ Cuarto rol "de staff visible" (se crea desde Usuarios, con tenant(s) asignados),
 
 ---
 
-## 24. Conversaciones y archivo de mensajes (ClickHouse)
+## 24. Conversaciones, consumo y planes (ClickHouse)
 
 Una **Conversation** es un intercambio acotado con un contacto, distinto de la `Session` de Switchboard (sección 20). La Session tiene un id fijo por contacto (`{project}:{canal}:{contacto}`) y se reutiliza siempre. La Conversation tiene su propio UUID, empieza con el primer mensaje del contacto y termina con **lo primero** que ocurra de:
 
@@ -1341,7 +1341,9 @@ El id de la Conversation viaja en el envelope como `meta.llm_session_id`, y `Exe
 |---|---|---|
 | Estado de cada conversación (abierta/cerrada, contadores, fechas) | Postgres, tabla `conversations` (migración `0010`) | Datos que cambian y que la bandeja de entrada consulta. Una sola conversación abierta por sesión (índice único parcial) |
 | Texto de cada mensaje | ClickHouse, `flowsdone.messages` | Solo se añaden filas, volumen alto, borrado automático por TTL a los `MESSAGE_RETENTION_DAYS` (183 ≈ 6 meses), guardado por fila en `retention_until` |
-| Consumo medido (canal, tokens, plataforma) | ClickHouse, `flowsdone.usage_events` | Solo se crea la tabla; se llena en la Fase 2. **Sin TTL** (respalda la facturación) |
+| Consumo medido (canal, tokens, plataforma) | ClickHouse, `flowsdone.usage_events` | Solo **cantidades**, nunca dinero. **Sin TTL** (respalda la facturación) |
+| Catálogo de costes, planes, suscripciones y extractos cerrados | Postgres: `cost_rates`, `plans`, `tenant_subscriptions`, `usage_statements` (migraciones `0011` y `0012`) | Configuración y cierres mensuales congelados |
+| Contadores de cuota del mes | Redis, `billing:quota:{tenant}:{YYYY-MM}` | Se consultan en cada mensaje. Si se pierden, se reconstruyen desde ClickHouse |
 | Auditoría de sesión | Postgres, `session_events` | Un evento `closed` por cada conversación cerrada |
 
 `session_messages` (Postgres) se sigue escribiendo en paralelo por ahora. Se retira cuando el archivo de ClickHouse esté validado en producción.
@@ -1374,4 +1376,68 @@ HandleOutboundResponse.deliver ──┘        │
   ```
 
 - **Cambios de esquema:** solo con sentencias idempotentes (`ADD COLUMN IF NOT EXISTS`), nunca con `DROP`.
+
+### Medición del consumo
+
+| Contador | De dónde sale | `kind` / `sku` / `unit` |
+|---|---|---|
+| Mensajes por canal (entrantes y salientes) | `kafka_conversations_worker`, al archivar cada mensaje | `channel` / `message.inbound\|outbound` / `message` |
+| Mensaje atendido por el agente (lo que cuentan las cuotas) | Igual, solo para mensajes entrantes **no rechazados** por la cuota | `platform` / `ai_message` / `message` |
+| Tokens de LLM por modelo | `usage_worker`: lee de Langfuse las generaciones y las atribuye por `sessionId` (= id de conversación) | `llm` / modelo / `input_token`, `output_token`, `cached_input_token` |
+
+- **Los ids de los eventos son deterministas** (uuid5 del mensaje o de la observación de Langfuse). Reprocesar no duplica nada.
+- **Sincronización de tokens:** se ejecuta cada `LLM_USAGE_SYNC_INTERVAL_SECONDS`, relee 1 h antes del último cursor (`sync_cursors`) y se detiene 2 min antes de ahora, porque Langfuse ingiere con retraso. Sin `LANGFUSE_PUBLIC_KEY`/`SECRET_KEY`, no hace nada (lo deja en el log).
+- **Traces sin conversación asociada** (webchat, playground de Langflow, sesiones anteriores a la sección 24): no se atribuyen a ningún tenant.
+- **El coste se calcula al leer,** con el catálogo `cost_rates`: se aplica la tarifa más específica vigente ese día (exacta > prefijo `gpt-4.1-mini*` > `*`). Un cambio de precio es una tarifa **nueva** con `valid_from`, y el consumo anterior mantiene su precio. Una tarifa añadida tarde se aplica también al consumo ya medido, **salvo en los meses cerrados**.
+- **Consumo externo sin tarifa:** se valora a 0 y aparece en *Planes → Costes → Consumo sin tarifa*.
+
+### Planes, cuotas y excedente
+
+- **Plan:** cuota mensual, mensajes incluidos y precio de excedente **por canal** (`*` = resto de canales), margen objetivo, modelos permitidos y tokens de uso razonable.
+- **Suscripción:** un plan por tenant, con modo de excedente propio y un tope de gasto opcional.
+- **`QuotaGate`**, en el Switchboard: evalúa cada mensaje entrante **antes** de pasarlo a la app:
+
+| Modo | Al superar los incluidos |
+|---|---|
+| `notify` | Sigue respondiendo. Envía aviso y no cobra el excedente |
+| `overage` | Sigue respondiendo y cobra cada mensaje extra. Si se supera el tope de gasto, deja de responder |
+| `hard_stop` | Deja de responder hasta el mes siguiente |
+
+- **Mensajes rechazados:** se registran en la conversación (`billable=false`), pero **nunca llegan a Langflow**, así que no hay respuesta ni coste de LLM.
+- **Si la comprobación falla** (Redis o la base de datos caídos), **el mensaje se admite**.
+- **Tenants sin suscripción:** no tienen límites ni se les cobra.
+- **Avisos por email** a `billing_email` al 80 %, al 100 % y al primer rechazo del mes. Plantilla `quota_alert`; cada aviso se envía una sola vez por tenant, canal y mes.
+- **Uso razonable y modelos permitidos:** no bloquean. Se marcan en el extracto para que el admin lo revise.
+- **Extracto del mes:** mientras el mes está en curso, se calcula en vivo (cuota + excedente = ingreso; coste = canal + LLM; margen). El `usage_worker` **cierra el mes anterior** 6 h después de terminar, cuando ya ha llegado el consumo en tránsito, y lo congela en `usage_statements`. Es idempotente.
+- **Precio sugerido de excedente** (`GET /plans/{id}/pricing-insight`): coste medio por mensaje de los últimos 30 días × (1 + margen). Usa los tenants del plan o, si no hay datos, toda la plataforma.
+
+### API de administración (`/internal/admin`)
+
+| Ruta | Quién | Qué |
+|---|---|---|
+| `GET /conversations`, `GET /conversations/{id}` | admin, tenant_manager, botmaster (sus tenants) | Bandeja con filtros (`status`, `channel_type`, `contact`, `project_id`, paginación con `before`) y detalle con transcripción, tokens y coste |
+| `GET/POST/PATCH/DELETE /plans`, `GET /plans/{id}/pricing-insight` | admin | Planes (409 al borrar uno en uso) |
+| `GET/POST/DELETE /cost-rates`, `GET /cost-rates/unrated` | admin | Catálogo de costes y contadores sin tarifa |
+| `GET/PUT/DELETE /tenants/{id}/subscription` | lectura: admin y tenant_manager · escritura: admin | Plan del tenant |
+| `GET /tenants/{id}/statement?period=YYYY-MM`, `GET /tenants/{id}/statements` | admin, tenant_manager | Extracto en curso o cerrado |
+| `POST /billing/periods/{YYYY-MM}/close` | admin | Cierre manual (el worker ya lo hace solo) |
+| `GET /me/usage` | client | Su consumo del mes |
+
+**Los costes y el margen de Flowsdone solo los ve el admin.** Para el resto de roles, la API devuelve esos campos a `null`.
+
+### PWA
+
+- **Conversaciones:** bandeja filtrable, acotada por el selector de tenant de la barra superior. El detalle muestra la transcripción (los rechazados por cuota van marcados), los tokens y, para el admin, el coste.
+- **Planes** (solo admin), con dos pestañas:
+  - *Planes:* alta y edición, con el precio sugerido y el botón "Usar sugeridos".
+  - *Costes:* catálogo de tarifas y consumo sin tarifa, con alta precargada.
+- **Tenants:** tarjeta *Plan* (el admin la asigna o cambia; el gestor solo la ve) y tarjeta *Consumo* con barras por canal y total del mes. El admin ve además el coste y el margen.
+- **Mi empresa** (cliente): su consumo del mes.
+
+### Límites conocidos
+
+- **El webchat no pasa por el Switchboard.** No genera conversaciones ni cuenta para la cuota.
+- **Voz:** cada turno cuenta como un mensaje. Los minutos de Twilio todavía no se miden.
+- **Los modelos permitidos no se imponen dentro de Langflow.** Solo se detectan en el consumo.
+- **`session_messages` (Postgres)** se sigue escribiendo en paralelo hasta validar el archivo de ClickHouse en producción.
 
