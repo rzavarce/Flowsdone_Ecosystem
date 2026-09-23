@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS ${DB}.messages
     app                   LowCardinality(String),
     contact               String,
     text                  String,
+    billable              Bool DEFAULT true,
     retention_until       DateTime('UTC'),
     inserted_at           DateTime64(3, 'UTC') DEFAULT now64(3)
 )

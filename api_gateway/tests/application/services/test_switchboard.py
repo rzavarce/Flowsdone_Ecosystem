@@ -337,3 +337,75 @@ async def test_inbound_turn_still_reaches_the_connector_when_conversation_tracki
     )
 
     assert len(connector.calls) == 1
+
+
+# --- handle_inbound_turn(): quota ----------------------------------------------
+
+
+class _Gate:
+    def __init__(self, allowed=True, fail=False):
+        self.allowed = allowed
+        self.fail = fail
+        self.calls = []
+
+    async def admit(self, *, tenant_id, channel_type, now):
+        from app.domain.models.billing import QuotaDecision
+
+        self.calls.append((tenant_id, channel_type))
+        if self.fail:
+            raise RuntimeError("redis down")
+        return QuotaDecision(allowed=self.allowed, reason="x", channel_type=channel_type)
+
+
+def _quota_switchboard(gate):
+    resolution = make_channel_resolution(channel_type="telegram", external_id="bot-1")
+    connector = FakeAppConnector()
+    tracker, _, events = _tracker()
+    session_repo = FakeSessionRepository()
+    switchboard = Switchboard(
+        channel_connection_repo=FakeChannelConnectionRepo(resolution=resolution),
+        session_repo=session_repo,
+        session_history_repo=FakeSessionHistoryRepository(),
+        app_connectors={"langflow": connector},
+        outbound_handler=FakeOutboundHandler(),
+        session_ttl_seconds=86400,
+        conversation_tracker=tracker,
+        quota_gate=gate,
+    )
+    return switchboard, connector, events, session_repo, resolution
+
+
+async def _turn(switchboard):
+    await switchboard.handle_inbound_turn(
+        channel_type="telegram", external_id="bot-1", external_conversation_key="chat-42",
+        sender_id="user-7", message_text="hola", raw_payload={},
+    )
+
+
+async def test_a_message_refused_by_the_quota_is_recorded_but_never_dispatched():
+    gate = _Gate(allowed=False)
+    switchboard, connector, events, session_repo, resolution = _quota_switchboard(gate)
+
+    await _turn(switchboard)
+
+    assert gate.calls == [(resolution.tenant_id, "telegram")]
+    assert connector.calls == []
+    assert events.events[0].billable is False
+    assert session_repo.saved  # the session (and its conversation) is kept
+
+
+async def test_an_admitted_message_is_dispatched_and_billable():
+    switchboard, connector, events, _, _ = _quota_switchboard(_Gate(allowed=True))
+
+    await _turn(switchboard)
+
+    assert len(connector.calls) == 1
+    assert events.events[0].billable is True
+
+
+async def test_a_failing_quota_check_fails_open():
+    switchboard, connector, _, _, _ = _quota_switchboard(_Gate(fail=True))
+
+    await _turn(switchboard)
+
+    assert len(connector.calls) == 1

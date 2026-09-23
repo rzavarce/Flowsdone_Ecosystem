@@ -27,6 +27,7 @@ _COLUMNS = (
     "app",
     "contact",
     "text",
+    "billable",
     "retention_until",
 )
 
@@ -37,7 +38,7 @@ SELECT toString(message_id) AS message_id, toString(ts) AS ts, toString(tenant_i
        toString(project_id) AS project_id, toString(agent_id) AS agent_id,
        toString(conversation_id) AS conversation_id, session_id, channel_type,
        toString(channel_connection_id) AS channel_connection_id, toString(direction) AS direction,
-       sender_type, app, contact, text
+       sender_type, app, contact, text, billable
 FROM {db}.messages FINAL
 WHERE tenant_id = {tenant:UUID} AND conversation_id = {conversation:UUID}
 ORDER BY ts, message_id
@@ -71,6 +72,7 @@ def _to_row(event: ConversationMessageRecorded, retention: timedelta) -> Dict[st
         "app": event.app,
         "contact": event.contact,
         "text": event.text,
+        "billable": event.billable,
         "retention_until": (ts + retention).strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -119,7 +121,8 @@ class ClickHouseMessageArchive(MessageArchivePort):
         rows = await self._client.select(
             _LIST_SQL, {"tenant": tenant_id, "conversation": conversation_id, "limit": limit}
         )
-        return [
-            ConversationMessageRecorded.model_validate({**row, "timestamp": row.pop("ts") + "+00:00"})
-            for row in rows
-        ]
+        messages = []
+        for row in rows:
+            timestamp = row.pop("ts") + "+00:00"
+            messages.append(ConversationMessageRecorded.model_validate({**row, "timestamp": timestamp}))
+        return messages

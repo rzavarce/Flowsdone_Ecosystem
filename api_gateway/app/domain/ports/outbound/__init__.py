@@ -75,6 +75,13 @@ from app.domain.ports.outbound.auth import (  # noqa: F401
     UserAvatarRepositoryPort,
     UserRepositoryPort,
 )
+from app.domain.ports.outbound.billing import (  # noqa: F401
+    PlanInUseError,
+    PlanRepositoryPort,
+    QuotaCounterPort,
+    StatementRepositoryPort,
+    SubscriptionRepositoryPort,
+)
 from app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.channel_sender import ChannelSenderPort  # noqa: F401
 from app.domain.ports.outbound.conversations import (  # noqa: F401

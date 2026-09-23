@@ -59,7 +59,9 @@ class ConversationTracker:
         self._history = session_history_repo
         self._policy = policy
 
-    async def record_inbound(self, *, session: Session, text: str, now: datetime) -> Conversation:
+    async def record_inbound(
+        self, *, session: Session, text: str, now: datetime, billable: bool = True
+    ) -> Conversation:
         """Record a message from the contact, opening a new conversation
         first if the session has none or its current one has expired.
 
@@ -68,6 +70,8 @@ class ConversationTracker:
                 `conversation_id` is updated in place.
             text (str): The message text.
             now (datetime): When the message arrived (timezone-aware).
+            billable (bool): False if the message was refused (e.g. by the
+                plan's quota) and so is not platform usage.
 
         Returns:
             Conversation: The conversation the message was recorded in.
@@ -76,7 +80,9 @@ class ConversationTracker:
         session.conversation_id = conversation.id
 
         await self._conversations.record_message(conversation.id, direction="inbound", at=now)
-        await self._publish(session, conversation, direction="inbound", sender_type="contact", text=text, now=now)
+        await self._publish(
+            session, conversation, direction="inbound", sender_type="contact", text=text, now=now, billable=billable
+        )
         return conversation
 
     async def record_outbound(
@@ -181,6 +187,7 @@ class ConversationTracker:
         sender_type: MessageSenderType,
         text: str,
         now: datetime,
+        billable: bool = True,
     ) -> None:
         """Publish a recorded message to the conversation event stream.
 
@@ -191,6 +198,7 @@ class ConversationTracker:
             sender_type (MessageSenderType): Who wrote it.
             text (str): The message text.
             now (datetime): When it happened.
+            billable (bool): Whether an inbound message counts as usage.
         """
         await self._events.publish_message_recorded(
             ConversationMessageRecorded(
@@ -208,6 +216,7 @@ class ConversationTracker:
                 app=session.current_app,
                 contact=conversation.contact,
                 text=text,
+                billable=billable,
             )
         )
 

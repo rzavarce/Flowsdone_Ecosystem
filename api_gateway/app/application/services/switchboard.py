@@ -24,6 +24,7 @@ from app.domain.ports.outbound import (
     SessionRepositoryPort,
 )
 from app.application.services.conversation_tracker import ConversationTracker
+from app.application.services.quota_gate import QuotaGate
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 
 logger = logging.getLogger("switchboard")
@@ -75,6 +76,7 @@ class Switchboard:
         session_ttl_seconds: int,
         default_app: str = DEFAULT_APP,
         conversation_tracker: Optional[ConversationTracker] = None,
+        quota_gate: Optional[QuotaGate] = None,
     ) -> None:
         """Build the switchboard.
 
@@ -98,6 +100,9 @@ class Switchboard:
                 rotates the session's Conversation and records the
                 inbound message into the conversation archive. Optional
                 so tests/callers that don't need it can omit it.
+            quota_gate (Optional[QuotaGate]): Checks the tenant's plan
+                before a message is handed to an app; a refused message
+                is recorded but never dispatched. Optional (no limits).
         """
         self.channel_connection_repo = channel_connection_repo
         self.session_repo = session_repo
@@ -107,6 +112,7 @@ class Switchboard:
         self.session_ttl_seconds = session_ttl_seconds
         self.default_app = default_app
         self.conversation_tracker = conversation_tracker
+        self.quota_gate = quota_gate
 
     async def handle_inbound_turn(
         self,
@@ -200,7 +206,18 @@ class Switchboard:
         session.record_message(
             direction="inbound", text=message_text, app=session.current_app, timestamp=now
         )
-        await self._track_inbound(session, message_text, now)
+        admitted = await self._admit(session, now)
+        await self._track_inbound(session, message_text, now, billable=admitted)
+
+        if not admitted:
+            # Over the plan's limit: keep the conversation record, but the
+            # app never sees the message (no reply, no LLM cost).
+            await self.session_repo.save(session, ttl_seconds=self.session_ttl_seconds)
+            logger.warning(
+                "switchboard.turn.refused_by_quota",
+                extra={"session_id": session_id, "tenant_id": str(session.tenant_id)},
+            )
+            return
 
         logger.info(
             "switchboard.turn.dispatched",
@@ -266,7 +283,32 @@ class Switchboard:
 
         return session
 
-    async def _track_inbound(self, session: Session, text: str, now: datetime) -> None:
+    async def _admit(self, session: Session, now: datetime) -> bool:
+        """Best-effort quota check for one inbound message.
+
+        Fails open: if the check itself errors (Redis/DB down), the
+        message is admitted - an infrastructure problem must never
+        silence a tenant's assistant.
+
+        Args:
+            session (Session): The contact's session.
+            now (datetime): When the message arrived.
+
+        Returns:
+            bool: True if the message may be handed to the app.
+        """
+        if self.quota_gate is None:
+            return True
+        try:
+            decision = await self.quota_gate.admit(
+                tenant_id=session.tenant_id, channel_type=session.channel_type, now=now
+            )
+            return decision.allowed
+        except Exception:
+            logger.error("switchboard.quota_check.failed", extra={"session_id": session.id}, exc_info=True)
+            return True
+
+    async def _track_inbound(self, session: Session, text: str, now: datetime, billable: bool = True) -> None:
         """Best-effort: attach the session to its current Conversation
         (opening a new one if needed) and record the inbound message.
 
@@ -279,11 +321,12 @@ class Switchboard:
             session (Session): The contact's session (mutated in place).
             text (str): The inbound message text.
             now (datetime): When the message arrived.
+            billable (bool): False if the quota refused the message.
         """
         if self.conversation_tracker is None:
             return
         try:
-            await self.conversation_tracker.record_inbound(session=session, text=text, now=now)
+            await self.conversation_tracker.record_inbound(session=session, text=text, now=now, billable=billable)
         except Exception:
             logger.error(
                 "switchboard.conversation_tracking.failed",

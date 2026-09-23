@@ -10,8 +10,13 @@ that is inherently "about me", not a general-purpose escape hatch around
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from datetime import datetime, timezone
+from typing import Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+
+from app.adapters.inbound.http.admin.billing import statement_out
+from app.adapters.inbound.http.admin.billing_schemas import StatementOut
 from app.adapters.inbound.http.admin.schemas import ProfileUpdate, TenantBillingOut
 from app.adapters.inbound.http.auth_deps import get_current_user, require_console_header
 from app.adapters.inbound.http.avatar_io import avatar_response, read_image_body
@@ -53,6 +58,42 @@ async def my_billing_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="no billing profile yet")
     return TenantBillingOut(**profile.model_dump())
+
+
+@router.get("/usage", response_model=StatementOut)
+async def my_usage(
+    request: Request,
+    period: Optional[str] = Query(default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> StatementOut:
+    """The caller's tenant usage and charges for a month (read-only).
+
+    Built for `client`, like `/billing-profile`: messages per channel
+    against the plan's quota, overage and the month's total. Flowsdone's
+    costs and margins are never included. `consultant` is excluded (no
+    billing data, see the PWA's role matrix).
+
+    Args:
+        request (Request): Used to reach `request.app.state.compute_statement_use_case`.
+        period (Optional[str]): "YYYY-MM"; current month if omitted.
+        user (AuthenticatedUser): The signed-in user.
+
+    Returns:
+        StatementOut: The statement without costs.
+
+    Raises:
+        HTTPException: 403 for roles other than `client`; 404 if the caller
+            belongs to no tenant.
+    """
+    if user.role != "client":
+        raise HTTPException(status_code=403, detail="forbidden")
+    if not user.tenants:
+        raise HTTPException(status_code=404, detail="no tenant for this account")
+    now = datetime.now(timezone.utc)
+    statement = await request.app.state.compute_statement_use_case.execute(
+        tenant_id=user.tenants[0].id, period=period or now.strftime("%Y-%m"), now=now
+    )
+    return statement_out(statement, with_costs=False)
 
 
 @router.patch("/profile", response_model=AuthenticatedUser, dependencies=[Depends(require_console_header)])

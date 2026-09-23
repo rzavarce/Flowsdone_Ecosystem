@@ -26,8 +26,24 @@ from app.domain.models.project import Project
 from app.domain.models.workflow_config import WorkflowConfig
 from app.domain.ports.outbound import AlreadyExistsError
 from api_gateway.tests.support.asgi import client_for_router
+from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.billing import (
+    CloseBillingPeriodUseCase,
+    ComputeStatementUseCase,
+    ListUnratedMetersUseCase,
+    PlanPricingInsightUseCase,
+)
+from app.application.use_cases.conversation_queries import GetConversationDetailUseCase
 from api_gateway.tests.support.fakes import (
     FakeAccountTokenStore,
+    FakeConversationRepository,
+    FakeCostRateRepo,
+    FakePlanRepo,
+    FakeQuotaCounter,
+    FakeStatementRepo,
+    FakeSubscriptionRepo,
+    FakeUsageStore,
+    make_conversation,
     FakeAuthSessionRepo,
     FakeEmailSender,
     FakePasswordHasher,
@@ -163,6 +179,19 @@ class World:
         self.billing_profiles = FakeTenantBillingProfileRepo()
         self.avatars = FakeUserAvatarRepo(self.users)
 
+        # Conversations and billing (one conversation per tenant).
+        self.conversation_a = make_conversation(tenant_id=self.tenant_a.id, project_id=self.project_a.id, contact="+34 600 111")
+        self.conversation_b = make_conversation(tenant_id=self.tenant_b.id, project_id=self.project_b.id, contact="+34 600 222")
+        self.conversations = FakeConversationRepository(self.conversation_a, self.conversation_b)
+        self.archived_messages: List[Any] = []
+        self.usage = FakeUsageStore()
+        self.cost_rates = FakeCostRateRepo()
+        self.plans = FakePlanRepo()
+        self.subscriptions = FakeSubscriptionRepo()
+        self.plans.subscriptions = self.subscriptions
+        self.statements = FakeStatementRepo()
+        self.quota_gate = QuotaGate(subscriptions=self.subscriptions, plans=self.plans, counters=FakeQuotaCounter())
+
     @classmethod
     def build(cls) -> "World":
         return cls()
@@ -202,6 +231,39 @@ class World:
             create_tenant_use_case=CreateTenantUseCase(
                 tenant_repo=self.tenants, user_repo=self.users, provision_user=provision_user
             ),
+            **self.billing_state(),
+        )
+
+    def billing_state(self) -> Dict[str, Any]:
+        """`app.state` entries for the conversations and billing routers."""
+        world = self
+
+        class _Archive:
+            async def list_messages(self, *, tenant_id, conversation_id, limit=500):
+                return [m for m in world.archived_messages if m.conversation_id == conversation_id and m.tenant_id == tenant_id]
+
+        compute = ComputeStatementUseCase(
+            usage_store=self.usage, cost_rates=self.cost_rates, plans=self.plans,
+            subscriptions=self.subscriptions, statements=self.statements,
+        )
+        return dict(
+            conversation_repo=self.conversations,
+            cost_rate_repo=self.cost_rates,
+            plan_repo=self.plans,
+            subscription_repo=self.subscriptions,
+            statement_repo=self.statements,
+            quota_gate=self.quota_gate,
+            get_conversation_detail_use_case=GetConversationDetailUseCase(
+                conversations=self.conversations, archive=_Archive(), usage_store=self.usage, cost_rates=self.cost_rates
+            ),
+            compute_statement_use_case=compute,
+            close_billing_period_use_case=CloseBillingPeriodUseCase(
+                compute=compute, subscriptions=self.subscriptions, statements=self.statements
+            ),
+            plan_pricing_insight_use_case=PlanPricingInsightUseCase(
+                usage_store=self.usage, cost_rates=self.cost_rates, plans=self.plans, subscriptions=self.subscriptions
+            ),
+            list_unrated_meters_use_case=ListUnratedMetersUseCase(usage_store=self.usage, cost_rates=self.cost_rates),
         )
 
     def provision_user_use_case(self) -> ProvisionUserUseCase:

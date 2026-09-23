@@ -1,4 +1,5 @@
-"""Admin HTTP API: tenant/project/agent/workflow/channel/user CRUD, mounted
+"""Admin HTTP API: tenant/project/agent/workflow/channel/user CRUD, the
+conversation inbox and billing (plans, cost catalog, statements), mounted
 under /internal/admin.
 
 Callers authenticate with either the shared `X-Admin-Api-Key` (machines) or a
@@ -10,8 +11,10 @@ for the role matrix and tenant scoping.
 from fastapi import APIRouter
 
 from app.adapters.inbound.http.admin.agents import router as agents_router
+from app.adapters.inbound.http.admin.billing import router as billing_router
 from app.adapters.inbound.http.admin.channel_apps import router as channel_apps_router
 from app.adapters.inbound.http.admin.channel_connections import router as channel_connections_router
+from app.adapters.inbound.http.admin.conversations import router as conversations_router
 from app.adapters.inbound.http.admin.langflow import router as langflow_router
 from app.adapters.inbound.http.admin.projects import router as projects_router
 from app.adapters.inbound.http.admin.tenant_billing import router as tenant_billing_router
@@ -31,5 +34,7 @@ for _sub_router in (
     channel_apps_router,
     users_router,
     langflow_router,
+    conversations_router,
+    billing_router,
 ):
     router.include_router(_sub_router)

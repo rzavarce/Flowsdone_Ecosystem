@@ -1,0 +1,22 @@
+{# Context: tenant_name, event ("80"|"100"|"blocked"), channel, used, included, period, reason. #}
+{% extends "base.html.jinja" %}
+{% block title %}Consumo de tu plan de Flowsdone{% endblock %}
+{% block content %}
+  <p style="margin:0 0 16px 0;font-size:17px;font-weight:600;color:#0f172a;">Hola{% if tenant_name %}, {{ tenant_name }}{% endif %}:</p>
+  {% if event == "blocked" %}
+  <p style="margin:0 0 20px 0;">
+    Tu asistente en <strong>{{ channel }}</strong> ha dejado de responder mensajes nuevos este mes
+    ({{ period }}) porque se alcanzó el límite de tu plan{% if reason == "spending_cap" %} (tope de gasto de excedente){% endif %}.
+  </p>
+  <p style="margin:0 0 20px 0;">Para reactivarlo, contacta con nosotros para ampliar tu plan o el tope de gasto.</p>
+  {% else %}
+  <p style="margin:0 0 20px 0;">
+    Has usado <strong>{{ used }}</strong> de los <strong>{{ included }}</strong> mensajes incluidos en tu plan
+    para <strong>{{ channel }}</strong> este mes ({{ period }}) — el {{ event }}%.
+  </p>
+  {% if event == "100" %}
+  <p style="margin:0 0 20px 0;">Los mensajes adicionales se gestionan según la configuración de excedentes de tu plan.</p>
+  {% endif %}
+  {% endif %}
+  <p style="margin:0;font-size:13px;color:#64748b;">Puedes ver el detalle de tu consumo en la consola de Flowsdone.</p>
+{% endblock %}

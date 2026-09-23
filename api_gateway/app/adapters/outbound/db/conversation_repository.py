@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Collection, List, Optional
 from uuid import UUID
 
 from sqlalchemy import func, select, text, update
@@ -177,6 +177,51 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
             )
             await session.commit()
             return result.rowcount > 0
+
+    async def list(
+        self,
+        *,
+        tenant_ids: Optional[Collection[UUID]] = None,
+        project_id: Optional[UUID] = None,
+        channel_type: Optional[str] = None,
+        status: Optional[str] = None,
+        contact: Optional[str] = None,
+        before: Optional[datetime] = None,
+        limit: int = 50,
+    ) -> List[Conversation]:
+        """Conversations for an inbox, most recent activity first.
+
+        Args:
+            tenant_ids (Optional[Collection[UUID]]): Only these tenants; None = all.
+            project_id (Optional[UUID]): Only this project.
+            channel_type (Optional[str]): Only this channel.
+            status (Optional[str]): "open" or "closed".
+            contact (Optional[str]): Contact contains this text (case-insensitive).
+            before (Optional[datetime]): Only last_message_at before this.
+            limit (int): Page size.
+
+        Returns:
+            List[Conversation]: The page.
+        """
+        query = select(ConversationModel)
+        if tenant_ids is not None:
+            if not tenant_ids:
+                return []
+            query = query.where(ConversationModel.tenant_id.in_(list(tenant_ids)))
+        if project_id is not None:
+            query = query.where(ConversationModel.project_id == project_id)
+        if channel_type:
+            query = query.where(ConversationModel.channel_type == channel_type)
+        if status:
+            query = query.where(ConversationModel.status == status)
+        if contact:
+            escaped = contact.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            query = query.where(ConversationModel.contact.ilike(f"%{escaped}%", escape="\\"))
+        if before is not None:
+            query = query.where(ConversationModel.last_message_at < before)
+        query = query.order_by(ConversationModel.last_message_at.desc(), ConversationModel.id).limit(limit)
+        async with self._sessionmaker() as session:
+            return [_to_domain(row) for row in (await session.execute(query)).scalars()]
 
     async def close_expired(
         self, *, now: datetime, inactivity: timedelta, max_duration: timedelta, limit: int

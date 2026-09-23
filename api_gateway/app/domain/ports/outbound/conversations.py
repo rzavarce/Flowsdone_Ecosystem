@@ -6,7 +6,7 @@ archive (ClickHouse).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Protocol, Sequence
+from typing import Collection, List, Optional, Protocol, Sequence
 from uuid import UUID
 
 from app.domain.models.conversation import Conversation, ConversationCloseReason
@@ -73,6 +73,35 @@ class ConversationRepositoryPort(Protocol):
         Returns:
             bool: True if it was open and got closed; False if it was
             already closed or does not exist.
+        """
+        ...
+
+    async def list(
+        self,
+        *,
+        tenant_ids: Optional[Collection[UUID]] = None,
+        project_id: Optional[UUID] = None,
+        channel_type: Optional[str] = None,
+        status: Optional[str] = None,
+        contact: Optional[str] = None,
+        before: Optional[datetime] = None,
+        limit: int = 50,
+    ) -> List[Conversation]:
+        """Conversations for an inbox, most recent activity first.
+
+        Args:
+            tenant_ids (Optional[Collection[UUID]]): Only these tenants;
+                None = all (unrestricted callers only).
+            project_id (Optional[UUID]): Only this project.
+            channel_type (Optional[str]): Only this channel.
+            status (Optional[str]): "open" or "closed".
+            contact (Optional[str]): Contact contains this text.
+            before (Optional[datetime]): Only last_message_at before this
+                (pagination cursor).
+            limit (int): Page size.
+
+        Returns:
+            List[Conversation]: The page.
         """
         ...
 

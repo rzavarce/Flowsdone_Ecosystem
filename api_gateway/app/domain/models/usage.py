@@ -213,6 +213,16 @@ class RatedUsage:
         """True when a rate was found."""
         return self.rate is not None
 
+    @property
+    def missing_rate(self) -> bool:
+        """True for external usage (channel, LLM) that no rate covers.
+
+        Platform meters measure Flowsdone's own work: they only cost
+        something if the admin chooses to price them, so they are never
+        reported as missing a rate.
+        """
+        return not self.rated and self.usage.kind != "platform" and bool(self.usage.quantity)
+
 
 class CostCatalog:
     """All cost rates, able to find the one applying to a meter on a day."""
