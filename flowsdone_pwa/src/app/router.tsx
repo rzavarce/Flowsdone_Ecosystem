@@ -25,9 +25,9 @@ const guarded = (permission: Permission, element: ReactNode) => (
 )
 
 /**
- * Rutas: `/` redirige (login o inicio del perfil); `/login` y `/recuperar-password`
- * son públicas (redirigen si ya hay sesión); `/activar-cuenta/:token` y
- * `/restablecer-password/:token` son públicas SIN redirigir (ver comentario abajo);
+ * Rutas: `/` redirige (login o inicio del perfil); `/login` y `/forgot-password`
+ * son públicas (redirigen si ya hay sesión); `/activate-account/:token` y
+ * `/reset-password/:token` son públicas SIN redirigir (ver comentario abajo);
  * el resto exige sesión y, según la sección, un permiso.
  */
 export const routes = [
@@ -46,10 +46,10 @@ export const routes = [
   // otro usuario), PublicOnly la redirigiría antes de mostrar el formulario y el
   // token nunca se canjearía. Al activar/restablecer, el propio flujo reemplaza
   // la sesión por la de la cuenta del token (ver ActivateAccountForm/ResetPasswordForm).
-  { path: '/activar-cuenta/:token', element: <ActivateAccountPage /> },
-  { path: '/restablecer-password/:token', element: <ResetPasswordPage /> },
+  { path: '/activate-account/:token', element: <ActivateAccountPage /> },
+  { path: '/reset-password/:token', element: <ResetPasswordPage /> },
   {
-    path: '/recuperar-password',
+    path: '/forgot-password',
     element: (
       <PublicOnly>
         <ForgotPasswordPage />
@@ -64,13 +64,13 @@ export const routes = [
     ),
     children: [
       { path: '/dashboard', element: <DashboardRoute /> },
-      { path: '/conversaciones', element: guarded('conversations:manage', <ConversationsPage />) },
-      { path: '/canales', element: guarded('channels:manage', <ChannelsPage />) },
+      { path: '/conversations', element: guarded('conversations:manage', <ConversationsPage />) },
+      { path: '/channels', element: guarded('channels:manage', <ChannelsPage />) },
       { path: '/tenants', element: guarded('projects:manage', <TenantsPage />) },
-      { path: '/usuarios', element: guarded('users:manage', <UsersPage />) },
-      { path: '/agentes', element: guarded('agents:edit', <AgentsPage />) },
-      { path: '/mi-empresa', element: guarded('company:view', <CompanyPage />) },
-      { path: '/ajustes', element: guarded('settings:view', <SettingsPage />) },
+      { path: '/users', element: guarded('users:manage', <UsersPage />) },
+      { path: '/agents', element: guarded('agents:edit', <AgentsPage />) },
+      { path: '/company', element: guarded('company:view', <CompanyPage />) },
+      { path: '/settings', element: guarded('settings:view', <SettingsPage />) },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

@@ -36,7 +36,7 @@ async def test_sends_the_rendered_template_with_the_resend_key():
     await adapter.send_template(
         to="carla@cliente.com",
         template="account_activation",
-        context={"name": "Carla", "link": "https://app.flowsdone.com/activar-cuenta/tok", "ttl_hours": 24},
+        context={"name": "Carla", "link": "https://app.flowsdone.com/activate-account/tok", "ttl_hours": 24},
         subject="Activa tu cuenta en Flowsdone",
     )
 
@@ -48,7 +48,7 @@ async def test_sends_the_rendered_template_with_the_resend_key():
     assert '"to":["carla@cliente.com"]' in body.replace(" ", "")
     assert "Flowsdone <no-reply@flowsdone.com>" in body
     assert "Activa tu cuenta en Flowsdone" in body
-    assert "https://app.flowsdone.com/activar-cuenta/tok" in body
+    assert "https://app.flowsdone.com/activate-account/tok" in body
     assert "Carla" in body
 
 

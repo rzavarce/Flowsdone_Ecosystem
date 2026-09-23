@@ -8,7 +8,7 @@ import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 const mock = () => createMockAdminApi({ latencyMs: 0, seed: SEED })
 
 async function open(api = mock()) {
-  renderApp('/usuarios', fakeAuthApi(makeUser('admin')), api)
+  renderApp('/users', fakeAuthApi(makeUser('admin')), api)
   await screen.findByRole('heading', { level: 1, name: 'Usuarios' })
   await screen.findByRole('list', { name: 'Usuarios' })
   return api

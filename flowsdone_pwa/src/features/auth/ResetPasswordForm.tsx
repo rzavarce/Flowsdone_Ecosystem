@@ -104,7 +104,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         <p id={ids.error} role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
           {error.message}{' '}
           {error.invalidToken && (
-            <Link to="/recuperar-password" className="font-medium underline">
+            <Link to="/forgot-password" className="font-medium underline">
               Pide un enlace nuevo
             </Link>
           )}

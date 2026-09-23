@@ -104,7 +104,7 @@ class Settings(BaseModel):
     # application/use_cases/provision_user.py, activate_account.py,
     # request_password_reset.py, reset_password.py). Emailed via Resend
     # (HTTPS API - the VPS has outbound SMTP blocked), links built as
-    # f"{PUBLIC_BASE_URL}/activar-cuenta/{token}" etc. RESEND_API_KEY has no
+    # f"{PUBLIC_BASE_URL}/activate-account/{token}" etc. RESEND_API_KEY has no
     # default: sending fails clearly (EmailSendError) if it's missing,
     # instead of the app refusing to start.
     RESEND_API_KEY: Optional[str] = None
@@ -155,8 +155,8 @@ class Settings(BaseModel):
     # PWA's domain), so this is deliberately NOT the same as PWA_PUBLIC_URL
     # below even though they're often set to look-alike values in dev.
     PUBLIC_BASE_URL: str = "http://localhost:8000"
-    # Public URL of the console (PWA) - where /activar-cuenta and
-    # /restablecer-password are actually served (nginx SPA fallback), unlike
+    # Public URL of the console (PWA) - where /activate-account and
+    # /reset-password are actually served (nginx SPA fallback), unlike
     # PUBLIC_BASE_URL above which points at this gateway. Defaults to
     # PUBLIC_BASE_URL so a single-domain dev setup (same origin for both)
     # keeps working without setting this - but in prod they're different

@@ -9,9 +9,9 @@ import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 
 const seeded = (over: Partial<AdminApi> = {}): AdminApi => ({ ...createMockAdminApi({ latencyMs: 0, seed: SEED }), ...over })
 
-/** Renderiza /canales y espera a que termine la carga inicial. */
+/** Renderiza /channels y espera a que termine la carga inicial. */
 async function open(role: 'admin' | 'tenant_manager' = 'admin', api: AdminApi = seeded()) {
-  const view = renderApp('/canales', fakeAuthApi(makeUser(role)), api)
+  const view = renderApp('/channels', fakeAuthApi(makeUser(role)), api)
   await screen.findByRole('heading', { level: 1, name: 'Canales' })
   return view
 }
@@ -20,7 +20,7 @@ const selectTenant = (id: string) => userEvent.selectOptions(screen.getByRole('c
 
 describe('listado', () => {
   it('muestra un spinner mientras carga', () => {
-    renderApp('/canales', fakeAuthApi(makeUser('admin')), seeded())
+    renderApp('/channels', fakeAuthApi(makeUser('admin')), seeded())
     expect(screen.getByText('Cargando sesión')).toBeInTheDocument()
   })
 
@@ -79,7 +79,7 @@ describe('listado', () => {
   })
 
   it('un 401 (sesión vencida) cierra la sesión y lleva al login', async () => {
-    renderApp('/canales', fakeAuthApi(makeUser('admin')), seeded({ listProjects: vi.fn().mockRejectedValue(new ApiError(401, 'not authenticated')) }))
+    renderApp('/channels', fakeAuthApi(makeUser('admin')), seeded({ listProjects: vi.fn().mockRejectedValue(new ApiError(401, 'not authenticated')) }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Inicia sesión' })).toBeInTheDocument()
   })
 })
@@ -177,7 +177,7 @@ describe('conectar un canal', () => {
     // Ya hay proyecto: aparece el formulario del canal, pero el proyecto aún no tiene agentes.
     expect(await within(dialog).findByLabelText('Proyecto')).toHaveDisplayValue('Soporte técnico')
     expect(within(dialog).getByText(/todavía no tiene agentes/)).toBeInTheDocument()
-    expect(within(dialog).getByRole('link', { name: 'Agentes' })).toHaveAttribute('href', '/agentes')
+    expect(within(dialog).getByRole('link', { name: 'Agentes' })).toHaveAttribute('href', '/agents')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Conectar canal' }))
     expect(within(dialog).getByText('Elige un agente.')).toBeInTheDocument()
   })

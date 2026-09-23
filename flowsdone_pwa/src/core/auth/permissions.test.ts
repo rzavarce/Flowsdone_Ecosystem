@@ -45,7 +45,7 @@ describe('homePathFor', () => {
     ['admin', '/dashboard'],
     ['tenant_manager', '/dashboard'],
     ['client', '/dashboard'],
-    ['botmaster', '/agentes'],
+    ['botmaster', '/agents'],
   ] as const)('%s -> %s', (role, path) => {
     expect(homePathFor(makeUser(role))).toBe(path)
   })

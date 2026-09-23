@@ -10,7 +10,7 @@ describe('ResetPasswordPage', () => {
   it('fija la contraseña nueva y entra directo (auto-login)', async () => {
     const user = makeUser('client')
     const api = { ...fakeAuthApi(null), resetPassword: vi.fn().mockResolvedValue(user) }
-    renderApp('/restablecer-password/tok-1', api)
+    renderApp('/reset-password/tok-1', api)
     await h1('Crea una nueva contraseña')
 
     await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'x'.repeat(10))
@@ -27,7 +27,7 @@ describe('ResetPasswordPage', () => {
     const admin = makeUser('admin')
     const targetUser = makeUser('client')
     const api = { ...fakeAuthApi(admin), resetPassword: vi.fn().mockResolvedValue(targetUser) }
-    renderApp('/restablecer-password/tok-1', api)
+    renderApp('/reset-password/tok-1', api)
 
     await h1('Crea una nueva contraseña') // no rebota a /dashboard del admin
 
@@ -44,7 +44,7 @@ describe('ResetPasswordPage', () => {
       ...fakeAuthApi(null),
       resetPassword: vi.fn().mockRejectedValue(new AuthError('invalid_token', 'El enlace no es válido o ya venció. Pide uno nuevo.')),
     }
-    renderApp('/restablecer-password/tok-vencido', api)
+    renderApp('/reset-password/tok-vencido', api)
     await h1('Crea una nueva contraseña')
 
     await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'x'.repeat(10))
@@ -54,13 +54,13 @@ describe('ResetPasswordPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('El enlace no es válido o ya venció.')
     expect(within(screen.getByRole('alert')).getByRole('link', { name: 'Pide un enlace nuevo' })).toHaveAttribute(
       'href',
-      '/recuperar-password',
+      '/forgot-password',
     )
   })
 
   it('avisa si las contraseñas no coinciden, sin llamar al backend', async () => {
     const api = { ...fakeAuthApi(null), resetPassword: vi.fn() }
-    renderApp('/restablecer-password/tok-1', api)
+    renderApp('/reset-password/tok-1', api)
     await h1('Crea una nueva contraseña')
 
     await userEvent.type(screen.getByLabelText('Contraseña nueva'), 'x'.repeat(10))

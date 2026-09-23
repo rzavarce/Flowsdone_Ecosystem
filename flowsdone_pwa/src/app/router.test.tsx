@@ -15,7 +15,7 @@ const navLinks = () => {
 }
 
 describe('sin sesión', () => {
-  it.each(['/', '/dashboard', '/canales', '/agentes', '/ajustes'])('%s redirige a /login', async (path) => {
+  it.each(['/', '/dashboard', '/channels', '/agents', '/settings'])('%s redirige a /login', async (path) => {
     renderApp(path, fakeAuthApi(null))
     expect(await h1('Inicia sesión')).toBeInTheDocument()
   })
@@ -73,46 +73,46 @@ describe('menú y acceso por perfil', () => {
   })
 
   it.each<[Role, string]>([
-    ['client', '/canales'],
-    ['client', '/agentes'],
-    ['client', '/conversaciones'],
+    ['client', '/channels'],
+    ['client', '/agents'],
+    ['client', '/conversations'],
     ['botmaster', '/tenants'],
     ['client', '/tenants'],
-    ['tenant_manager', '/usuarios'],
-    ['botmaster', '/usuarios'],
-    ['client', '/usuarios'],
-    ['consultant', '/canales'],
-    ['consultant', '/agentes'],
-    ['consultant', '/conversaciones'],
+    ['tenant_manager', '/users'],
+    ['botmaster', '/users'],
+    ['client', '/users'],
+    ['consultant', '/channels'],
+    ['consultant', '/agents'],
+    ['consultant', '/conversations'],
     ['consultant', '/tenants'],
-    ['consultant', '/usuarios'],
+    ['consultant', '/users'],
     // "Mi empresa" es exclusivo de client (ni siquiera el admin la ve - la edita desde Tenants).
-    ['admin', '/mi-empresa'],
-    ['botmaster', '/mi-empresa'],
-    ['consultant', '/mi-empresa'],
+    ['admin', '/company'],
+    ['botmaster', '/company'],
+    ['consultant', '/company'],
   ])('%s recibe 403 al abrir %s por URL directa', async (role, path) => {
     renderApp(path, fakeAuthApi(makeUser(role)))
     expect(await h1('Sin acceso')).toBeInTheDocument()
   })
 
   it('el client puede abrir Mi empresa', async () => {
-    renderApp('/mi-empresa', fakeAuthApi(makeUser('client')))
+    renderApp('/company', fakeAuthApi(makeUser('client')))
     expect(await h1('Mi empresa')).toBeInTheDocument()
   })
 
-  it.each(['/canales', '/conversaciones'])('el botmaster sí puede abrir %s (gestiona canales y conversaciones de sus tenants)', async (path) => {
+  it.each(['/channels', '/conversations'])('el botmaster sí puede abrir %s (gestiona canales y conversaciones de sus tenants)', async (path) => {
     renderApp(path, fakeAuthApi(makeUser('botmaster')))
-    expect(await h1(path === '/canales' ? 'Canales' : 'Conversaciones')).toBeInTheDocument()
+    expect(await h1(path === '/channels' ? 'Canales' : 'Conversaciones')).toBeInTheDocument()
   })
 
-  it('solo el admin puede abrir /usuarios', async () => {
-    renderApp('/usuarios', fakeAuthApi(makeUser('admin')))
+  it('solo el admin puede abrir /users', async () => {
+    renderApp('/users', fakeAuthApi(makeUser('admin')))
     expect(await h1('Usuarios')).toBeInTheDocument()
   })
 
   it('todos los perfiles pueden abrir Ajustes', async () => {
     for (const role of ['admin', 'tenant_manager', 'botmaster', 'client', 'consultant'] as const) {
-      const { unmount } = renderApp('/ajustes', fakeAuthApi(makeUser(role)))
+      const { unmount } = renderApp('/settings', fakeAuthApi(makeUser(role)))
       expect(await h1('Ajustes')).toBeInTheDocument()
       unmount()
     }

@@ -8,7 +8,7 @@ const h1 = (name: string | RegExp) => screen.findByRole('heading', { level: 1, n
 
 describe('ActivateAccountPage', () => {
   it('el botón sigue deshabilitado hasta que ambas contraseñas coinciden y cumplen el mínimo', async () => {
-    renderApp('/activar-cuenta/tok-1', fakeAuthApi(null))
+    renderApp('/activate-account/tok-1', fakeAuthApi(null))
     await h1('Activa tu cuenta')
     const submit = screen.getByRole('button', { name: 'Activar mi cuenta' })
     expect(submit).toBeDisabled()
@@ -28,7 +28,7 @@ describe('ActivateAccountPage', () => {
   it('activa la cuenta y entra directo (auto-login)', async () => {
     const user = makeUser('botmaster')
     const api = { ...fakeAuthApi(null), activateAccount: vi.fn().mockResolvedValue(user) }
-    renderApp('/activar-cuenta/tok-1', api)
+    renderApp('/activate-account/tok-1', api)
     await h1('Activa tu cuenta')
 
     await userEvent.type(screen.getByLabelText('Contraseña'), 'x'.repeat(10))
@@ -46,7 +46,7 @@ describe('ActivateAccountPage', () => {
     const admin = makeUser('admin')
     const newUser = makeUser('botmaster')
     const api = { ...fakeAuthApi(admin), activateAccount: vi.fn().mockResolvedValue(newUser) }
-    renderApp('/activar-cuenta/tok-1', api)
+    renderApp('/activate-account/tok-1', api)
 
     // No debe rebotar a /dashboard del admin.
     await h1('Activa tu cuenta')
@@ -65,7 +65,7 @@ describe('ActivateAccountPage', () => {
       ...fakeAuthApi(null),
       activateAccount: vi.fn().mockRejectedValue(new AuthError('invalid_token', 'El enlace no es válido o ya venció. Pide uno nuevo.')),
     }
-    renderApp('/activar-cuenta/tok-vencido', api)
+    renderApp('/activate-account/tok-vencido', api)
     await h1('Activa tu cuenta')
 
     await userEvent.type(screen.getByLabelText('Contraseña'), 'x'.repeat(10))

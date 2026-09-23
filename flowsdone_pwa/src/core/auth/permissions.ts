@@ -62,11 +62,11 @@ export function can(user: User | null, ...permissions: Permission[]): boolean {
  * Ruta a la que se envía al usuario tras iniciar sesión.
  *
  * @param user - Usuario autenticado.
- * @returns `/dashboard` para quien ve dashboards, `/agentes` para el
- *   botmaster y `/ajustes` como último recurso.
+ * @returns `/dashboard` para quien ve dashboards, `/agents` para el
+ *   botmaster y `/settings` como último recurso.
  */
 export function homePathFor(user: User): string {
   if (can(user, 'dashboard:view', 'reports:view')) return '/dashboard'
-  if (can(user, 'agents:edit')) return '/agentes'
-  return '/ajustes'
+  if (can(user, 'agents:edit')) return '/agents'
+  return '/settings'
 }

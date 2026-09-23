@@ -11,7 +11,7 @@ import type { Role } from '@/core/auth/types'
 const seeded = (over: Partial<AdminApi> = {}): AdminApi => ({ ...createMockAdminApi({ latencyMs: 0, seed: SEED }), ...over })
 
 async function open(role: Role = 'admin', api: AdminApi = seeded()) {
-  renderApp('/ajustes', fakeAuthApi(makeUser(role)), api)
+  renderApp('/settings', fakeAuthApi(makeUser(role)), api)
   await screen.findByRole('heading', { level: 1, name: 'Ajustes' })
 }
 const row = (label: string) => screen.getByText(label).closest('li') as HTMLElement

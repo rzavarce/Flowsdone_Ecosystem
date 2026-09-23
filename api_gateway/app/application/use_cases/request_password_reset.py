@@ -52,7 +52,7 @@ class RequestPasswordResetUseCase:
             throttle (LoginThrottlePort): Request-rate counters.
             ttl_seconds (int): Reset link lifetime.
             reset_base_url (str): Public origin the link is built against
-                (`{reset_base_url}/restablecer-password/{token}`).
+                (`{reset_base_url}/reset-password/{token}`).
             window_seconds (int): Throttle window.
             max_requests_per_email (int): Requests per account before blocking.
             max_requests_per_ip (int): Requests per client IP before blocking.
@@ -98,7 +98,7 @@ class RequestPasswordResetUseCase:
             return
 
         token = await self._tokens.issue(creds.user.id, ttl_seconds=self._ttl)
-        link = f"{self._base_url}/restablecer-password/{token}"
+        link = f"{self._base_url}/reset-password/{token}"
         await self._mailer.send_template(
             to=creds.user.email,
             template="password_reset",
