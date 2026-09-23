@@ -140,11 +140,18 @@ class LangflowAdminClient(LangflowAdminPort):
         created = await self._request(
             "POST", "/api/v1/users/", json={"username": username, "password": password}, headers=headers
         )
+        # New users start inactive (LANGFLOW_NEW_USER_IS_ACTIVE=false).
+        update: Dict[str, Any] = {"is_active": True}
         if created.status_code == 201:
             user_id = self._json(created, "create user")["id"]
         else:
-            # Already there (an earlier attempt died half-way): find it and
-            # bring its password back in line with the stored one.
+            # Already there (an earlier attempt died half-way, or the tenant
+            # was deleted and created again with the same slug - deleting a
+            # tenant does not delete its Langflow user): find it and bring its
+            # password back in line with the stored one. Through
+            # `PATCH /users/{id}`, the only way a superuser may set another
+            # user's password: `/reset-password` only lets users change their
+            # own and answers 400 ("You can't change another user's password").
             listing = await self._request("GET", "/api/v1/users/", params={"limit": 1000}, headers=headers)
             if listing.status_code != 200:
                 raise LangflowSessionError(f"langflow rejected create user (HTTP {created.status_code})")
@@ -152,17 +159,10 @@ class LangflowAdminClient(LangflowAdminPort):
             if not found:
                 raise LangflowSessionError(f"langflow rejected create user (HTTP {created.status_code})")
             user_id = found[0]["id"]
-            reset = await self._request(
-                "PATCH", f"/api/v1/users/{user_id}/reset-password", json={"password": password}, headers=headers
-            )
-            if reset.status_code != 200:
-                raise LangflowSessionError(f"langflow rejected reset password (HTTP {reset.status_code})")
-        # New users start inactive (LANGFLOW_NEW_USER_IS_ACTIVE=false).
-        activated = await self._request(
-            "PATCH", f"/api/v1/users/{user_id}", json={"is_active": True}, headers=headers
-        )
-        if activated.status_code != 200:
-            raise LangflowSessionError(f"langflow rejected activate user (HTTP {activated.status_code})")
+            update["password"] = password
+        updated = await self._request("PATCH", f"/api/v1/users/{user_id}", json=update, headers=headers)
+        if updated.status_code != 200:
+            raise LangflowSessionError(f"langflow rejected update user (HTTP {updated.status_code})")
         return str(user_id)
 
     async def login(self, username: str, password: str) -> LangflowTokens:
