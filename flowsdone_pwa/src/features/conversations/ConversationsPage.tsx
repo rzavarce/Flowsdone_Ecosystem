@@ -1,16 +1,18 @@
 import { MessageSquare } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { useTranslation } from 'react-i18next'
 
 /** Placeholder: conversations inbox (upcoming feature). */
 export function ConversationsPage() {
+  const { t } = useTranslation()
   return (
     <>
-      <PageHeader title="Conversaciones" description="Bandeja unificada de todos los canales." />
+      <PageHeader title={t('nav.conversations')} description={t('conversations.description')} />
       <EmptyState
         icon={MessageSquare}
-        title="Próximamente"
-        description="Aquí vivirá la bandeja de conversaciones en tiempo real, con intervención humana sobre el agente."
+        title={t('common.comingSoon')}
+        description={t('conversations.comingSoon')}
       />
     </>
   )

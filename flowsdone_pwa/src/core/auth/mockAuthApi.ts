@@ -1,4 +1,6 @@
 import { AuthError, type AuthApi } from './AuthApi'
+import { ApiError } from '@/core/http/apiFetch'
+import { i18n } from '@/core/i18n/i18n'
 import type { Role, Tenant, User } from './types'
 
 /**
@@ -35,7 +37,20 @@ export const MOCK_SESSION_KEY = 'fd-mock-session'
 export const DEMO_ACTIVATION_TOKEN = 'demo-activate-token'
 /** Demo token for exercising `/reset-password/:token` in mock mode; see {@link DEMO_ACTIVATION_TOKEN}. */
 export const DEMO_RESET_TOKEN = 'demo-reset-token'
-const INVALID_TOKEN = 'El enlace no es válido o ya venció. Pide uno nuevo.'
+const INVALID_TOKEN = () => i18n.t('auth.errors.invalidToken')
+
+/** Photos of the demo accounts (data URLs), in memory only. */
+const AVATARS = new Map<string, string>()
+
+/** Reads a blob as a data URL (the mock has no server to serve the photo from). */
+function toDataUrl(image: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(image)
+  })
+}
 
 /** Options for {@link createMockAuthApi}. */
 export interface MockAuthOptions {
@@ -57,6 +72,13 @@ function defaultStorage(): MockAuthOptions['storage'] {
 /** Creates the mock adapter. */
 export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() }: MockAuthOptions = {}): AuthApi {
   const wait = () => new Promise<void>((resolve) => setTimeout(resolve, latencyMs))
+  /** The signed-in demo user (the one stored in the mock session). */
+  const current = () => {
+    const id = storage?.getItem(MOCK_SESSION_KEY)
+    const user = USERS.find((u) => u.id === id)
+    if (!user) throw new ApiError(401, 'not authenticated')
+    return user
+  }
   const remember = (fn: () => void) => {
     try {
       fn()
@@ -80,7 +102,7 @@ export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() 
       await wait()
       const user = USERS.find((u) => u.email === email.trim().toLowerCase())
       if (!user || password !== DEMO_PASSWORD) {
-        throw new AuthError('invalid_credentials', 'Correo o contraseña incorrectos.')
+        throw new AuthError('invalid_credentials', i18n.t('auth.errors.invalidCredentials'))
       }
       remember(() => storage?.setItem(MOCK_SESSION_KEY, user.id))
       return user
@@ -93,7 +115,7 @@ export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() 
     async activateAccount(token, password) {
       await wait()
       if (token !== DEMO_ACTIVATION_TOKEN || password.length < 10) {
-        throw new AuthError('invalid_token', INVALID_TOKEN)
+        throw new AuthError('invalid_token', INVALID_TOKEN())
       }
       const user = USERS[0]
       remember(() => storage?.setItem(MOCK_SESSION_KEY, user.id))
@@ -108,11 +130,39 @@ export function createMockAuthApi({ latencyMs = 350, storage = defaultStorage() 
     async resetPassword(token, password) {
       await wait()
       if (token !== DEMO_RESET_TOKEN || password.length < 10) {
-        throw new AuthError('invalid_token', INVALID_TOKEN)
+        throw new AuthError('invalid_token', INVALID_TOKEN())
       }
       const user = USERS[0]
       remember(() => storage?.setItem(MOCK_SESSION_KEY, user.id))
       return user
+    },
+    async updateProfile(patch) {
+      await wait()
+      const user = current()
+      if (patch.name !== undefined) user.name = patch.name.trim()
+      if (patch.phone !== undefined) user.phone = patch.phone.trim() || null
+      if (patch.address !== undefined) user.address = patch.address.trim() || null
+      if (patch.social_links !== undefined) {
+        user.social_links = Object.fromEntries(Object.entries(patch.social_links).filter(([, url]) => url?.trim()))
+      }
+      return { ...user }
+    },
+    async uploadAvatar(image) {
+      await wait()
+      const user = current()
+      AVATARS.set(user.id, await toDataUrl(image))
+      user.avatar_updated_at = new Date().toISOString()
+      return { ...user }
+    },
+    async removeAvatar() {
+      await wait()
+      const user = current()
+      AVATARS.delete(user.id)
+      user.avatar_updated_at = null
+      return { ...user }
+    },
+    avatarUrl(user) {
+      return AVATARS.get(user.id) ?? null
     },
   }
 }

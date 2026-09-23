@@ -2,12 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { createHttpAuthApi, parseUser } from './httpAuthApi'
 import { makeUser } from '@/test/renderApp'
 
+/** What `parseUser` returns for a user without the optional profile fields. */
+const normalized = <T extends object>(u: T) => ({ phone: null, address: null, social_links: {}, avatar_updated_at: null, ...u })
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 
 describe('parseUser', () => {
   it('acepta un usuario válido', () => {
     const u = makeUser('admin')
-    expect(parseUser(u)).toEqual(u)
+    expect(parseUser(u)).toEqual(normalized(u))
   })
 
   it.each([
@@ -26,7 +29,7 @@ describe('httpAuthApi', () => {
     const fetchFn = vi.fn().mockResolvedValue(json(user))
     const result = await createHttpAuthApi('/api', fetchFn).login({ email: 'a@b.c', password: 'x' })
 
-    expect(result).toEqual(user)
+    expect(result).toEqual(normalized(user))
     const [url, init] = fetchFn.mock.calls[0]!
     expect(url).toBe('/api/auth/login')
     expect(init).toMatchObject({ method: 'POST', credentials: 'include' })
@@ -56,7 +59,7 @@ describe('httpAuthApi', () => {
 
   it('restore devuelve el usuario, o null si 401 / servidor caído', async () => {
     const user = makeUser('client')
-    expect(await createHttpAuthApi('/api', vi.fn().mockResolvedValue(json(user))).restore()).toEqual(user)
+    expect(await createHttpAuthApi('/api', vi.fn().mockResolvedValue(json(user))).restore()).toEqual(normalized(user))
     expect(await createHttpAuthApi('/api', vi.fn().mockResolvedValue(json({}, 401))).restore()).toBeNull()
     expect(await createHttpAuthApi('/api', vi.fn().mockRejectedValue(new Error('x'))).restore()).toBeNull()
   })
@@ -71,7 +74,7 @@ describe('httpAuthApi', () => {
     const fetchFn = vi.fn().mockResolvedValue(json(user))
     const result = await createHttpAuthApi('/api', fetchFn).activateAccount('tok', 'x'.repeat(10))
 
-    expect(result).toEqual(user)
+    expect(result).toEqual(normalized(user))
     const [url, init] = fetchFn.mock.calls[0]!
     expect(url).toBe('/api/auth/activate')
     expect(init).toMatchObject({ method: 'POST', credentials: 'include' })
@@ -116,7 +119,7 @@ describe('httpAuthApi', () => {
     const fetchFn = vi.fn().mockResolvedValue(json(user))
     const result = await createHttpAuthApi('/api', fetchFn).resetPassword('tok', 'x'.repeat(10))
 
-    expect(result).toEqual(user)
+    expect(result).toEqual(normalized(user))
     const [url, init] = fetchFn.mock.calls[0]!
     expect(url).toBe('/api/auth/reset-password')
     expect(JSON.parse(init.body)).toEqual({ token: 'tok', password: 'x'.repeat(10) })
@@ -125,5 +128,66 @@ describe('httpAuthApi', () => {
   it('resetPassword con 400 -> invalid_token', async () => {
     const api = createHttpAuthApi('/api', vi.fn().mockResolvedValue(json({ detail: 'invalid or expired link' }, 400)))
     await expect(api.resetPassword('tok', 'x')).rejects.toMatchObject({ code: 'invalid_token', message: 'invalid or expired link' })
+  })
+})
+
+describe('httpAuthApi: perfil propio', () => {
+  it('parseUser conserva los datos de perfil y descarta redes desconocidas', () => {
+    const u = {
+      ...makeUser('client'),
+      phone: '600',
+      address: 'Calle 1',
+      social_links: { linkedin: 'https://l.in/x', myspace: 'https://m.s', x: 42 },
+      avatar_updated_at: '2026-09-23T10:00:00Z',
+    }
+    expect(parseUser(u)).toMatchObject({
+      phone: '600',
+      address: 'Calle 1',
+      social_links: { linkedin: 'https://l.in/x' },
+      avatar_updated_at: '2026-09-23T10:00:00Z',
+    })
+  })
+
+  it('updateProfile hace PATCH /me/profile con la cabecera CSRF y devuelve el usuario', async () => {
+    const user = { ...makeUser('client'), phone: '600' }
+    const fetchFn = vi.fn().mockResolvedValue(json(user))
+    const result = await createHttpAuthApi('/api', fetchFn).updateProfile({ phone: '600' })
+    expect(result.phone).toBe('600')
+    const [url, init] = fetchFn.mock.calls[0]!
+    expect(url).toBe('/api/me/profile')
+    expect(init.method).toBe('PATCH')
+    expect(init.headers['X-Requested-With']).toBe('fd-console')
+    expect(JSON.parse(init.body)).toEqual({ phone: '600' })
+  })
+
+  it('uploadAvatar envía la imagen tal cual (PUT, Content-Type de la imagen); removeAvatar hace DELETE', async () => {
+    const fetchFn = vi.fn().mockImplementation(async () => json({ ...makeUser('client'), avatar_updated_at: 'v1' }))
+    const api = createHttpAuthApi('/api', fetchFn)
+    const image = new Blob(['jpeg'], { type: 'image/jpeg' })
+    await api.uploadAvatar(image)
+    const [url, init] = fetchFn.mock.calls[0]!
+    expect(url).toBe('/api/me/avatar')
+    expect(init.method).toBe('PUT')
+    expect(init.body).toBe(image)
+    expect(init.headers['Content-Type']).toBe('image/jpeg')
+
+    await api.removeAvatar()
+    expect(fetchFn.mock.calls[1]![1].method).toBe('DELETE')
+  })
+
+  it('avatarUrl apunta a /me/avatar con la versión, o null sin foto', () => {
+    const api = createHttpAuthApi('/api', vi.fn())
+    expect(api.avatarUrl({ ...makeUser('client'), avatar_updated_at: '2026-09-23T10:00:00+00:00' })).toBe(
+      '/api/me/avatar?v=2026-09-23T10%3A00%3A00%2B00%3A00',
+    )
+    expect(api.avatarUrl(makeUser('client'))).toBeNull()
+  })
+
+  it('un error del servidor llega como ApiError con su detalle', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(json({ detail: 'phone must contain only digits' }, 400))
+    await expect(createHttpAuthApi('/api', fetchFn).updateProfile({ phone: 'x' })).rejects.toMatchObject({
+      status: 400,
+      message: 'phone must contain only digits',
+    })
   })
 })

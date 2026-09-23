@@ -21,7 +21,8 @@ No se usó una librería de componentes completa (MUI, Ant…): los componentes 
 El aspecto se controla con dos ejes independientes, desde **Ajustes → Apariencia**:
 
 - **Template** (`data-theme` en `<html>`):
-  - `flowsdone` (por defecto) — identidad de marca "Intelligent Execution": Deep Space `#04141F`, Electric Cyan `#19B4E6`, Neon Flow Green `#3EFF8B`, Soft Ice White `#F2FBF7`, estructura `#11506C`.
+  - `admin` (por defecto) — look & feel de [TailAdmin](https://react-demo.tailadmin.com/) (MIT): grises neutros, índigo `#465FFF` como marca/CTA, sidebar y top bar blancos sobre fondo `#F9FAFB` (en oscuro `#101828`), tipografía Outfit.
+  - `flowsdone` — identidad de marca "Intelligent Execution": Deep Space `#04141F`, Electric Cyan `#19B4E6`, Neon Flow Green `#3EFF8B`, Soft Ice White `#F2FBF7`, estructura `#11506C`.
   - `agentic` — Violeta & Neón (`#1E1B4B` / `#8B5CF6` / `#10B981`).
   - `corporate` — Azul corporativo & Coral (`#0F172A` / `#2563EB` / `#FF6B6B`).
 - **Modo** (clase `dark` en `<html>`): claro, oscuro o del sistema (sigue `prefers-color-scheme` en vivo).
@@ -33,6 +34,20 @@ Cada template define, para claro y oscuro, sus neutros y sus colores de marca (`
 - `--primary` es para rellenos; para **texto** usar `text-primary-ink` (en claro es un cian más oscuro: el cian puro da 2,3:1 sobre Ice White). Todos los pares texto/fondo se calcularon contra WCAG AA.
 
 La elección se guarda en `localStorage` (`fd-theme`) y un script en `index.html` la aplica antes del primer pintado (sin parpadeo).
+
+La *forma* (sidebar de 290 px con rótulo "Menú", top bar con botones redondos y búsqueda con Ctrl+K, tarjetas planas con borde, campos de 44 px, diálogos amplios, login con panel de marca a la derecha) sigue el estilo TailAdmin en todos los templates; solo cambian los colores. Tokens opcionales por template: `--chrome` (fondo de sidebar/top bar, por defecto `--surface`) e `--input` (borde de campos, por defecto `--border`).
+
+## Idiomas
+
+La consola está en **español (por defecto), catalán e inglés** con i18next + react-i18next (`src/core/i18n/`). Los tres catálogos van empaquetados (funcionan offline en la PWA instalada); `es.ts` es la fuente de las claves y `ca.ts`/`en.ts` están tipados contra él, así que una clave que falte o sobre no compila (y `i18n.test.ts` lo vuelve a comprobar). El idioma se elige en el menú del avatar → **Idioma** (o en el selector de las pantallas de login) y se guarda por navegador (`localStorage` `fd-lang`); `<html lang>` se actualiza con él.
+
+- En componentes: `const { t } = useTranslation()` y `t('seccion.clave')`; plurales con `_one`/`_other` y `{ count }`; texto con marcado con `<Trans>`.
+- Catálogos a nivel de módulo (menú, roles, tipos de canal, templates, datos de ejemplo del dashboard): *getters* que llaman a `i18n.t` al leerse. El router se remonta al cambiar de idioma (`key={i18n.language}` en `App.tsx`), así que todo se vuelve a pintar sin perder sesión, tenant ni caché.
+- Los tests se escriben contra el español; `src/test/setup.ts` vuelve a `es` después de cada test.
+
+## Perfil de usuario
+
+"Mi perfil" (`/profile`, todos los roles) muestra y edita nombre, teléfono, dirección, redes (sitio web, LinkedIn, X, Facebook, Instagram) y foto, todo opcional salvo el nombre (`PATCH /me/profile`, `PUT|DELETE /me/avatar`). Email, rol y tenants solo los cambia un admin. Los mismos campos se editan en Usuarios (admin). La foto se recorta y reduce a 256 px JPEG en el navegador antes de subirla (`src/lib/resizeImage.ts`); el gateway vuelve a validar el tipo por sus bytes. **Soporte** (`/support`) es por ahora una página de preguntas frecuentes.
 
 **Agregar un template:** bloque claro + bloque `.dark` en `src/index.css`, una entrada en `THEMES` (`src/core/theme/themes.ts`) y el id en el script anti-flash de `index.html`.
 

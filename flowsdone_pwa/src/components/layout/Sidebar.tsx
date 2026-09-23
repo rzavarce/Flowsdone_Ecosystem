@@ -1,68 +1,75 @@
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { Logo } from './Logo'
 import { useNavItems } from './useNavItems'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link Sidebar}. */
 export interface SidebarProps {
+  /** Icons-only mode; toggled from the top bar. */
   collapsed: boolean
-  onToggle: () => void
 }
 
-/** Desktop side navigation (>= lg); collapsible down to icons only. */
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+/** Desktop side navigation (>= lg), TailAdmin style; collapsible down to icons only. */
+export function Sidebar({ collapsed }: SidebarProps) {
+  const { t } = useTranslation()
   const items = useNavItems()
   return (
     <aside
       className={cn(
-        'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-200 lg:flex',
-        collapsed ? 'w-[4.5rem]' : 'w-64',
+        'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border bg-chrome px-5 transition-[width] duration-300 ease-in-out lg:flex',
+        collapsed ? 'w-[5.625rem]' : 'w-[18.125rem]',
       )}
     >
-      <div className={cn('flex h-16 items-center px-4', collapsed && 'justify-center')}>
-        <Logo variant={collapsed ? 'icon' : 'wordmark'} className={collapsed ? 'size-9' : 'h-8 w-auto'} />
+      <div className={cn('flex py-8', collapsed && 'justify-center')}>
+        <Logo variant={collapsed ? 'icon' : 'wordmark'} className={collapsed ? 'size-9' : 'h-9 w-auto'} />
       </div>
 
-      <nav aria-label="Principal" className="flex-1 space-y-1 px-3 py-2">
-        {items.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            title={collapsed ? label : undefined}
-            className={({ isActive }) =>
-              cn(
-                'flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition',
-                collapsed && 'justify-center px-0',
-                isActive ? 'bg-accent text-primary-ink' : 'text-muted hover:bg-surface-muted hover:text-foreground',
-              )
-            }
-          >
-            <Icon className="size-5 shrink-0" aria-hidden="true" />
-            <span className={cn(collapsed && 'sr-only')}>{label}</span>
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className={cn('p-3', collapsed && 'flex justify-center')}>
-        <Button
-          variant="ghost"
-          size={collapsed ? 'icon' : 'md'}
-          onClick={onToggle}
-          aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'}
-          className={cn(!collapsed && 'w-full justify-start')}
-        >
-          {collapsed ? (
-            <PanelLeftOpen className="size-5" aria-hidden="true" />
-          ) : (
-            <>
-              <PanelLeftClose className="size-5" aria-hidden="true" />
-              Contraer
-            </>
+      <nav aria-label={t('layout.mainNav')} className="no-scrollbar flex-1 overflow-y-auto pb-6">
+        {/* Rótulo visual: la <nav> ya tiene nombre accesible, así que no es un heading. */}
+        <p
+          aria-hidden="true"
+          className={cn(
+            'mb-4 flex text-xs leading-5 tracking-wide text-muted/80 uppercase',
+            collapsed && 'justify-center',
           )}
-        </Button>
-      </div>
+        >
+          {collapsed ? '···' : t('layout.menu')}
+        </p>
+        <ul className="flex flex-col gap-1">
+          {items.map(({ to, label, icon: Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) =>
+                  cn(
+                    'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
+                    collapsed && 'justify-center',
+                    isActive
+                      ? 'bg-primary/10 text-primary-ink dark:bg-primary/15'
+                      : 'text-foreground/80 hover:bg-surface-muted hover:text-foreground',
+                  )
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <Icon
+                      className={cn(
+                        'size-6 shrink-0',
+                        isActive ? 'text-primary-ink' : 'text-muted group-hover:text-foreground/80',
+                      )}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                    />
+                    <span className={cn(collapsed && 'sr-only')}>{label}</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </aside>
   )
 }

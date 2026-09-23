@@ -20,16 +20,17 @@ describe('ThemePicker', () => {
     }
   })
 
-  it('marca flowsdone como activo por defecto', () => {
+  it('marca admin (estilo TailAdmin) como activo por defecto', () => {
     setup()
-    expect(screen.getByRole('radio', { name: /Flowsdone/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Admin/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Flowsdone/ })).not.toBeChecked()
   })
 
   it('cambia el template activo y el data-theme del documento', async () => {
     setup()
     await userEvent.click(screen.getByRole('radio', { name: /Agentic/ }))
     expect(screen.getByRole('radio', { name: /Agentic/ })).toBeChecked()
-    expect(screen.getByRole('radio', { name: /Flowsdone/ })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: /Admin/ })).not.toBeChecked()
     expect(document.documentElement.dataset.theme).toBe('agentic')
   })
 

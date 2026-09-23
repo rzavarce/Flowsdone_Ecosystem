@@ -1,13 +1,23 @@
-import type { Permission, Role, User } from './types'
+import { i18n } from '@/core/i18n/i18n'
+import { ROLES, type Permission, type Role, type User } from './types'
 
-/** Display name and short description of each profile. */
-export const ROLE_META: Record<Role, { label: string; description: string }> = {
-  admin: { label: 'Administrador', description: 'Gestiona toda la plataforma y todos los tenants.' },
-  tenant_manager: { label: 'Gestor de tenant', description: 'Gestiona por completo los tenants asignados.' },
-  botmaster: { label: 'Botmaster', description: 'Crea y ajusta agentes en Langflow.' },
-  client: { label: 'Cliente', description: 'Consulta gráficos y paneles de su organización.' },
-  consultant: { label: 'Consultor', description: 'Consultor externo de un cliente: solo ve reportes.' },
-}
+/**
+ * Display name and short description of each profile, in the active
+ * language (getters: read at render time, so they follow language changes).
+ */
+export const ROLE_META = Object.fromEntries(
+  ROLES.map((role) => [
+    role,
+    {
+      get label() {
+        return i18n.t(`roles.${role}.label`)
+      },
+      get description() {
+        return i18n.t(`roles.${role}.description`)
+      },
+    },
+  ]),
+) as Record<Role, { readonly label: string; readonly description: string }>
 
 /** Role -> permissions matrix. The single source of truth for access control in the UI. */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {

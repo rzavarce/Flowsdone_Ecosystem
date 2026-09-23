@@ -6,10 +6,10 @@ export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
 
 const TONES: Record<BadgeTone, string> = {
   neutral: 'bg-surface-muted text-muted',
-  primary: 'bg-accent text-primary-ink',
-  success: 'bg-success/15 text-success',
-  warning: 'bg-warning/20 text-warning',
-  danger: 'bg-danger/15 text-danger',
+  primary: 'bg-primary/10 text-primary-ink dark:bg-primary/15',
+  success: 'bg-success/10 text-success dark:bg-success/15',
+  warning: 'bg-warning/15 text-warning',
+  danger: 'bg-danger/10 text-danger dark:bg-danger/15',
 }
 
 /** Props for {@link Badge}. */
@@ -22,7 +22,7 @@ export function Badge({ tone = 'neutral', className, ...props }: BadgeProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
         TONES[tone],
         className,
       )}

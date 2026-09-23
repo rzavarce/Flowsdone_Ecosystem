@@ -2,9 +2,11 @@ import { Card, CardHeader } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import type { ActivityPoint } from '@/mocks/data'
 import { H, W, linePath, toPoints } from './chartGeometry'
+import { useTranslation } from 'react-i18next'
 
 /** Simple area chart (SVG, no library) using the template's colors. */
 export function ActivityChart({ data, className }: { data: readonly ActivityPoint[]; className?: string }) {
+  const { t } = useTranslation()
   const points = toPoints(data.map((d) => d.value))
   const line = linePath(points)
   const area = `${line} L${points.at(-1)![0]} ${H} L${points[0]![0]} ${H} Z`
@@ -12,13 +14,13 @@ export function ActivityChart({ data, className }: { data: readonly ActivityPoin
 
   return (
     <Card className={cn('flex flex-col', className)}>
-      <CardHeader title="Actividad semanal" description="Conversaciones por día" />
+      <CardHeader title={t('dashboard.activity.title')} description={t('dashboard.activity.description')} />
       <div className="flex flex-1 flex-col p-5">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
           role="img"
-          aria-label={`Conversaciones por día; el máximo fue ${peak.value} el ${peak.label}.`}
+          aria-label={t('dashboard.activity.aria', { value: peak.value, day: peak.label })}
           className="min-h-48 w-full flex-1"
         >
           <defs>

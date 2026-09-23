@@ -1,4 +1,4 @@
-import type { Credentials, User } from './types'
+import type { Credentials, ProfileUpdate, User } from './types'
 
 /**
  * Authentication port. The UI only knows this interface; there is a mock
@@ -27,6 +27,14 @@ export interface AuthApi {
    * session logged in. @throws AuthError with `invalid_token` or `unavailable`.
    */
   resetPassword(token: string, password: string): Promise<User>
+  /** Edits the signed-in user's own name and optional profile data. @throws ApiError. */
+  updateProfile(patch: ProfileUpdate): Promise<User>
+  /** Sets (or replaces) the signed-in user's photo. @throws ApiError (400 not an image, 413 too large). */
+  uploadAvatar(image: Blob): Promise<User>
+  /** Removes the signed-in user's photo. @throws ApiError. */
+  removeAvatar(): Promise<User>
+  /** URL to display the user's photo, or `null` if they have none. */
+  avatarUrl(user: User): string | null
 }
 
 /** Machine-readable auth failure reasons the UI maps to user-facing copy. */

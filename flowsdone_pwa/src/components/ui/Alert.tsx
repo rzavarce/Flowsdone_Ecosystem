@@ -1,13 +1,14 @@
 import { CircleAlert, CircleCheck, Info, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { useTranslation } from 'react-i18next'
 
 type Tone = 'danger' | 'success' | 'info'
 
 const STYLES: Record<Tone, { box: string; icon: typeof Info; dismiss: string }> = {
-  danger: { box: 'bg-danger/10 text-danger', icon: CircleAlert, dismiss: 'hover:bg-danger/15' },
-  success: { box: 'bg-success/10 text-success', icon: CircleCheck, dismiss: 'hover:bg-success/15' },
-  info: { box: 'bg-accent text-primary-ink', icon: Info, dismiss: 'hover:bg-black/5' },
+  danger: { box: 'border-danger/40 bg-danger/5 text-danger', icon: CircleAlert, dismiss: 'hover:bg-danger/15' },
+  success: { box: 'border-success/40 bg-success/5 text-success', icon: CircleCheck, dismiss: 'hover:bg-success/15' },
+  info: { box: 'border-primary/40 bg-primary/5 text-primary-ink', icon: Info, dismiss: 'hover:bg-primary/10' },
 }
 
 /** Props for {@link Alert}. */
@@ -26,11 +27,12 @@ export interface AlertProps {
 
 /** Highlighted message. `danger` is announced as an alert; the rest as a status notice. */
 export function Alert({ tone = 'info', children, className, onDismiss }: AlertProps) {
+  const { t } = useTranslation()
   const { box, icon: Icon, dismiss } = STYLES[tone]
   return (
     <div
       role={tone === 'danger' ? 'alert' : 'status'}
-      className={cn('flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-sm', box, className)}
+      className={cn('flex items-start gap-2.5 rounded-xl border px-4 py-3.5 text-sm', box, className)}
     >
       <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1">{children}</div>
@@ -38,7 +40,7 @@ export function Alert({ tone = 'info', children, className, onDismiss }: AlertPr
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Quitar aviso"
+          aria-label={t('common.dismissNotice')}
           className={cn('-my-1 -mr-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-lg', dismiss)}
         >
           <X className="size-3.5" aria-hidden="true" />

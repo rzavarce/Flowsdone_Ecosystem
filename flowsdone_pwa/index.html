@@ -16,8 +16,8 @@
     <script>
       try {
         var s = JSON.parse(localStorage.getItem('fd-theme') || '{}')
-        var themes = ['flowsdone', 'agentic', 'corporate']
-        var theme = themes.indexOf(s.theme) > -1 ? s.theme : 'flowsdone'
+        var themes = ['admin', 'flowsdone', 'agentic', 'corporate']
+        var theme = themes.indexOf(s.theme) > -1 ? s.theme : 'admin'
         var dark =
           s.mode === 'dark' ||
           (s.mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)

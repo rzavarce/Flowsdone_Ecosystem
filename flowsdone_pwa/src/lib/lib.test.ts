@@ -34,4 +34,12 @@ describe('formatDelta', () => {
     expect(formatDelta(-14.2)).toBe('−14,2 %')
     expect(formatDelta(0)).toBe('0,0 %')
   })
+
+  it('en inglés usa punto decimal y sin espacio antes del %', async () => {
+    const { setLanguage } = await import('@/core/i18n/i18n')
+    setLanguage('en')
+    expect(formatDelta(12.4)).toBe('+12.4%')
+    setLanguage('ca')
+    expect(formatDelta(12.4)).toBe('+12,4 %')
+  })
 })

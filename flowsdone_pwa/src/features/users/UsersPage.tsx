@@ -1,5 +1,6 @@
 import { Plus, Users as UsersIcon } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -21,6 +22,7 @@ type Dialog = { user: UserRecord | null } | null
  * created and viewed alongside their tenant, in the Tenants screen.
  */
 export function UsersPage() {
+  const { t } = useTranslation()
   const users = useUsers()
   const deleteUser = useDeleteUser()
   const resendActivation = useResendUserActivation()
@@ -47,7 +49,7 @@ export function UsersPage() {
     setResendFeedback(null)
     try {
       await resendActivation.mutateAsync(user.id)
-      setResendFeedback({ userId: user.id, tone: 'success', message: `Se reenvió el email de activación a ${user.email}.` })
+      setResendFeedback({ userId: user.id, tone: 'success', message: t('users.resend.done', { email: user.email }) })
     } catch (err) {
       setResendFeedback({ userId: user.id, tone: 'danger', message: describeError(err) })
     }
@@ -56,12 +58,12 @@ export function UsersPage() {
   return (
     <div>
       <PageHeader
-        title="Usuarios"
-        description="Administradores, gestores de tenant y botmasters de la plataforma."
+        title={t('nav.users')}
+        description={t('users.description')}
         actions={
           <Button onClick={() => setDialog({ user: null })}>
             <Plus className="size-4" aria-hidden="true" />
-            Nuevo usuario
+            {t('users.new')}
           </Button>
         }
       />
@@ -73,11 +75,11 @@ export function UsersPage() {
       )}
 
       {users.isPending ? (
-        <Spinner label="Cargando usuarios" className="py-20" />
+        <Spinner label={t('users.loading')} className="py-20" />
       ) : users.isError ? (
         <Alert tone="danger">{describeError(users.error)}</Alert>
       ) : staff.length === 0 ? (
-        <EmptyState icon={UsersIcon} title="Aún no hay usuarios" description="Crea el primero para empezar a repartir accesos." />
+        <EmptyState icon={UsersIcon} title={t('users.empty.title')} description={t('users.empty.description')} />
       ) : (
         <UserList
           users={staff}
@@ -92,9 +94,9 @@ export function UsersPage() {
 
       <ConfirmDialog
         open={toDelete !== null}
-        title="Eliminar usuario"
-        description={toDelete ? `Se eliminará a ${toDelete.name} (${toDelete.email}) y se cerrarán todas sus sesiones activas.` : ''}
-        confirmLabel="Eliminar"
+        title={t('users.delete.title')}
+        description={toDelete ? t('users.delete.description', { name: toDelete.name, email: toDelete.email }) : ''}
+        confirmLabel={t('common.delete')}
         pending={deleteUser.isPending}
         error={deleteUser.error ? describeError(deleteUser.error) : null}
         onConfirm={confirmDelete}

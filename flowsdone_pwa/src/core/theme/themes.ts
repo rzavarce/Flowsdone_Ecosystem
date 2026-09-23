@@ -2,9 +2,10 @@
  * Catalog of templates (color presets) and pure helpers for the theme
  * system. No React: it can be tested and reused in the anti-flash script.
  */
+import { i18n } from '@/core/i18n/i18n'
 
 /** Identifiers of the available templates. */
-export type ThemeId = 'flowsdone' | 'agentic' | 'corporate'
+export type ThemeId = 'admin' | 'flowsdone' | 'agentic' | 'corporate'
 
 /** Mode preference chosen by the user. */
 export type ColorMode = 'light' | 'dark' | 'system'
@@ -20,14 +21,24 @@ export interface ThemePreset {
 }
 
 /** Templates in display order. Their colors live in index.css. */
-export const THEMES: readonly ThemePreset[] = [
-  { id: 'flowsdone', name: 'Flowsdone', description: 'Identidad de marca: Deep Space, cian eléctrico y verde "done".' },
-  { id: 'agentic', name: 'Agentic', description: 'Violeta y menta, la estética de las herramientas de agentes.' },
-  { id: 'corporate', name: 'Corporate', description: 'Azul cobalto y coral, sobrio para entornos B2B.' },
-]
+export const THEMES: readonly ThemePreset[] = (
+  [
+    ['admin', 'Admin'],
+    ['flowsdone', 'Flowsdone'],
+    ['agentic', 'Agentic'],
+    ['corporate', 'Corporate'],
+  ] as const
+).map(([id, name]) => ({
+  id,
+  name,
+  // Getter: se traduce al leerse, en el idioma activo.
+  get description() {
+    return i18n.t(`theme.presets.${id}`)
+  },
+}))
 
 /** Template used when nothing has been chosen yet. */
-export const DEFAULT_THEME: ThemeId = 'flowsdone'
+export const DEFAULT_THEME: ThemeId = 'admin'
 /** Color mode used when nothing has been chosen yet: follows the OS. */
 export const DEFAULT_MODE: ColorMode = 'system'
 

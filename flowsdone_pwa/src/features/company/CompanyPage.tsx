@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Spinner } from '@/components/ui/Spinner'
 import { useCompany } from '@/core/company/useCompany'
 import { describeError } from '@/core/http/describeError'
+import { useTranslation } from 'react-i18next'
 
 /** A single company field, or nothing if it's empty. */
 function Row({ label, value }: { label: string; value: string | null }) {
@@ -24,6 +25,7 @@ function Row({ label, value }: { label: string; value: string | null }) {
  * this screen never goes through the admin API, it uses `GET /me/billing-profile`.
  */
 export function CompanyPage() {
+  const { t } = useTranslation()
   const company = useCompany()
   const address = company.data
     ? [company.data.address_line1, company.data.address_line2, company.data.city, company.data.state_province, company.data.country]
@@ -33,29 +35,29 @@ export function CompanyPage() {
 
   return (
     <>
-      <PageHeader title="Mi empresa" description="Los datos de facturación de tu organización." />
+      <PageHeader title={t('nav.company')} description={t('company.description')} />
       {company.isPending ? (
-        <Spinner label="Cargando los datos de tu empresa" className="py-20" />
+        <Spinner label={t('company.loading')} className="py-20" />
       ) : company.isError ? (
         <Alert tone="danger">{describeError(company.error)}</Alert>
       ) : !company.data ? (
         <EmptyState
           icon={Building2}
-          title="Todavía no hay datos cargados"
-          description="Pídele a tu administrador que complete los datos de facturación de tu empresa."
+          title={t('company.empty.title')}
+          description={t('company.empty.description')}
         />
       ) : (
         <Card className="max-w-xl p-5">
-          <Row label="Razón social" value={company.data.legal_name} />
-          <Row label="Identificación fiscal" value={company.data.tax_id} />
-          <Row label="Email de facturación" value={company.data.billing_email} />
-          <Row label="Contacto de facturación" value={company.data.billing_contact_name} />
-          <Row label="Teléfono" value={company.data.billing_phone} />
-          <Row label="Dirección" value={address || null} />
-          <Row label="Código postal" value={company.data.postal_code} />
-          <Row label="Plan" value={company.data.plan} />
-          <Row label="Ciclo de facturación" value={company.data.billing_cycle} />
-          <Row label="Moneda" value={company.data.currency} />
+          <Row label={t('billing.fields.legal_name')} value={company.data.legal_name} />
+          <Row label={t('billing.fields.tax_id')} value={company.data.tax_id} />
+          <Row label={t('billing.fields.billing_email')} value={company.data.billing_email} />
+          <Row label={t('billing.fields.billing_contact_name')} value={company.data.billing_contact_name} />
+          <Row label={t('billing.fields.billing_phone')} value={company.data.billing_phone} />
+          <Row label={t('billing.fields.address_line1')} value={address || null} />
+          <Row label={t('billing.fields.postal_code')} value={company.data.postal_code} />
+          <Row label={t('billing.fields.plan')} value={company.data.plan} />
+          <Row label={t('billing.fields.billing_cycle')} value={company.data.billing_cycle} />
+          <Row label={t('billing.fields.currency')} value={company.data.currency} />
         </Card>
       )}
     </>

@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { useTenantBilling } from '@/core/admin/hooks'
 import { describeError } from '@/core/http/describeError'
 import { BillingProfileDialog } from './BillingProfileDialog'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link BillingProfileCard}. */
 export interface BillingProfileCardProps {
@@ -32,6 +33,7 @@ function Row({ label, value }: { label: string; value: string | null }) {
  * (`features/company/CompanyPage.tsx`).
  */
 export function BillingProfileCard({ tenantId, tenantName }: BillingProfileCardProps) {
+  const { t } = useTranslation()
   const billing = useTenantBilling(tenantId)
   const [editing, setEditing] = useState(false)
 
@@ -42,34 +44,34 @@ export function BillingProfileCard({ tenantId, tenantName }: BillingProfileCardP
   return (
     <Card>
       <CardHeader
-        title="Datos de facturación"
-        description="Para poder facturar a este tenant."
+        title={t('billing.title')}
+        description={t('billing.cardDescription')}
         action={
           <Button size="sm" variant="secondary" onClick={() => setEditing(true)} disabled={billing.isPending}>
             <Pencil className="size-4" aria-hidden="true" />
-            Editar
+            {t('common.edit')}
           </Button>
         }
       />
       <div className="p-5 pt-4">
         {billing.isPending ? (
-          <Spinner label="Cargando datos de facturación" />
+          <Spinner label={t('billing.loading')} />
         ) : billing.isError ? (
           <Alert tone="danger">{describeError(billing.error)}</Alert>
         ) : !billing.data?.legal_name && !billing.data?.tax_id && !billing.data?.billing_email ? (
           <p className="flex items-center gap-2 text-sm text-muted">
             <Receipt className="size-4 shrink-0" aria-hidden="true" />
-            Todavía no se cargaron los datos de facturación de este tenant.
+            {t('billing.empty')}
           </p>
         ) : (
           <div className="divide-y divide-border">
-            <Row label="Razón social" value={billing.data.legal_name} />
-            <Row label="Identificación fiscal" value={billing.data.tax_id} />
-            <Row label="Email de facturación" value={billing.data.billing_email} />
-            <Row label="Contacto" value={billing.data.billing_contact_name} />
-            <Row label="Dirección" value={address || null} />
-            <Row label="Plan" value={billing.data.plan} />
-            <Row label="Moneda" value={billing.data.currency} />
+            <Row label={t('billing.fields.legal_name')} value={billing.data.legal_name} />
+            <Row label={t('billing.fields.tax_id')} value={billing.data.tax_id} />
+            <Row label={t('billing.fields.billing_email')} value={billing.data.billing_email} />
+            <Row label={t('billing.fields.contact')} value={billing.data.billing_contact_name} />
+            <Row label={t('billing.fields.address_line1')} value={address || null} />
+            <Row label={t('billing.fields.plan')} value={billing.data.plan} />
+            <Row label={t('billing.fields.currency')} value={billing.data.currency} />
           </div>
         )}
       </div>

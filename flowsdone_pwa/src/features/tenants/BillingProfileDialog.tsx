@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { useUpdateTenantBilling } from '@/core/admin/hooks'
 import type { TenantBillingProfile } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link BillingProfileDialog}. */
 export interface BillingProfileDialogProps {
@@ -28,6 +29,7 @@ const orNull = (v: string) => (v.trim() ? v.trim() : null)
  * it; `plan`/`billing_cycle` are free text.
  */
 export function BillingProfileDialog({ tenantId, tenantName, profile, onClose }: BillingProfileDialogProps) {
+  const { t } = useTranslation()
   const update = useUpdateTenantBilling()
   const [fields, setFields] = useState({
     legal_name: profile.legal_name ?? '',
@@ -67,77 +69,77 @@ export function BillingProfileDialog({ tenantId, tenantName, profile, onClose }:
     <Dialog
       open
       onClose={update.isPending ? () => {} : onClose}
-      title="Datos de facturación"
+      title={t('billing.title')}
       description={tenantName}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={update.isPending}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form={FORM_ID} disabled={update.isPending}>
-            {update.isPending ? 'Guardando…' : 'Guardar'}
+            {update.isPending ? t('common.saving') : t('common.save')}
           </Button>
         </>
       }
     >
       <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Razón social">
-            <Input value={fields.legal_name} onChange={set('legal_name')} placeholder="Acme Corp S.A. de C.V." />
+          <Field label={t('billing.fields.legal_name')}>
+            <Input value={fields.legal_name} onChange={set('legal_name')} placeholder={t('billing.placeholders.legal_name')} />
           </Field>
-          <Field label="Identificación fiscal" hint="RFC, NIF, VAT, EIN…">
+          <Field label={t('billing.fields.tax_id')} hint={t('billing.hints.tax_id')}>
             <Input value={fields.tax_id} onChange={set('tax_id')} />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Email de facturación">
+          <Field label={t('billing.fields.billing_email')}>
             <Input type="email" value={fields.billing_email} onChange={set('billing_email')} />
           </Field>
-          <Field label="Contacto de facturación">
+          <Field label={t('billing.fields.billing_contact_name')}>
             <Input value={fields.billing_contact_name} onChange={set('billing_contact_name')} />
           </Field>
         </div>
-        <Field label="Teléfono">
+        <Field label={t('billing.fields.billing_phone')}>
           <Input type="tel" value={fields.billing_phone} onChange={set('billing_phone')} />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Dirección">
-            <Input value={fields.address_line1} onChange={set('address_line1')} placeholder="Calle y número" />
+          <Field label={t('billing.fields.address_line1')}>
+            <Input value={fields.address_line1} onChange={set('address_line1')} placeholder={t('billing.placeholders.address_line1')} />
           </Field>
-          <Field label="Dirección (línea 2)">
-            <Input value={fields.address_line2} onChange={set('address_line2')} placeholder="Piso, oficina…" />
+          <Field label={t('billing.fields.address_line2')}>
+            <Input value={fields.address_line2} onChange={set('address_line2')} placeholder={t('billing.placeholders.address_line2')} />
           </Field>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Ciudad">
+          <Field label={t('billing.fields.city')}>
             <Input value={fields.city} onChange={set('city')} />
           </Field>
-          <Field label="Estado/provincia">
+          <Field label={t('billing.fields.state_province')}>
             <Input value={fields.state_province} onChange={set('state_province')} />
           </Field>
-          <Field label="Código postal">
+          <Field label={t('billing.fields.postal_code')}>
             <Input value={fields.postal_code} onChange={set('postal_code')} />
           </Field>
         </div>
-        <Field label="País">
+        <Field label={t('billing.fields.country')}>
           <Input value={fields.country} onChange={set('country')} />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Field label="Moneda" hint="USD, MXN…">
+          <Field label={t('billing.fields.currency')} hint={t('billing.hints.currency')}>
             <Input value={fields.currency} onChange={set('currency')} />
           </Field>
-          <Field label="Plan">
-            <Input value={fields.plan} onChange={set('plan')} placeholder="starter, pro…" />
+          <Field label={t('billing.fields.plan')}>
+            <Input value={fields.plan} onChange={set('plan')} placeholder={t('billing.placeholders.plan')} />
           </Field>
-          <Field label="Ciclo de facturación">
-            <Input value={fields.billing_cycle} onChange={set('billing_cycle')} placeholder="mensual, anual…" />
+          <Field label={t('billing.fields.billing_cycle')}>
+            <Input value={fields.billing_cycle} onChange={set('billing_cycle')} placeholder={t('billing.placeholders.billing_cycle')} />
           </Field>
         </div>
 
-        <Field label="Notas">
+        <Field label={t('billing.fields.notes')}>
           <Input value={fields.notes} onChange={set('notes')} />
         </Field>
 

@@ -2,6 +2,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardHeader } from '@/components/ui/Card'
 import type { ConversationSummary } from '@/mocks/data'
+import { useTranslation } from 'react-i18next'
 
 /** List of the latest conversations with their channel and status. */
 export function RecentConversations({
@@ -11,9 +12,10 @@ export function RecentConversations({
   items: readonly ConversationSummary[]
   className?: string
 }) {
+  const { t } = useTranslation()
   return (
     <Card className={className}>
-      <CardHeader title="Conversaciones recientes" description="Últimas interacciones de todos los canales" />
+      <CardHeader title={t('dashboard.recent.title')} description={t('dashboard.recent.description')} />
       <ul className="p-2">
         {items.map((c) => (
           <li key={c.id} className="flex items-center gap-3 rounded-xl p-3 transition hover:bg-surface-muted">

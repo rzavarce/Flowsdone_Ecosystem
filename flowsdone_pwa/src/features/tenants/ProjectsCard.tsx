@@ -5,6 +5,7 @@ import { Card, CardHeader } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { Project } from '@/core/admin/types'
 import { summarize, type ProjectCounts } from './useTenantsView'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link ProjectsCard}. */
 export interface ProjectsCardProps {
@@ -19,21 +20,22 @@ export interface ProjectsCardProps {
 
 /** Projects of the selected tenant, with status, content and actions. */
 export function ProjectsCard({ projects, counts, onCreate, onEdit, onToggleStatus, onDelete }: ProjectsCardProps) {
+  const { t } = useTranslation()
   return (
     <Card>
       <CardHeader
-        title="Proyectos"
-        description="Cada canal y cada agente pertenece a un proyecto."
+        title={t('tenants.projects.title')}
+        description={t('tenants.projects.description')}
         action={
           <Button size="sm" onClick={onCreate}>
             <Plus className="size-4" aria-hidden="true" />
-            Nuevo proyecto
+            {t('tenants.projects.new')}
           </Button>
         }
       />
       {projects.length === 0 ? (
         <div className="p-5">
-          <EmptyState icon={FolderKanban} title="Este tenant aún no tiene proyectos" description="Crea el primero para poder conectar canales y agentes." />
+          <EmptyState icon={FolderKanban} title={t('tenants.projects.empty.title')} description={t('tenants.projects.empty.description')} />
         </div>
       ) : (
         <ul className="mt-4 divide-y divide-border border-t border-border">
@@ -45,23 +47,23 @@ export function ProjectsCard({ projects, counts, onCreate, onEdit, onToggleStatu
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 font-medium">
                     <span className="truncate">{project.name}</span>
-                    {!active && <Badge tone="warning">Suspendido</Badge>}
+                    {!active && <Badge tone="warning">{t('common.suspended')}</Badge>}
                   </p>
                   <p className="truncate font-mono text-xs text-muted">{project.slug}</p>
                   <p className="mt-1 text-xs text-muted">{summarize(c)}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => onEdit(project)} aria-label={`Editar ${project.name}`}>
+                  <Button variant="secondary" size="sm" onClick={() => onEdit(project)} aria-label={t('common.editItem', { name: project.name })}>
                     <Pencil className="size-4" aria-hidden="true" />
-                    Editar
+                    {t('common.edit')}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => onToggleStatus(project)} aria-label={`${active ? 'Suspender' : 'Reactivar'} ${project.name}`}>
+                  <Button variant="ghost" size="sm" onClick={() => onToggleStatus(project)} aria-label={t(active ? 'common.suspendItem' : 'common.reactivateItem', { name: project.name })}>
                     {active ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
-                    {active ? 'Suspender' : 'Reactivar'}
+                    {active ? t('common.suspend') : t('common.reactivate')}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => onDelete(project)} aria-label={`Eliminar ${project.name}`}>
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(project)} aria-label={t('common.deleteItem', { name: project.name })}>
                     <Trash2 className="size-4" aria-hidden="true" />
-                    Eliminar
+                    {t('common.delete')}
                   </Button>
                 </div>
               </li>

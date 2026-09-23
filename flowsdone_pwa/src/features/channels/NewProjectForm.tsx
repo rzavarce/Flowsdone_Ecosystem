@@ -8,6 +8,7 @@ import type { Project } from '@/core/admin/types'
 import type { Tenant } from '@/core/auth/types'
 import { describeError } from '@/core/http/describeError'
 import { slugify } from '@/lib/slug'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link NewProjectForm}. */
 export interface NewProjectFormProps {
@@ -22,6 +23,7 @@ export interface NewProjectFormProps {
  * doesn't have any project yet (a channel always hangs off a project).
  */
 export function NewProjectForm({ tenants, defaultTenantId, onCreated }: NewProjectFormProps) {
+  const { t } = useTranslation()
   const create = useCreateProject()
   const [tenantId, setTenantId] = useState(defaultTenantId ?? tenants[0]?.id ?? '')
   const [name, setName] = useState('')
@@ -39,12 +41,12 @@ export function NewProjectForm({ tenants, defaultTenantId, onCreated }: NewProje
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-xl border border-dashed border-border p-4" aria-label="Nuevo proyecto">
+    <form onSubmit={submit} className="space-y-4 rounded-xl border border-dashed border-border p-4" aria-label={t('tenants.projects.new')}>
       <p className="text-sm text-muted">
-        Un canal siempre pertenece a un proyecto. Crea el primero para continuar.
+        {t('channels.newProject.help')}
       </p>
       {tenants.length > 1 && (
-        <Field label="Tenant">
+        <Field label={t('common.tenant')}>
           <Select value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>
@@ -54,10 +56,10 @@ export function NewProjectForm({ tenants, defaultTenantId, onCreated }: NewProje
           </Select>
         </Field>
       )}
-      <Field label="Nombre del proyecto">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Atención al cliente" />
+      <Field label={t('channels.newProject.name')}>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tenants.projects.namePlaceholder')} />
       </Field>
-      <Field label="Identificador (slug)" hint="Minúsculas, números y guiones.">
+      <Field label={t('common.slug')} hint={t('common.slugHint')}>
         <Input
           value={effectiveSlug}
           onChange={(e) => {
@@ -69,7 +71,7 @@ export function NewProjectForm({ tenants, defaultTenantId, onCreated }: NewProje
       </Field>
       {create.error && <Alert tone="danger">{describeError(create.error)}</Alert>}
       <Button type="submit" size="sm" disabled={!valid || create.isPending}>
-        {create.isPending ? 'Creando…' : 'Crear proyecto'}
+        {create.isPending ? t('common.creating') : t('tenants.projects.create')}
       </Button>
     </form>
   )

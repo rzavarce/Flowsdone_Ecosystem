@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { useUpsertChannelApp } from '@/core/admin/hooks'
 import { describeError } from '@/core/http/describeError'
 import type { ChannelAppConfig } from './channelApps'
+import { useTranslation } from 'react-i18next'
 
 /** Props for {@link ChannelAppDialog}. */
 export interface ChannelAppDialogProps {
@@ -26,6 +27,7 @@ const FORM_ID = 'channel-app-form'
  * token, which is kept if a new one isn't sent).
  */
 export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogProps) {
+  const { t } = useTranslation()
   const save = useUpsertChannelApp()
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -49,15 +51,15 @@ export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogP
     <Dialog
       open
       onClose={save.isPending ? () => {} : onClose}
-      title={configured ? `Reemplazar credenciales de ${app.label}` : `Configurar ${app.label}`}
+      title={configured ? t('settings.integrations.replaceTitle', { name: app.label }) : t('settings.integrations.configureItem', { name: app.label })}
       description={app.description}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={save.isPending}>
-            Cancelar
+            {t('common.cancel')}
           </Button>
           <Button type="submit" form={FORM_ID} disabled={save.isPending}>
-            {save.isPending ? 'Guardando…' : 'Guardar'}
+            {save.isPending ? t('common.saving') : t('common.save')}
           </Button>
         </>
       }
@@ -65,8 +67,7 @@ export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogP
       <form id={FORM_ID} onSubmit={submit} noValidate className="space-y-5">
         {configured && (
           <Alert tone="info">
-            Ya hay credenciales guardadas y no se pueden mostrar. Al guardar se reemplazan por las que escribas aquí: vuelve
-            a introducir todas.
+            {t('settings.integrations.replaceNotice')}
           </Alert>
         )}
         {app.fields.map((field) => (
@@ -74,7 +75,7 @@ export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogP
             key={field.key}
             label={field.label}
             hint={field.hint}
-            error={submitted && missing.includes(field) ? `${field.label} es obligatorio.` : undefined}
+            error={submitted && missing.includes(field) ? t('common.fieldRequired', { field: field.label }) : undefined}
           >
             <Input
               type="password"

@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { Credentials, User } from './types'
+import type { Credentials, ProfileUpdate, User } from './types'
 
 /** Session lifecycle: `loading` while restoring, then `authenticated` or `anonymous`. */
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
@@ -21,6 +21,14 @@ export interface AuthContextValue {
   requestPasswordReset: (email: string) => Promise<void>
   /** Redeems the recovery link, sets the new password and leaves the session logged in. */
   resetPassword: (token: string, password: string) => Promise<User>
+  /** Edits the signed-in user's own profile and refreshes `user`. @throws ApiError. */
+  updateProfile: (patch: ProfileUpdate) => Promise<User>
+  /** Sets the signed-in user's photo and refreshes `user`. @throws ApiError. */
+  uploadAvatar: (image: Blob) => Promise<User>
+  /** Removes the signed-in user's photo and refreshes `user`. @throws ApiError. */
+  removeAvatar: () => Promise<User>
+  /** URL of the signed-in user's photo, or `null`. */
+  avatarUrl: string | null
 }
 
 /** React context carrying the current {@link AuthContextValue}; `null` outside `<AuthProvider>`. */

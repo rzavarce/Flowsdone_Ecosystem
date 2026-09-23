@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { AuthError } from '@/core/auth/AuthApi'
 import { homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
+import { useTranslation } from 'react-i18next'
 
 /** Same minimum the backend enforces (MIN_PASSWORD_LENGTH in create_user.py). */
 const MIN_PASSWORD_LENGTH = 10
@@ -22,6 +23,7 @@ export interface ResetPasswordFormProps {
  * hand, same as `ActivateAccountForm`.
  */
 export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
+  const { t } = useTranslation()
   const { resetPassword } = useAuth()
   const navigate = useNavigate()
   const ids = { password: useId(), confirm: useId(), error: useId() }
@@ -36,7 +38,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     if (password !== confirm) {
-      setError({ message: 'Las contraseñas no coinciden.', invalidToken: false })
+      setError({ message: t('auth.passwordMismatch'), invalidToken: false })
       return
     }
     setPending(true)
@@ -48,7 +50,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
       if (err instanceof AuthError) {
         setError({ message: err.message, invalidToken: err.code === 'invalid_token' })
       } else {
-        setError({ message: 'Ocurrió un error inesperado.', invalidToken: false })
+        setError({ message: t('common.unexpectedError'), invalidToken: false })
       }
       setPending(false)
     }
@@ -58,7 +60,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
     <form onSubmit={onSubmit} noValidate className="space-y-5" aria-describedby={error ? ids.error : undefined}>
       <div className="space-y-1.5">
         <label htmlFor={ids.password} className="text-sm font-medium">
-          Contraseña nueva
+          {t('auth.newPassword')}
         </label>
         <div className="relative">
           <Input
@@ -74,19 +76,19 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           <button
             type="button"
             onClick={() => setShowPassword((s) => !s)}
-            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             aria-pressed={showPassword}
             className="absolute top-1/2 right-2 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-muted hover:text-foreground"
           >
             {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
           </button>
         </div>
-        <p className="text-xs text-muted">Mínimo {MIN_PASSWORD_LENGTH} caracteres.</p>
+        <p className="text-xs text-muted">{t('auth.minLength', { count: MIN_PASSWORD_LENGTH })}</p>
       </div>
 
       <div className="space-y-1.5">
         <label htmlFor={ids.confirm} className="text-sm font-medium">
-          Confirma la contraseña
+          {t('auth.confirmPassword')}
         </label>
         <Input
           id={ids.confirm}
@@ -97,15 +99,15 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
           onChange={(e) => setConfirm(e.target.value)}
           aria-invalid={mismatch}
         />
-        {mismatch && <p className="text-xs text-danger">Las contraseñas no coinciden.</p>}
+        {mismatch && <p className="text-xs text-danger">{t('auth.passwordMismatch')}</p>}
       </div>
 
       {error && (
-        <p id={ids.error} role="alert" className="rounded-xl bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p id={ids.error} role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
           {error.message}{' '}
           {error.invalidToken && (
             <Link to="/forgot-password" className="font-medium underline">
-              Pide un enlace nuevo
+              {t('auth.reset.requestNew')}
             </Link>
           )}
         </p>
@@ -117,7 +119,7 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
         className="w-full"
       >
         {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
-        {pending ? 'Guardando…' : 'Guardar contraseña'}
+        {pending ? t('common.saving') : t('auth.reset.submit')}
       </Button>
     </form>
   )

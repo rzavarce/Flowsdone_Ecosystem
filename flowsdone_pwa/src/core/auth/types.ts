@@ -30,13 +30,38 @@ export interface Tenant {
   name: string
 }
 
+/** Social networks a profile can link to, in display order (same keys as the gateway's `SOCIAL_NETWORKS`). */
+export const SOCIAL_NETWORKS = ['website', 'linkedin', 'x', 'facebook', 'instagram'] as const
+
+/** One of {@link SOCIAL_NETWORKS}. */
+export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number]
+
+/** Optional profile data, editable by the user ("My profile") and by an admin (Users). */
+export interface ProfileFields {
+  phone?: string | null
+  address?: string | null
+  /** Only the networks that are set. */
+  social_links?: Partial<Record<SocialNetwork, string>>
+  /** Set when the user has a photo; doubles as a cache-buster for its URL. */
+  avatar_updated_at?: string | null
+}
+
 /** An authenticated user. `tenants` are the tenants they have access to. */
-export interface User {
+export interface User extends ProfileFields {
   id: string
   name: string
   email: string
   role: Role
   tenants: Tenant[]
+}
+
+/** What a user may change about themselves (`PATCH /me/profile`). An empty string clears a field. */
+export interface ProfileUpdate {
+  name?: string
+  phone?: string
+  address?: string
+  /** Replaces all the links. */
+  social_links?: Partial<Record<SocialNetwork, string>>
 }
 
 /** Login credentials submitted from the login form. */

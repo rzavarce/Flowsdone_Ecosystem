@@ -10,6 +10,7 @@ import type { Agent, ChannelApp, ChannelConnection, Project, TenantBillingProfil
 export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): AdminApi {
   const call = <T>(path: string, method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown) =>
     apiFetch<T>(`/admin${path}`, { method, body, fetchFn, baseUrl })
+  const base = baseUrl ?? '/api'
   const query = (params: Record<string, string | undefined>) => {
     const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][])
     return qs.size ? `?${qs}` : ''
@@ -50,5 +51,12 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     updateUser: (id, patch) => call<UserRecord>(`/users/${id}`, 'PATCH', patch),
     deleteUser: (id) => call<void>(`/users/${id}`, 'DELETE'),
     resendUserActivation: (id) => call<void>(`/users/${id}/resend-activation`, 'POST'),
+    uploadUserAvatar: (id, image) =>
+      apiFetch<UserRecord>(`/admin/users/${id}/avatar`, { method: 'PUT', blob: image, fetchFn, baseUrl }),
+    removeUserAvatar: (id) => call<UserRecord>(`/users/${id}/avatar`, 'DELETE'),
+    userAvatarUrl: (user) =>
+      user.avatar_updated_at
+        ? `${base}/admin/users/${user.id}/avatar?v=${encodeURIComponent(user.avatar_updated_at)}`
+        : null,
   }
 }

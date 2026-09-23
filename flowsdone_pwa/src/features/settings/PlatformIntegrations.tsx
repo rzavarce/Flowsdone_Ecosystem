@@ -10,6 +10,7 @@ import { useChannelApps, useDeleteChannelApp, useRevealChannelApp } from '@/core
 import { describeError } from '@/core/http/describeError'
 import { CHANNEL_APPS, type ChannelAppConfig } from './channelApps'
 import { ChannelAppDialog } from './ChannelAppDialog'
+import { Trans, useTranslation } from 'react-i18next'
 
 /** Seconds the verification token stays visible before it hides itself. */
 const REVEAL_SECONDS = 30
@@ -23,6 +24,7 @@ const REVEAL_SECONDS = 30
  * itself after {@link REVEAL_SECONDS} s.
  */
 export function PlatformIntegrations() {
+  const { t } = useTranslation()
   const apps = useChannelApps()
   const remove = useDeleteChannelApp()
   const reveal = useRevealChannelApp()
@@ -73,22 +75,21 @@ export function PlatformIntegrations() {
   return (
     <Card>
       <CardHeader
-        title="Integraciones de plataforma"
-        description="Credenciales de la app de cada proveedor, compartidas por todos los tenants. Se configuran una sola vez."
+        title={t('settings.integrations.title')}
+        description={t('settings.integrations.description')}
       />
       <div className="space-y-3 p-5">
         <Alert tone="info">
-          Estas credenciales firman y verifican los webhooks de <strong>todos</strong> los clientes. Los secretos guardados
-          no se pueden volver a ver; solo se pueden reemplazar.
+          <Trans i18nKey="settings.integrations.notice" components={{ strong: <strong /> }} />
         </Alert>
 
         {apps.isLoading ? (
-          <Spinner label="Cargando integraciones" className="py-8" />
+          <Spinner label={t('settings.integrations.loading')} className="py-8" />
         ) : apps.error ? (
           <Alert tone="danger">
-            <p>No se pudieron cargar las integraciones: {describeError(apps.error)}</p>
+            <p>{t('settings.integrations.loadError', { error: describeError(apps.error) })}</p>
             <Button variant="secondary" size="sm" className="mt-3" onClick={() => void apps.refetch()}>
-              Reintentar
+              {t('common.retry')}
             </Button>
           </Alert>
         ) : (
@@ -102,7 +103,7 @@ export function PlatformIntegrations() {
                       <p className="flex items-center gap-2 font-medium">
                         <KeyRound className="size-4 text-muted" aria-hidden="true" />
                         {app.label}
-                        <Badge tone={isConfigured ? 'success' : 'neutral'}>{isConfigured ? 'Configurada' : 'Sin configurar'}</Badge>
+                        <Badge tone={isConfigured ? 'success' : 'neutral'}>{isConfigured ? t('settings.integrations.configured') : t('settings.integrations.notConfigured')}</Badge>
                       </p>
                       <p className="mt-0.5 text-sm text-muted">{app.description}</p>
                     </div>
@@ -110,11 +111,11 @@ export function PlatformIntegrations() {
                       {app.provider === 'meta' && isConfigured && (
                         <Button variant="ghost" size="sm" onClick={showToken} disabled={reveal.isPending}>
                           <Eye className="size-4" aria-hidden="true" />
-                          Ver token de verificación
+                          {t('settings.integrations.showToken')}
                         </Button>
                       )}
-                      <Button variant="secondary" size="sm" onClick={() => setEditing(app)} aria-label={`${isConfigured ? 'Reemplazar' : 'Configurar'} ${app.label}`}>
-                        {isConfigured ? 'Reemplazar' : 'Configurar'}
+                      <Button variant="secondary" size="sm" onClick={() => setEditing(app)} aria-label={t(isConfigured ? 'settings.integrations.replaceItem' : 'settings.integrations.configureItem', { name: app.label })}>
+                        {isConfigured ? t('settings.integrations.replace') : t('settings.integrations.configure')}
                       </Button>
                       {isConfigured && (
                         <Button
@@ -124,9 +125,9 @@ export function PlatformIntegrations() {
                             remove.reset()
                             setRemoving(app)
                           }}
-                          aria-label={`Quitar ${app.label}`}
+                          aria-label={t('settings.integrations.removeItem', { name: app.label })}
                         >
-                          Quitar
+                          {t('settings.integrations.remove')}
                         </Button>
                       )}
                     </div>
@@ -134,14 +135,14 @@ export function PlatformIntegrations() {
 
                   {app.provider === 'meta' && token !== null && (
                     <div className="mt-3 rounded-xl bg-surface-muted p-3">
-                      <p className="text-xs text-muted">Pégalo en el panel de Meta como "Verify token". Se oculta solo en {REVEAL_SECONDS} s.</p>
+                      <p className="text-xs text-muted">{t('settings.integrations.tokenHelp', { seconds: REVEAL_SECONDS })}</p>
                       <div className="mt-2 flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs" aria-label="Token de verificación">
-                          {token || '(sin token)'}
+                        <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-3 py-2 font-mono text-xs" aria-label={t('settings.integrations.tokenLabel')}>
+                          {token || t('settings.integrations.noToken')}
                         </code>
                         <Button variant="secondary" size="sm" onClick={copyToken} disabled={!token}>
                           {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
-                          {copied ? 'Copiado' : 'Copiar'}
+                          {copied ? t('settings.integrations.copied') : t('settings.integrations.copy')}
                         </Button>
                       </div>
                     </div>
@@ -158,9 +159,9 @@ export function PlatformIntegrations() {
 
       <ConfirmDialog
         open={removing !== null}
-        title={removing ? `Quitar ${removing.label}` : ''}
-        description="Los webhooks de este proveedor dejarán de verificarse: los mensajes entrantes de todos los tenants se ignorarán hasta que vuelvas a configurarlo."
-        confirmLabel="Quitar credenciales"
+        title={removing ? t('settings.integrations.removeItem', { name: removing.label }) : ''}
+        description={t('settings.integrations.removeDescription')}
+        confirmLabel={t('settings.integrations.removeConfirm')}
         pending={remove.isPending}
         error={remove.error ? describeError(remove.error) : null}
         onConfirm={confirmRemove}

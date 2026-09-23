@@ -9,6 +9,8 @@
  *   `detail` as the message.
  */
 
+import { i18n } from '@/core/i18n/i18n'
+
 /** Headers the gateway requires to accept cookie-authenticated writes. */
 export const CSRF_HEADERS = { 'X-Requested-With': 'fd-console' } as const
 
@@ -28,6 +30,8 @@ export interface ApiFetchOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   /** JSON body. */
   body?: unknown
+  /** Raw binary body (e.g. an image upload); sent with its own `type` as Content-Type. Takes precedence over `body`. */
+  blob?: Blob
   /** Injectable `fetch` for tests. */
   fetchFn?: typeof fetch
   /** API base; defaults to `/api`. */
@@ -66,7 +70,7 @@ async function errorMessage(res: Response): Promise<string> {
  *   there was no connection.
  */
 export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { method = 'GET', body, fetchFn = (...a) => fetch(...a), baseUrl = '/api' } = options
+  const { method = 'GET', body, blob, fetchFn = (...a) => fetch(...a), baseUrl = '/api' } = options
   let res: Response
   try {
     res = await fetchFn(`${baseUrl}${path}`, {
@@ -74,12 +78,12 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       credentials: 'include',
       headers: {
         ...CSRF_HEADERS,
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(blob ? { 'Content-Type': blob.type || 'application/octet-stream' } : body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: blob ?? (body !== undefined ? JSON.stringify(body) : undefined),
     })
   } catch {
-    throw new ApiError(0, 'No se pudo contactar con el servidor. Inténtalo de nuevo.')
+    throw new ApiError(0, i18n.t('auth.errors.unavailable'))
   }
   if (!res.ok) throw new ApiError(res.status, await errorMessage(res))
   if (res.status === 204) return undefined as T

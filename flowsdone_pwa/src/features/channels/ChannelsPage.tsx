@@ -14,6 +14,7 @@ import { ConnectionCard } from './ConnectionCard'
 import { ConnectionDialog } from './ConnectionDialog'
 import { describeError } from '@/core/http/describeError'
 import { useChannelsView } from './useChannelsView'
+import { useTranslation } from 'react-i18next'
 
 /** Which dialog is open: create, edit a connection, or none. */
 type DialogState = { kind: 'create' } | { kind: 'edit'; connection: ChannelConnection } | null
@@ -25,6 +26,7 @@ type DialogState = { kind: 'create' } | { kind: 'edit'; connection: ChannelConne
  * this component further narrows it by the tenant chosen in the selector.
  */
 export function ChannelsPage() {
+  const { t } = useTranslation()
   const view = useChannelsView()
   const { current, tenants } = useTenant()
   const remove = useDeleteConnection()
@@ -36,7 +38,7 @@ export function ChannelsPage() {
     const project = view.projectById.get(projectId)
     if (!project) return '—'
     // Con "Todos los tenants" hace falta el tenant para distinguir proyectos homónimos.
-    return current ? project.name : `${tenantName.get(project.tenant_id) ?? 'Tenant'} · ${project.name}`
+    return current ? project.name : `${tenantName.get(project.tenant_id) ?? t('common.tenant')} · ${project.name}`
   }
 
   async function confirmDelete() {
@@ -52,32 +54,32 @@ export function ChannelsPage() {
   const actions = (
     <Button onClick={() => setDialog({ kind: 'create' })} disabled={view.isLoading}>
       <Plus className="size-4" aria-hidden="true" />
-      Nuevo canal
+      {t('channels.new')}
     </Button>
   )
 
   return (
     <>
       <PageHeader
-        title="Canales"
-        description={current ? `Canales conectados de ${current.name}.` : 'Canales conectados de todos los tenants.'}
+        title={t('nav.channels')}
+        description={current ? t('channels.descriptionOne', { name: current.name }) : t('channels.descriptionAll')}
         actions={actions}
       />
 
       {view.isLoading ? (
-        <Spinner label="Cargando canales" className="py-20" />
+        <Spinner label={t('channels.loading')} className="py-20" />
       ) : view.error ? (
         <Alert tone="danger">
-          <p>No se pudieron cargar los canales: {describeError(view.error)}</p>
+          <p>{t('channels.loadError', { error: describeError(view.error) })}</p>
           <Button variant="secondary" size="sm" className="mt-3" onClick={view.refetch}>
-            Reintentar
+            {t('common.retry')}
           </Button>
         </Alert>
       ) : view.connections.length === 0 ? (
         <EmptyState
           icon={Plug}
-          title="Aún no hay canales conectados"
-          description="Conecta WhatsApp, Telegram, Instagram u otro canal para que un agente empiece a responder."
+          title={t('channels.empty.title')}
+          description={t('channels.empty.description')}
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -107,9 +109,9 @@ export function ChannelsPage() {
 
       <ConfirmDialog
         open={toDelete !== null}
-        title={toDelete ? `Eliminar ${toDelete.display_name || CHANNEL_TYPES[toDelete.channel_type].label}` : ''}
-        description="El agente dejará de recibir y responder mensajes por este canal. Para Telegram, Flowsdone también intentará quitar el webhook."
-        confirmLabel="Eliminar canal"
+        title={toDelete ? t('common.deleteItem', { name: toDelete.display_name || CHANNEL_TYPES[toDelete.channel_type].label }) : ''}
+        description={t('channels.delete.description')}
+        confirmLabel={t('channels.delete.confirm')}
         pending={remove.isPending}
         error={remove.error ? describeError(remove.error) : null}
         onConfirm={confirmDelete}

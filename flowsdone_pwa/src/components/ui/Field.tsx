@@ -18,7 +18,7 @@ export function Field({ label, hint, error, children }: FieldProps) {
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium">
+      <label htmlFor={id} className="block text-sm font-medium text-foreground/80">
         {label}
       </label>
       {cloneElement(children, { id, 'aria-describedby': describedBy, 'aria-invalid': error ? true : undefined })}
@@ -42,8 +42,11 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
   return (
     <select
       className={cn(
-        'h-10 w-full cursor-pointer rounded-xl border border-border bg-surface-muted px-3 text-sm',
-        'focus-visible:bg-surface disabled:cursor-not-allowed disabled:opacity-60',
+        'h-11 w-full cursor-pointer rounded-lg border border-input bg-transparent px-4 text-sm shadow-theme-xs',
+        'focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/15 focus-visible:outline-none',
+        'disabled:cursor-not-allowed disabled:bg-surface-muted disabled:opacity-60',
+        // Las opciones nativas no heredan el fondo transparente: se pintan con la superficie.
+        '[&>option]:bg-surface',
         className,
       )}
       {...props}

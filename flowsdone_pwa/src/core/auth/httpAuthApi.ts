@@ -1,5 +1,7 @@
 import { AuthError, type AuthApi } from './AuthApi'
-import { ROLES, type Role, type Tenant, type User } from './types'
+import { apiFetch } from '@/core/http/apiFetch'
+import { i18n } from '@/core/i18n/i18n'
+import { ROLES, SOCIAL_NETWORKS, type Role, type SocialNetwork, type Tenant, type User } from './types'
 
 /**
  * Adapter against the real gateway (api_gateway, `/auth/*`, served under `/api`
@@ -11,6 +13,9 @@ import { ROLES, type Role, type Tenant, type User } from './types'
  * - `POST {base}/auth/activate`          body `{token, password}` -> 200 `User` | 400
  * - `POST {base}/auth/forgot-password`   body `{email}`           -> 202 | 429
  * - `POST {base}/auth/reset-password`    body `{token, password}` -> 200 `User` | 400
+ * - `PATCH {base}/me/profile`            body `ProfileUpdate`     -> 200 `User` | 400
+ * - `PUT|DELETE {base}/me/avatar`        raw image body           -> 200 `User` | 400 | 413
+ * - `GET  {base}/me/avatar?v=…`          -> the image (long private cache: the `v` changes with it)
  *
  * The session travels in an httpOnly cookie (`credentials: 'include'`): the
  * frontend never sees or stores the token, which keeps it out of XSS's reach.
@@ -18,9 +23,10 @@ import { ROLES, type Role, type Tenant, type User } from './types'
  * link's URL (never in a cookie or localStorage) and the server consumes it once.
  */
 
-const UNAVAILABLE = 'No se pudo contactar con el servidor. Inténtalo de nuevo.'
-const RATE_LIMITED = 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'
-const INVALID_TOKEN_FALLBACK = 'El enlace no es válido o ya venció. Pide uno nuevo.'
+// Mensajes resueltos al lanzar el error, en el idioma activo en ese momento.
+const UNAVAILABLE = () => i18n.t('auth.errors.unavailable')
+const RATE_LIMITED = () => i18n.t('auth.errors.rateLimited')
+const INVALID_TOKEN_FALLBACK = () => i18n.t('auth.errors.invalidToken')
 
 /** Extracts the `detail` field from a FastAPI error body, if present. */
 async function detailOf(res: Response): Promise<string | undefined> {
@@ -56,9 +62,19 @@ export function parseUser(data: unknown): User {
     !Array.isArray(u.tenants) ||
     !u.tenants.every(isTenant)
   ) {
-    throw new AuthError('unavailable', UNAVAILABLE)
+    throw new AuthError('unavailable', UNAVAILABLE())
   }
-  return u as User
+  const links = (u.social_links ?? {}) as Record<string, unknown>
+  return {
+    ...(u as User),
+    phone: typeof u.phone === 'string' ? u.phone : null,
+    address: typeof u.address === 'string' ? u.address : null,
+    // Solo las redes conocidas y con URL de texto (tolerante con respuestas viejas o raras).
+    social_links: Object.fromEntries(
+      SOCIAL_NETWORKS.filter((n) => typeof links[n] === 'string').map((n) => [n, links[n] as string]),
+    ) as Partial<Record<SocialNetwork, string>>,
+    avatar_updated_at: typeof u.avatar_updated_at === 'string' ? u.avatar_updated_at : null,
+  }
 }
 
 /** Creates the HTTP adapter. `fetchFn` is injectable for tests. */
@@ -92,15 +108,15 @@ export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...
           body: JSON.stringify(credentials),
         })
       } catch {
-        throw new AuthError('unavailable', UNAVAILABLE)
+        throw new AuthError('unavailable', UNAVAILABLE())
       }
       if (res.status === 400 || res.status === 401) {
-        throw new AuthError('invalid_credentials', 'Correo o contraseña incorrectos.')
+        throw new AuthError('invalid_credentials', i18n.t('auth.errors.invalidCredentials'))
       }
       if (res.status === 429) {
-        throw new AuthError('rate_limited', 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.')
+        throw new AuthError('rate_limited', RATE_LIMITED())
       }
-      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE())
       return parseUser(await res.json())
     },
 
@@ -121,12 +137,12 @@ export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...
           body: JSON.stringify({ token, password }),
         })
       } catch {
-        throw new AuthError('unavailable', UNAVAILABLE)
+        throw new AuthError('unavailable', UNAVAILABLE())
       }
       if (res.status === 400) {
-        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK)
+        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK())
       }
-      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE())
       return parseUser(await res.json())
     },
 
@@ -139,14 +155,14 @@ export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...
           body: JSON.stringify({ email }),
         })
       } catch {
-        throw new AuthError('unavailable', UNAVAILABLE)
+        throw new AuthError('unavailable', UNAVAILABLE())
       }
       if (res.status === 429) {
-        throw new AuthError('rate_limited', RATE_LIMITED)
+        throw new AuthError('rate_limited', RATE_LIMITED())
       }
       // Cualquier otra respuesta (incluida un correo desconocido) se trata
       // como éxito a propósito: el backend nunca revela si la cuenta existe.
-      if (res.status !== 202 && !res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      if (res.status !== 202 && !res.ok) throw new AuthError('unavailable', UNAVAILABLE())
     },
 
     async resetPassword(token, password) {
@@ -158,13 +174,25 @@ export function createHttpAuthApi(baseUrl = '/api', fetchFn: typeof fetch = (...
           body: JSON.stringify({ token, password }),
         })
       } catch {
-        throw new AuthError('unavailable', UNAVAILABLE)
+        throw new AuthError('unavailable', UNAVAILABLE())
       }
       if (res.status === 400) {
-        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK)
+        throw new AuthError('invalid_token', (await detailOf(res)) ?? INVALID_TOKEN_FALLBACK())
       }
-      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE)
+      if (!res.ok) throw new AuthError('unavailable', UNAVAILABLE())
       return parseUser(await res.json())
+    },
+    async updateProfile(patch) {
+      return parseUser(await apiFetch('/me/profile', { method: 'PATCH', body: patch, fetchFn, baseUrl }))
+    },
+    async uploadAvatar(image) {
+      return parseUser(await apiFetch('/me/avatar', { method: 'PUT', blob: image, fetchFn, baseUrl }))
+    },
+    async removeAvatar() {
+      return parseUser(await apiFetch('/me/avatar', { method: 'DELETE', fetchFn, baseUrl }))
+    },
+    avatarUrl(user) {
+      return user.avatar_updated_at ? `${baseUrl}/me/avatar?v=${encodeURIComponent(user.avatar_updated_at)}` : null
     },
   }
 }

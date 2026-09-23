@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useAgents, useChannelConnections, useProjects, useTenants } from '@/core/admin/hooks'
 import type { Project, TenantRecord } from '@/core/admin/types'
+import { i18n } from '@/core/i18n/i18n'
 
 /** How many items hang off a project. */
 export interface ProjectCounts {
@@ -83,13 +84,12 @@ export function useTenantsView(): TenantsView {
   }, [tenantsQ, projectsQ, agentsQ, connectionsQ])
 }
 
-/** Phrase with the counts, correctly singular/plural (e.g. "1 project · 3 channels"). */
+/** Phrase with the counts, correctly singular/plural in the active language (e.g. "1 project · 3 channels"). */
 export function summarize({ projects, agents, channels }: { projects?: number; agents: number; channels: number }): string {
-  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   return [
-    projects === undefined ? null : plural(projects, 'proyecto', 'proyectos'),
-    plural(agents, 'agente', 'agentes'),
-    plural(channels, 'canal', 'canales'),
+    projects === undefined ? null : i18n.t('tenants.count.projects', { count: projects }),
+    i18n.t('tenants.count.agents', { count: agents }),
+    i18n.t('tenants.count.channels', { count: channels }),
   ]
     .filter(Boolean)
     .join(' · ')
