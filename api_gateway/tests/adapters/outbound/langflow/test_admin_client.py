@@ -42,18 +42,36 @@ async def test_ensure_user_creates_activates_and_uses_the_gateway_key():
     assert b'"is_active":true' in seen[1].content.replace(b" ", b"")
 
 
-async def test_ensure_user_resets_the_password_when_the_user_already_exists():
+async def test_ensure_user_sets_password_and_activates_an_existing_user_as_superuser():
+    # Like Langflow 1.4: /reset-password only works on oneself (400 for anyone
+    # else); a superuser sets another user's password with PATCH /users/{id}.
     def handler(request):
         if request.method == "POST":
             return httpx.Response(400, json={"detail": "This username is unavailable."})
         if request.method == "GET":
             return httpx.Response(200, json={"total_count": 1, "users": [{"id": "u9", "username": "tenant-a"}]})
+        if request.url.path.endswith("/reset-password"):
+            return httpx.Response(400, json={"detail": "You can't change another user's password"})
         return httpx.Response(200, json={})
 
     client, seen = _client(handler)
 
     assert await client.ensure_user("tenant-a", "pw") == "u9"
-    assert ("PATCH", "/api/v1/users/u9/reset-password") in [(r.method, r.url.path) for r in seen]
+    calls = [(r.method, r.url.path) for r in seen]
+    assert calls == [("POST", "/api/v1/users/"), ("GET", "/api/v1/users/"), ("PATCH", "/api/v1/users/u9")]
+    body = seen[-1].content.replace(b" ", b"")
+    assert b'"password":"pw"' in body and b'"is_active":true' in body
+
+
+async def test_ensure_user_fails_when_langflow_rejects_the_update():
+    def handler(request):
+        if request.method == "POST":
+            return httpx.Response(201, json={"id": "u1"})
+        return httpx.Response(403, json={})
+
+    client, _ = _client(handler)
+    with pytest.raises(LangflowSessionError):
+        await client.ensure_user("tenant-a", "pw")
 
 
 async def test_ensure_user_fails_when_langflow_rejects_and_the_user_is_not_there():
