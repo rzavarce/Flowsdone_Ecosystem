@@ -1,5 +1,6 @@
 import { MessageSquare } from 'lucide-react'
 import { useDeferredValue, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Avatar } from '@/components/ui/Avatar'
@@ -35,7 +36,20 @@ export function ConversationsPage() {
   const [channel, setChannel] = useState('')
   const [contact, setContact] = useState('')
   const deferredContact = useDeferredValue(contact.trim())
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The open conversation lives in the URL (`?c=`), so the global search
+  // and shared links can open one directly.
+  const [params, setParams] = useSearchParams()
+  const selectedId = params.get('c')
+  const setSelectedId = (id: string | null) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (id) next.set('c', id)
+        else next.delete('c')
+        return next
+      },
+      { replace: true },
+    )
 
   const list = useConversations({
     tenant_id: current?.id,

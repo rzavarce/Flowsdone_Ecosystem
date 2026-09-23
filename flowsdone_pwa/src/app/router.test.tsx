@@ -23,9 +23,9 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Usuarios', 'Agentes', 'Planes', 'Ajustes']],
-    ['tenant_manager', ['Dashboard', 'Conversaciones', 'Canales', 'Tenants', 'Agentes', 'Ajustes']],
-    ['botmaster', ['Conversaciones', 'Canales', 'Agentes', 'Ajustes']],
+    ['admin', ['Dashboard', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Usuarios', 'Planes', 'Ajustes']],
+    ['tenant_manager', ['Dashboard', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
+    ['botmaster', ['Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
     ['client', ['Dashboard', 'Mi empresa', 'Ajustes']],
     ['consultant', ['Dashboard', 'Ajustes']],
   ])('%s ve el menú esperado', async (role, expected) => {
@@ -153,7 +153,7 @@ describe('AppShell', () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
     await h1('Dashboard')
     await userEvent.keyboard('{Control>}k{/Control}')
-    expect(screen.getByRole('searchbox', { name: 'Buscar' })).toHaveFocus()
+    expect(screen.getByRole('combobox', { name: 'Buscar' })).toHaveFocus()
   })
 
   it('el menú de usuario muestra el rol y permite cerrar sesión', async () => {
@@ -170,15 +170,15 @@ describe('AppShell', () => {
     expect(document.documentElement).toHaveClass('dark')
   })
 
-  it('la búsqueda solo aparece para perfiles que operan conversaciones', async () => {
+  it('la búsqueda solo aparece para perfiles con algo que buscar', async () => {
     const admin = renderApp('/dashboard', fakeAuthApi(makeUser('admin')))
     await h1('Dashboard')
-    expect(screen.getByRole('searchbox', { name: 'Buscar' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Buscar' })).toBeInTheDocument()
     admin.unmount()
 
     renderApp('/dashboard', fakeAuthApi(makeUser('client')))
     await h1('Mi panel')
-    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Buscar' })).not.toBeInTheDocument()
   })
 })
 

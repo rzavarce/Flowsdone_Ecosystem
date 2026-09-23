@@ -1,6 +1,7 @@
 import { Plus, SearchX, Users as UsersIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Button } from '@/components/ui/Button'
@@ -49,7 +50,19 @@ export function UsersPage() {
   const [resendFeedback, setResendFeedback] = useState<{ userId: string; tone: 'success' | 'danger'; message: string } | null>(null)
 
   const { current } = useTenant()
-  const [query, setQuery] = useState('')
+  // The text filter lives in the URL (`?q=`), so the global search can land here filtered.
+  const [params, setParams] = useSearchParams()
+  const query = params.get('q') ?? ''
+  const setQuery = (value: string) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (value) next.set('q', value)
+        else next.delete('q')
+        return next
+      },
+      { replace: true },
+    )
   const [role, setRole] = useState<Role | ''>('')
   const [status, setStatus] = useState<UserAccountStatus | ''>('')
 

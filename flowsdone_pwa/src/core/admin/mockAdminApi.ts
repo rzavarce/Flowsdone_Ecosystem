@@ -315,7 +315,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
         { key: 'plan', status: subscription ? 'ok' : 'missing', detail: subscription?.plan_name ?? null },
         { key: 'project', status: own.length ? 'ok' : 'missing', detail: own[0]?.name ?? null },
         { key: 'agent', status: agent ? 'ok' : 'missing', detail: agent?.name ?? null },
-        { key: 'openai_key', status: 'ok', detail: 'OPENAI_API_KEY' },
+        { key: 'openai_key', status: agent ? 'ok' : 'missing', detail: null },
         { key: 'channel', status: channels ? 'ok' : 'warning', detail: String(channels) },
       ]
       const next_step = !profile?.billing_email ? 'company' : !subscription ? 'plan' : !own.length ? 'project' : !agent ? 'agent' : 'summary'
