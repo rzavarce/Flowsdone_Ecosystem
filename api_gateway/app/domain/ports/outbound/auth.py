@@ -4,10 +4,10 @@ sessions and login throttling.
 
 from __future__ import annotations
 
-from typing import List, Optional, Protocol
+from typing import Dict, List, Optional, Protocol
 from uuid import UUID
 
-from app.domain.models.user import User, UserCredentials
+from app.domain.models.user import User, UserAvatar, UserCredentials
 
 
 class UserAlreadyExistsError(Exception):
@@ -97,6 +97,9 @@ class UserRepositoryPort(Protocol):
         status: Optional[str] = None,
         tenant_ids: Optional[List[UUID]] = None,
         password_hash: Optional[str] = None,
+        phone: Optional[str] = None,
+        address: Optional[str] = None,
+        social_links: Optional[Dict[str, str]] = None,
     ) -> Optional[User]:
         """Update a user. `None` means "leave unchanged".
 
@@ -108,6 +111,10 @@ class UserRepositoryPort(Protocol):
             tenant_ids (Optional[List[UUID]]): If given, REPLACES the user's
                 tenant memberships (an empty list removes them all).
             password_hash (Optional[str]): New password hash.
+            phone (Optional[str]): New phone; an empty string clears it.
+            address (Optional[str]): New address; an empty string clears it.
+            social_links (Optional[Dict[str, str]]): If given, REPLACES all
+                the links (an empty dict removes them all).
 
         Returns:
             Optional[User]: The updated user, or None if it does not exist.
@@ -122,6 +129,48 @@ class UserRepositoryPort(Protocol):
 
         Returns:
             bool: True if a user was deleted, False if it did not exist.
+        """
+        ...
+
+
+class UserAvatarRepositoryPort(Protocol):
+    """Storage for users' profile photos, kept apart from the user row so
+    that loading or listing users never drags the image bytes along.
+    Implementations keep `User.avatar_updated_at` in sync.
+    """
+
+    async def get(self, user_id: UUID) -> Optional[UserAvatar]:
+        """Fetch a user's photo.
+
+        Args:
+            user_id (UUID): Id of the user.
+
+        Returns:
+            Optional[UserAvatar]: The photo, or None if the user has none.
+        """
+        ...
+
+    async def put(self, user_id: UUID, *, content_type: str, data: bytes) -> Optional[User]:
+        """Set (or replace) a user's photo.
+
+        Args:
+            user_id (UUID): Id of the user.
+            content_type (str): Already-validated image media type.
+            data (bytes): Already-validated image bytes.
+
+        Returns:
+            Optional[User]: The updated user, or None if it does not exist.
+        """
+        ...
+
+    async def delete(self, user_id: UUID) -> Optional[User]:
+        """Remove a user's photo (idempotent).
+
+        Args:
+            user_id (UUID): Id of the user.
+
+        Returns:
+            Optional[User]: The updated user, or None if it does not exist.
         """
         ...
 

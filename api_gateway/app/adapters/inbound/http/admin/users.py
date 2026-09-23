@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import UserCreate, UserOut, UserUpdate
+from app.adapters.inbound.http.avatar_io import avatar_response, read_image_body
+from app.application.use_cases.manage_profile import InvalidAvatarError, normalize_profile_fields
 from app.application.use_cases.manage_users import SelfLockoutError
 from app.domain.ports.outbound import EmailSendError, UserAlreadyExistsError
 
@@ -25,7 +27,8 @@ async def create_user(
 
     Args:
         body (UserCreate): The new user's fields.
-        request (Request): Used to reach `request.app.state.provision_user_use_case`.
+        request (Request): Used to reach `request.app.state.provision_user_use_case`
+            (and `update_user_use_case` to store the optional profile fields).
         access (AdminAccess): The authenticated caller (admin only).
 
     Returns:
@@ -37,7 +40,10 @@ async def create_user(
             the activation email could not be sent (retry via
             `POST /users/{id}/resend-activation`).
     """
+    profile = body.model_dump(include={"phone", "address", "social_links"}, exclude_none=True)
     try:
+        # Validated up front so a bad phone/URL never leaves a half-created user behind.
+        normalize_profile_fields(**profile)
         user = await request.app.state.provision_user_use_case.execute(
             email=body.email,
             name=body.name,
@@ -53,6 +59,8 @@ async def create_user(
             status_code=502,
             detail=f"user created but the activation email could not be sent: {exc}",
         ) from exc
+    if profile:
+        user = await request.app.state.update_user_use_case.execute(user.id, **profile) or user
     return UserOut(**user.model_dump())
 
 
@@ -181,3 +189,77 @@ async def resend_activation(
         raise HTTPException(status_code=502, detail=f"could not send the activation email: {exc}") from exc
     if not sent:
         raise HTTPException(status_code=404, detail="user not found or not pending")
+
+
+@router.get("/{user_id}/avatar")
+async def get_user_avatar(
+    user_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("users", "read"))
+) -> Response:
+    """A user's profile photo.
+
+    Args:
+        user_id (UUID): Id of the user.
+        request (Request): Used to reach `request.app.state.user_avatar_repo`.
+        access (AdminAccess): The authenticated caller (admin only).
+
+    Returns:
+        Response: The image.
+
+    Raises:
+        HTTPException: 404 if the user has no photo (or does not exist).
+    """
+    avatar = await request.app.state.user_avatar_repo.get(user_id)
+    if avatar is None:
+        raise HTTPException(status_code=404, detail="no avatar")
+    return avatar_response(avatar)
+
+
+@router.put("/{user_id}/avatar", response_model=UserOut)
+async def set_user_avatar(
+    user_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("users", "write"))
+) -> UserOut:
+    """Set (or replace) a user's photo; the body is the raw image.
+
+    Args:
+        user_id (UUID): Id of the user.
+        request (Request): The upload; also reaches `set_avatar_use_case`.
+        access (AdminAccess): The authenticated caller (admin only).
+
+    Returns:
+        UserOut: The updated user.
+
+    Raises:
+        HTTPException: 400 if not a JPEG/PNG/WebP image, 404 if the user
+            does not exist, 413 if too large.
+    """
+    data = await read_image_body(request)
+    try:
+        user = await request.app.state.set_avatar_use_case.execute(user_id, data)
+    except InvalidAvatarError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserOut(**user.model_dump())
+
+
+@router.delete("/{user_id}/avatar", response_model=UserOut)
+async def remove_user_avatar(
+    user_id: UUID, request: Request, access: AdminAccess = Depends(admin_access("users", "write"))
+) -> UserOut:
+    """Remove a user's photo (idempotent).
+
+    Args:
+        user_id (UUID): Id of the user.
+        request (Request): Used to reach `request.app.state.remove_avatar_use_case`.
+        access (AdminAccess): The authenticated caller (admin only).
+
+    Returns:
+        UserOut: The updated user.
+
+    Raises:
+        HTTPException: 404 if the user does not exist.
+    """
+    user = await request.app.state.remove_avatar_use_case.execute(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="user not found")
+    return UserOut(**user.model_dump())

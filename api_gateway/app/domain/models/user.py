@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -15,6 +15,9 @@ USER_ROLES: tuple[str, ...] = ("admin", "tenant_manager", "botmaster", "client",
 the tenants listed in `User.tenant_ids`. `consultant` is a client-side
 role scoped to reports only (no admin API access at all, same as `client`
 - see `POLICY` in `application/services/access_control.py`)."""
+
+SOCIAL_NETWORKS: tuple[str, ...] = ("website", "linkedin", "x", "facebook", "instagram")
+"""Keys accepted in `User.social_links`, in display order."""
 
 UserStatus = Literal["pending", "active", "disabled"]
 """`pending`: creado, esperando que el usuario active su cuenta por email
@@ -37,6 +40,13 @@ class User(BaseModel):
             live sessions stop working.
         tenant_ids (list[UUID]): Tenants this user is a member of. Ignored
             for `admin`, who has access to all of them.
+        phone (Optional[str]): Optional contact phone.
+        address (Optional[str]): Optional postal address, free text.
+        social_links (Dict[str, str]): Optional profile links, keyed by one
+            of `SOCIAL_NETWORKS` (only the ones that are set).
+        avatar_updated_at (Optional[datetime]): When the profile photo was
+            last set; None if the user has no photo. The bytes live apart
+            (see `UserAvatarRepositoryPort`) so listing users stays light.
         last_login_at (Optional[datetime]): Last successful sign-in.
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.
@@ -48,6 +58,10 @@ class User(BaseModel):
     role: UserRole
     status: UserStatus = "active"
     tenant_ids: list[UUID] = Field(default_factory=list)
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    social_links: Dict[str, str] = Field(default_factory=dict)
+    avatar_updated_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -71,3 +85,17 @@ class UserCredentials(BaseModel):
 
     user: User
     password_hash: str
+
+
+class UserAvatar(BaseModel):
+    """A user's profile photo.
+
+    Attributes:
+        content_type (str): `image/jpeg`, `image/png` or `image/webp`.
+        data (bytes): The image bytes.
+        updated_at (datetime): When it was set.
+    """
+
+    content_type: str
+    data: bytes
+    updated_at: datetime

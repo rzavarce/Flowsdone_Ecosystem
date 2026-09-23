@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    LargeBinary,
     Text,
     UniqueConstraint,
     func,
@@ -244,6 +245,10 @@ class UserModel(Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    social_links: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    avatar_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -254,6 +259,19 @@ class UserModel(Base):
 # Case-insensitive unique email. Declared here for parity with the
 # migration (0005_users), which is what actually creates it.
 Index("uq_users_email_lower", func.lower(UserModel.email), unique=True)
+
+
+class UserAvatarModel(Base):
+    """A user's profile photo (1:1 with `users`, bytes kept out of the user row)."""
+
+    __tablename__ = "user_avatars"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    content_type: Mapped[str] = mapped_column(Text, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class UserTenantModel(Base):

@@ -10,9 +10,9 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.adapters.outbound.db.models import UserModel, UserTenantModel
-from app.domain.models.user import User, UserCredentials
-from app.domain.ports.outbound import UserAlreadyExistsError, UserRepositoryPort
+from app.adapters.outbound.db.models import UserAvatarModel, UserModel, UserTenantModel
+from app.domain.models.user import User, UserAvatar, UserCredentials
+from app.domain.ports.outbound import UserAlreadyExistsError, UserAvatarRepositoryPort, UserRepositoryPort
 
 
 def _to_domain(model: UserModel, tenant_ids: List[UUID]) -> User:
@@ -32,6 +32,10 @@ def _to_domain(model: UserModel, tenant_ids: List[UUID]) -> User:
         role=model.role,  # type: ignore[arg-type]
         status=model.status,  # type: ignore[arg-type]
         tenant_ids=tenant_ids,
+        phone=model.phone,
+        address=model.address,
+        social_links=dict(model.social_links or {}),
+        avatar_updated_at=model.avatar_updated_at,
         last_login_at=model.last_login_at,
         created_at=model.created_at,
         updated_at=model.updated_at,
@@ -176,6 +180,9 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         status: Optional[str] = None,
         tenant_ids: Optional[List[UUID]] = None,
         password_hash: Optional[str] = None,
+        phone: Optional[str] = None,
+        address: Optional[str] = None,
+        social_links: Optional[Dict[str, str]] = None,
     ) -> Optional[User]:
         """Update a user; `tenant_ids`, when given, replaces the memberships.
 
@@ -186,6 +193,9 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
             status (Optional[str]): `active` or `disabled`.
             tenant_ids (Optional[List[UUID]]): New memberships (replaces all).
             password_hash (Optional[str]): New password hash.
+            phone (Optional[str]): New phone; an empty string stores NULL.
+            address (Optional[str]): New address; an empty string stores NULL.
+            social_links (Optional[Dict[str, str]]): Replaces all the links.
 
         Returns:
             Optional[User]: The updated user, or None if it does not exist.
@@ -202,6 +212,11 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
             ):
                 if value is not None:
                     setattr(model, field, value)
+            for field, value in (("phone", phone), ("address", address)):
+                if value is not None:
+                    setattr(model, field, value or None)
+            if social_links is not None:
+                model.social_links = dict(social_links)
             if tenant_ids is not None:
                 await session.execute(delete(UserTenantModel).where(UserTenantModel.user_id == user_id))
                 for tenant_id in dict.fromkeys(tenant_ids):
@@ -241,3 +256,82 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
                 .values(last_login_at=datetime.now(timezone.utc))
             )
             await session.commit()
+
+
+class SqlAlchemyUserAvatarRepository(UserAvatarRepositoryPort):
+    """Postgres-backed implementation of UserAvatarRepositoryPort.
+
+    Writes the `user_avatars` row and `users.avatar_updated_at` in the same
+    transaction, so the marker the PWA uses for cache-busting never points
+    at a photo that isn't there.
+    """
+
+    def __init__(self, sessionmaker: async_sessionmaker[AsyncSession]) -> None:
+        """Build the repository.
+
+        Args:
+            sessionmaker (async_sessionmaker[AsyncSession]): Session factory.
+        """
+        self._sessionmaker = sessionmaker
+
+    async def get(self, user_id: UUID) -> Optional[UserAvatar]:
+        """Fetch a user's photo.
+
+        Args:
+            user_id (UUID): Id of the user.
+
+        Returns:
+            Optional[UserAvatar]: The photo, or None if the user has none.
+        """
+        async with self._sessionmaker() as session:
+            row = await session.get(UserAvatarModel, user_id)
+            if row is None:
+                return None
+            return UserAvatar(content_type=row.content_type, data=row.data, updated_at=row.updated_at)
+
+    async def put(self, user_id: UUID, *, content_type: str, data: bytes) -> Optional[User]:
+        """Set (or replace) a user's photo.
+
+        Args:
+            user_id (UUID): Id of the user.
+            content_type (str): Image media type.
+            data (bytes): Image bytes.
+
+        Returns:
+            Optional[User]: The updated user, or None if it does not exist.
+        """
+        now = datetime.now(timezone.utc)
+        async with self._sessionmaker() as session:
+            model = await session.get(UserModel, user_id)
+            if model is None:
+                return None
+            row = await session.get(UserAvatarModel, user_id)
+            if row is None:
+                session.add(UserAvatarModel(user_id=user_id, content_type=content_type, data=data, updated_at=now))
+            else:
+                row.content_type, row.data, row.updated_at = content_type, data, now
+            model.avatar_updated_at = now
+            await session.commit()
+            await session.refresh(model)
+            tenants = await SqlAlchemyUserRepository._tenant_ids(session, [user_id])
+            return _to_domain(model, tenants[user_id])
+
+    async def delete(self, user_id: UUID) -> Optional[User]:
+        """Remove a user's photo (idempotent).
+
+        Args:
+            user_id (UUID): Id of the user.
+
+        Returns:
+            Optional[User]: The updated user, or None if it does not exist.
+        """
+        async with self._sessionmaker() as session:
+            model = await session.get(UserModel, user_id)
+            if model is None:
+                return None
+            await session.execute(delete(UserAvatarModel).where(UserAvatarModel.user_id == user_id))
+            model.avatar_updated_at = None
+            await session.commit()
+            await session.refresh(model)
+            tenants = await SqlAlchemyUserRepository._tenant_ids(session, [user_id])
+            return _to_domain(model, tenants[user_id])

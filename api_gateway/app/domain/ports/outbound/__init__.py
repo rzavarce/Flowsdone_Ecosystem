@@ -72,6 +72,7 @@ from app.domain.ports.outbound.auth import (  # noqa: F401
     LoginThrottlePort,
     PasswordHasherPort,
     UserAlreadyExistsError,
+    UserAvatarRepositoryPort,
     UserRepositoryPort,
 )
 from app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
