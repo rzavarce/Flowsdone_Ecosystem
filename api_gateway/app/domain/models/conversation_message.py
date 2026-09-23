@@ -41,6 +41,9 @@ class ConversationMessageRecorded(BaseModel):
         app (str): Which app was handling the conversation.
         contact (str): Who is on the other end (phone number, username...).
         text (str): The message text.
+        billable (bool): Whether an inbound message was handed to an app
+            and so counts as platform usage (False when it was refused,
+            e.g. by the plan's quota).
     """
 
     event_type: str = MESSAGE_RECORDED_EVENT
@@ -58,3 +61,4 @@ class ConversationMessageRecorded(BaseModel):
     app: str
     contact: str
     text: str
+    billable: bool = True

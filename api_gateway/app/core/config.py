@@ -74,6 +74,14 @@ class Settings(BaseModel):
     CLICKHOUSE_APP_USER: str = "flowsdone_app"
     CLICKHOUSE_APP_PASSWORD: Optional[str] = None
 
+    # LLM token usage is imported from Langfuse (the same project Langflow
+    # traces into) by the usage worker every LLM_USAGE_SYNC_INTERVAL_SECONDS.
+    # Without keys the sync is skipped (logged), nothing else breaks.
+    LANGFUSE_BASE_URL: str = "http://langfuse-web:3000"
+    LANGFUSE_PUBLIC_KEY: Optional[str] = None
+    LANGFUSE_SECRET_KEY: Optional[str] = None
+    LLM_USAGE_SYNC_INTERVAL_SECONDS: int = 300
+
     # RabbitMQ
     ENABLE_RABBITMQ: bool = False
     RABBITMQ_URL: Optional[str] = None
@@ -252,6 +260,11 @@ settings = Settings(
     CLICKHOUSE_DATABASE=os.getenv("CLICKHOUSE_DATABASE", "flowsdone"),
     CLICKHOUSE_APP_USER=os.getenv("CLICKHOUSE_APP_USER", "flowsdone_app"),
     CLICKHOUSE_APP_PASSWORD=os.getenv("CLICKHOUSE_APP_PASSWORD"),
+
+    LANGFUSE_BASE_URL=os.getenv("LANGFUSE_BASE_URL", "http://langfuse-web:3000"),
+    LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY") or None,
+    LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY") or None,
+    LLM_USAGE_SYNC_INTERVAL_SECONDS=int(os.getenv("LLM_USAGE_SYNC_INTERVAL_SECONDS", "300")),
 
     ENABLE_RABBITMQ=_bool(os.getenv("ENABLE_RABBITMQ"), False),
     RABBITMQ_URL=os.getenv("RABBITMQ_URL"),

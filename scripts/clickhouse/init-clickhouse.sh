@@ -47,9 +47,13 @@ ORDER BY (tenant_id, conversation_id, ts, message_id)
 TTL retention_until DELETE
 "
 
-# Consumo medido (canal, tokens de LLM, uso de plataforma). Se llena a partir
-# de la Fase 2. Sin TTL: respalda la facturación y se conserva años. Importes
-# en micro-unidades enteras (1 EUR = 1_000_000), nunca en coma flotante.
+# Consumo medido: solo CANTIDADES (mensajes por canal, tokens de LLM, mensajes
+# procesados por la plataforma). El coste se calcula al leer, con el catálogo
+# versionado de Postgres (cost_rates), así una tarifa nueva o corregida aplica
+# bien también a lo ya medido; el cierre de mes congela los importes en
+# usage_statements. cost_micros/price_micros quedan reservados (0).
+# Sin TTL: respalda la facturación y se conserva años. event_id determinista
+# (uuid5 del origen) -> reprocesar no duplica.
 ch "
 CREATE TABLE IF NOT EXISTS ${DB}.usage_events
 (
@@ -59,6 +63,7 @@ CREATE TABLE IF NOT EXISTS ${DB}.usage_events
     project_id      UUID,
     conversation_id Nullable(UUID),
     message_id      Nullable(UUID),
+    channel_type    LowCardinality(String) DEFAULT '',
     trace_id        String DEFAULT '',
     kind            LowCardinality(String),
     provider        LowCardinality(String),

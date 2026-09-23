@@ -15,7 +15,8 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from app.adapters.outbound.conversations.clickhouse_message_archive import ClickHouseMessageArchive
+from app.adapters.outbound.clickhouse.http_client import ClickHouseHttpClient
+from app.adapters.outbound.clickhouse.message_archive import ClickHouseMessageArchive
 from app.domain.models.conversation_message import ConversationMessageRecorded
 
 pytestmark = [
@@ -39,12 +40,13 @@ async def _query(sql: str) -> str:
 
 async def test_inserted_messages_are_stored_once_even_if_redelivered():
     database = os.environ["TEST_CLICKHOUSE_DATABASE"]
-    archive = ClickHouseMessageArchive(
+    client = ClickHouseHttpClient(
         base_url=os.environ["TEST_CLICKHOUSE_URL"],
         database=database,
         user=os.environ["TEST_CLICKHOUSE_USER"],
         password=os.environ["TEST_CLICKHOUSE_PASSWORD"],
     )
+    archive = ClickHouseMessageArchive(client)
     conversation_id = uuid4()
     event = ConversationMessageRecorded(
         message_id=uuid4(),
@@ -65,8 +67,15 @@ async def test_inserted_messages_are_stored_once_even_if_redelivered():
     try:
         await archive.insert_messages([event], retention=timedelta(days=183))
         await archive.insert_messages([event], retention=timedelta(days=183))
+        listed = await archive.list_messages(tenant_id=event.tenant_id, conversation_id=conversation_id)
+        other_tenant = await archive.list_messages(tenant_id=uuid4(), conversation_id=conversation_id)
     finally:
-        await archive.aclose()
+        await client.aclose()
+
+    assert [m.message_id for m in listed] == [event.message_id]
+    assert listed[0].text == event.text
+    assert abs((listed[0].timestamp - event.timestamp).total_seconds()) < 0.001
+    assert other_tenant == []
 
     result = await _query(
         f"SELECT count(), any(text), any(direction) FROM {database}.messages FINAL "

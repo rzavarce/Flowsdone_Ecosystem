@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -279,6 +280,43 @@ class ConversationModel(Base):
     outbound_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     close_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class CostRateModel(Base):
+    """Row for one version of what Flowsdone pays for a meter (see
+    domain/models/usage.py CostRate). Append-only: a price change is a
+    new row with a later valid_from."""
+
+    __tablename__ = "cost_rates"
+    __table_args__ = (
+        CheckConstraint("kind IN ('channel','llm','platform')", name="ck_cost_rates_kind"),
+        CheckConstraint("price_micros >= 0 AND per_quantity > 0", name="ck_cost_rates_amounts"),
+        Index("ix_cost_rates_meter", "kind", "unit", "provider", "sku", "valid_from"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    sku: Mapped[str] = mapped_column(Text, nullable=False)
+    unit: Mapped[str] = mapped_column(Text, nullable=False)
+    price_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    per_quantity: Mapped[int] = mapped_column(BigInteger, nullable=False, default=1)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="EUR")
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SyncCursorModel(Base):
+    """Row remembering up to when a periodic sync processed its source."""
+
+    __tablename__ = "sync_cursors"
+
+    name: Mapped[str] = mapped_column(Text, primary_key=True)
+    position: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class UserModel(Base):

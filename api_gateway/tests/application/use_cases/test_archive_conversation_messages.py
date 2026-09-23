@@ -71,3 +71,29 @@ async def test_propagates_archive_failures_so_the_batch_is_retried():
 
     with pytest.raises(RuntimeError):
         await use_case.execute([_event()])
+
+
+async def test_meters_the_usage_of_the_archived_messages():
+    from api_gateway.tests.support.fakes import FakeUsageStore
+
+    store = FakeUsageStore()
+    use_case = ArchiveConversationMessagesUseCase(archive=FakeMessageArchive(), retention=RETENTION, usage_store=store)
+
+    await use_case.execute([_event(), _event(direction="outbound", sender_type="bot")])
+
+    assert sorted((e.kind, e.sku) for e in store.events.values()) == [
+        ("channel", "message.inbound"),
+        ("channel", "message.outbound"),
+        ("platform", "ai_message"),
+    ]
+
+
+async def test_usage_failure_fails_the_batch_so_it_is_retried():
+    from api_gateway.tests.support.fakes import FakeUsageStore
+
+    use_case = ArchiveConversationMessagesUseCase(
+        archive=FakeMessageArchive(), retention=RETENTION, usage_store=FakeUsageStore(fail=True)
+    )
+
+    with pytest.raises(RuntimeError):
+        await use_case.execute([_event()])

@@ -17,6 +17,7 @@ from app.domain.models.tenant_billing_profile import TenantBillingProfile
 from app.domain.models.channel_resolution import ChannelResolution
 from app.domain.models.conversation import Conversation
 from app.domain.models.conversation_message import ConversationMessageRecorded
+from app.domain.models.usage import CostRate, UsageAggregate, UsageEvent
 from app.domain.models.session import Session
 from app.domain.models.tenant import Tenant
 from app.domain.models.user import User, UserAvatar, UserCredentials
@@ -593,6 +594,103 @@ class FakeMessageArchive:
         if self.fail:
             raise RuntimeError("clickhouse down")
         self.batches.append({"events": list(events), "retention": retention})
+
+
+class FakeUsageStore:
+    """In-memory UsageStorePort: dedups by event_id like ReplacingMergeTree
+    and aggregates per day/meter like the real queries."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.events: Dict[UUID, UsageEvent] = {}
+        self.insert_calls = 0
+        self.fail = fail
+
+    async def insert_usage(self, events: Sequence[UsageEvent]) -> None:
+        if self.fail:
+            raise RuntimeError("clickhouse down")
+        self.insert_calls += 1
+        for event in events:
+            self.events[event.event_id] = event
+
+    def _aggregate(self, events) -> List[UsageAggregate]:
+        totals: Dict[tuple, Any] = {}
+        for e in events:
+            key = (e.timestamp.date(), e.tenant_id, e.kind, e.provider, e.channel_type, e.sku, e.unit)
+            totals[key] = totals.get(key, 0) + e.quantity
+        return [
+            UsageAggregate(day=k[0], tenant_id=k[1], kind=k[2], provider=k[3], channel_type=k[4], sku=k[5], unit=k[6], quantity=q)
+            for k, q in sorted(totals.items(), key=lambda kv: str(kv[0]))
+        ]
+
+    async def aggregate_daily(self, *, start: datetime, end: datetime, tenant_id: Optional[UUID] = None) -> List[UsageAggregate]:
+        return self._aggregate(
+            e for e in self.events.values()
+            if start <= e.timestamp < end and (tenant_id is None or e.tenant_id == tenant_id)
+        )
+
+    async def aggregate_conversation(self, *, tenant_id: UUID, conversation_id: UUID) -> List[UsageAggregate]:
+        return self._aggregate(
+            e for e in self.events.values() if e.tenant_id == tenant_id and e.conversation_id == conversation_id
+        )
+
+
+def make_cost_rate(**overrides: Any) -> CostRate:
+    """Build a CostRate with sane defaults, overridable per test."""
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        kind="llm",
+        provider="openai",
+        sku="gpt-4.1-mini*",
+        unit="input_token",
+        price_micros=400_000,
+        per_quantity=1_000_000,
+        valid_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    defaults.update(overrides)
+    return CostRate(**defaults)
+
+
+class FakeCostRateRepo:
+    """In-memory CostRateRepositoryPort."""
+
+    def __init__(self, *rates: CostRate) -> None:
+        self.rates: Dict[UUID, CostRate] = {r.id: r for r in rates}
+
+    async def list_all(self) -> List[CostRate]:
+        return sorted(self.rates.values(), key=lambda r: r.valid_from, reverse=True)
+
+    async def create(self, rate: CostRate) -> CostRate:
+        stored = rate.model_copy(update={"created_at": datetime.now(timezone.utc)})
+        self.rates[rate.id] = stored
+        return stored
+
+    async def delete(self, rate_id: UUID) -> bool:
+        return self.rates.pop(rate_id, None) is not None
+
+
+class FakeSyncCursors:
+    """In-memory SyncCursorRepositoryPort."""
+
+    def __init__(self, **positions: datetime) -> None:
+        self.positions: Dict[str, datetime] = dict(positions)
+
+    async def get(self, name: str) -> Optional[datetime]:
+        return self.positions.get(name)
+
+    async def set(self, name: str, position: datetime) -> None:
+        self.positions[name] = position
+
+
+class FakeLlmUsageSource:
+    """Returns canned generations and records the windows asked for."""
+
+    def __init__(self, generations: Optional[List[Any]] = None) -> None:
+        self.generations = generations or []
+        self.windows: List[tuple] = []
+
+    async def list_generations(self, *, start: datetime, end: datetime) -> List[Any]:
+        self.windows.append((start, end))
+        return [g for g in self.generations if start <= g.start_time < end]
 
 
 class FakeAppConnector:

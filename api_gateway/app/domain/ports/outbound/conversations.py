@@ -124,3 +124,20 @@ class MessageArchivePort(Protocol):
                 its own timestamp before it is deleted.
         """
         ...
+
+    async def list_messages(
+        self, *, tenant_id: UUID, conversation_id: UUID, limit: int = 500
+    ) -> List[ConversationMessageRecorded]:
+        """A conversation's messages, oldest first (each stored once,
+        even if it was inserted more than once).
+
+        Args:
+            tenant_id (UUID): Owning tenant - a conversation of another
+                tenant yields nothing.
+            conversation_id (UUID): Conversation id.
+            limit (int): Maximum number of messages.
+
+        Returns:
+            List[ConversationMessageRecorded]: The messages.
+        """
+        ...

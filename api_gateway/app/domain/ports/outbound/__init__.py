@@ -94,5 +94,12 @@ from app.domain.ports.outbound.secret_generator import SecretGeneratorPort  # no
 from app.domain.ports.outbound.session_history_repository import SessionHistoryRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.session_repository import SessionRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.tenant_billing_profile import TenantBillingProfileRepositoryPort  # noqa: F401
+from app.domain.ports.outbound.usage import (  # noqa: F401
+    CostRateRepositoryPort,
+    LlmGeneration,
+    LlmUsageSourcePort,
+    SyncCursorRepositoryPort,
+    UsageStorePort,
+)
 from app.domain.ports.outbound.voice_provider import VoiceProviderPort  # noqa: F401
 from app.domain.ports.outbound.webhook_registrar import WebhookRegistrarPort  # noqa: F401
