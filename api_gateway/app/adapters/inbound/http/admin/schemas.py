@@ -623,7 +623,7 @@ class OnboardingCheckOut(BaseModel):
 
     Attributes:
         key (str): "billing", "client_account", "plan", "project", "agent",
-            "openai_key" or "channel".
+            "openai_key" (the default agent's LLM has an API key) or "channel".
         status (str): "ok", "warning", "missing" or "unknown".
         detail (Optional[str]): What was found.
     """

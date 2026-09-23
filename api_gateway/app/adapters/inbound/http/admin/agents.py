@@ -120,8 +120,8 @@ async def create_base_agent(
     """Create a project's base agent (new-client wizard): a chat flow with
     conversation memory and a prompt built from the answers, created in
     the project's Langflow folder and registered as its default agent. Its
-    LLM reads the `OPENAI_API_KEY` global variable of the tenant's Langflow,
-    which the Flowsdone team configures.
+    OpenAI component is created WITHOUT an API key: it is set by hand in the
+    editor for each client (the onboarding checklist flags it until then).
 
     Args:
         body (BaseAgentCreate): Project and the assistant's answers.

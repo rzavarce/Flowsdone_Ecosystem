@@ -176,7 +176,7 @@ async def test_list_flows_rejected():
         await client.list_flows("tok", "F1")
 
 
-def test_base_agent_flow_uses_the_prompt_memory_limit_and_openai_variable():
+def test_base_agent_flow_uses_the_prompt_memory_limit_and_no_api_key():
     from app.adapters.outbound.langflow.admin_client import build_base_agent_flow
 
     flow = build_base_agent_flow("Fibi", "Eres Fibi.")
@@ -185,13 +185,41 @@ def test_base_agent_flow_uses_the_prompt_memory_limit_and_openai_variable():
     assert set(nodes) == {"ChatInput", "ChatOutput", "Memory", "Prompt", "OpenAIModel"}
     assert nodes["Prompt"]["template"]["value"] == "Eres Fibi.\n\nHistorial de la conversación:\n{memory}\n"
     assert nodes["Memory"]["n_messages"]["value"] == 20
-    assert nodes["OpenAIModel"]["api_key"]["value"] == "OPENAI_API_KEY"
-    assert nodes["OpenAIModel"]["api_key"]["load_from_db"] is True
+    assert nodes["OpenAIModel"]["api_key"]["value"] == ""
+    assert nodes["OpenAIModel"]["api_key"]["load_from_db"] is False
     assert nodes["OpenAIModel"]["model_name"]["value"] == "gpt-4.1-mini"
     assert flow["name"] == "Fibi" and flow["endpoint_name"] is None
-    assert len(flow["data"]["edges"]) == 4
     # The template file itself is never modified.
     assert build_base_agent_flow("Otro", "x")["name"] == "Otro"
+
+
+def test_base_agent_edges_use_the_handle_strings_the_langflow_editor_rebuilds():
+    """Langflow's editor drops, on open, any edge whose handle string is not
+    exactly its own serialization: sorted keys, no spaces, `"` -> `œ`."""
+    import json as _json
+
+    from app.adapters.outbound.langflow.admin_client import build_base_agent_flow
+
+    def editor_handle(obj):  # JS: Jf(obj).replace(/"/g, "œ")
+        return _json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).replace('"', "œ")
+
+    flow = build_base_agent_flow("Fibi", "x")
+    nodes = {n["id"]: n["data"] for n in flow["data"]["nodes"]}
+    assert len(flow["data"]["edges"]) == 4
+    for edge in flow["data"]["edges"]:
+        target = nodes[edge["target"]]
+        field = _json.loads(edge["targetHandle"].replace("œ", '"'))["fieldName"]
+        spec = target["node"]["template"][field]
+        expected_target = {"fieldName": field, "id": edge["target"], "inputTypes": spec.get("input_types"), "type": spec["type"]}
+        assert edge["targetHandle"] == editor_handle(expected_target)
+
+        source = nodes[edge["source"]]
+        name = _json.loads(edge["sourceHandle"].replace("œ", '"'))["name"]
+        output = next(o for o in source["node"]["outputs"] if o["name"] == name)
+        types = output["types"] if len(output["types"]) == 1 else [output["selected"]]
+        expected_source = {"dataType": source["type"], "id": edge["source"], "name": name, "output_types": types}
+        assert edge["sourceHandle"] == editor_handle(expected_source)
+        assert edge["id"] == f"reactflow__edge-{edge['source']}{edge['sourceHandle']}-{edge['target']}{edge['targetHandle']}"
 
 
 async def test_create_base_flow_posts_to_the_folder_and_returns_the_id():
@@ -217,20 +245,29 @@ async def test_create_base_flow_posts_to_the_folder_and_returns_the_id():
     assert seen["auth"] == "Bearer tok"
 
 
-async def test_list_variable_names_and_errors():
+async def test_llm_key_configured_reads_only_whether_api_key_fields_are_set():
     import httpx
     import pytest
 
     from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
     from app.domain.ports.outbound import LangflowSessionError
 
-    ok = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(
-        lambda r: httpx.Response(200, json=[{"id": "1", "name": "OPENAI_API_KEY", "type": "Credential", "value": None}])
-    )))
-    assert await ok.list_variable_names("tok") == ["OPENAI_API_KEY"]
+    def flow(*keys):
+        nodes = [{"data": {"node": {"template": {"api_key": {"value": k}}}}} for k in keys]
+        nodes.append({"data": {"node": {"template": {"input_value": {"value": "x"}}}}})
+        return {"id": "f", "data": {"nodes": nodes}}
 
-    bad = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(lambda r: httpx.Response(500))))
+    def client(body, status=200):
+        return LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(
+            lambda r: httpx.Response(status, json=body)
+        )))
+
+    assert await client(flow("sk-abc")).llm_key_configured("tok", "f") is True
+    assert await client(flow("OPENAI_API_KEY")).llm_key_configured("tok", "f") is True  # a global variable
+    assert await client(flow("sk-abc", "  ")).llm_key_configured("tok", "f") is False
+    assert await client(flow("")).llm_key_configured("tok", "f") is False
+    assert await client(flow()).llm_key_configured("tok", "f") is None
     with pytest.raises(LangflowSessionError):
-        await bad.list_variable_names("tok")
+        await client({}, 404).llm_key_configured("tok", "f")
     with pytest.raises(LangflowSessionError):
-        await bad.create_base_flow("tok", "F1", name="x", system_prompt="y")
+        await client({}, 500).create_base_flow("tok", "F1", name="x", system_prompt="y")

@@ -392,7 +392,8 @@ Es un wizard de formularios, solo para el admin, con cinco pasos:
 El **agente base** se crea a partir de la plantilla "Memory Chatbot" de Langflow 1.4, guardada en `adapters/outbound/langflow/templates/base_agent.json`:
 - Tiene memoria de los últimos 20 mensajes.
 - Su prompt se construye con el nombre del asistente, la empresa, el tono y las instrucciones del wizard.
-- Usa gpt-4.1-mini, que lee su clave de la **variable global `OPENAI_API_KEY` del Langflow del tenant**. Esa variable la gestiona el equipo de Flowsdone, no el gateway.
+- Usa gpt-4.1-mini, y su componente OpenAI se crea **sin clave de API** (ni valor ni variable global). La clave de cada cliente se pone a mano en *Agentes → Editor de Langflow*; hasta entonces, la checklist marca "Clave de OpenAI del agente" como pendiente.
+- Las conexiones se guardan con el identificador de handle que reconstruye el editor de Langflow (JSON con claves ordenadas, sin espacios y `"` → `œ`). Si no coincide carácter a carácter, **el editor borra la conexión al abrir el flujo**.
 
 **Cada paso se guarda al continuar.** `/onboarding?tenant=<id>` retoma el alta en el primer paso pendiente, que calcula `GET /internal/admin/tenants/{id}/onboarding` a partir de lo que existe de verdad (no hay un estado del wizard guardado aparte).
 
@@ -400,7 +401,7 @@ Ese mismo endpoint alimenta la tarjeta **Estado del alta** de la ficha del tenan
 - datos de facturación y cuenta del cliente (activada o pendiente);
 - plan y proyecto;
 - que el flujo del agente predeterminado siga en la carpeta;
-- que exista `OPENAI_API_KEY` en el Langflow del tenant (solo el nombre, nunca el valor);
+- que el componente OpenAI del agente tenga clave (solo si está puesta, nunca su valor);
 - canales conectados.
 
 **Fuera del wizard, a mano:** los canales, incluido WhatsApp/Evolution.
