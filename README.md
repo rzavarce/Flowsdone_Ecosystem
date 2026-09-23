@@ -377,6 +377,34 @@ curl -s -X POST http://localhost:8000/internal/admin/channel-connections \
 
 Filtros disponibles: `GET /internal/admin/projects?tenant_id=...`, `GET /internal/admin/agents?project_id=...`, `GET /internal/admin/workflows?project_id=...`, `GET /internal/admin/channel-connections?project_id=...`.
 
+### Alta de cliente (PWA → Tenants → *Alta de cliente*)
+
+Es un wizard de formularios, solo para el admin, con cinco pasos:
+
+| Paso | Qué crea |
+|---|---|
+| **Empresa** | El tenant, su cuenta `client` (recibe el email de activación) y sus datos de facturación. El `billing_email` es obligatorio, porque ahí llegan los avisos de cuota |
+| **Plan** | La suscripción: plan, modo de excedente y tope de gasto |
+| **Proyecto** | El proyecto y su carpeta en el Langflow del tenant |
+| **Agente** | Un **agente base** en la carpeta del proyecto, registrado como predeterminado (`POST /internal/admin/agents/base`). Ver detalle debajo |
+| **Resumen** | La checklist del cliente |
+
+El **agente base** se crea a partir de la plantilla "Memory Chatbot" de Langflow 1.4, guardada en `adapters/outbound/langflow/templates/base_agent.json`:
+- Tiene memoria de los últimos 20 mensajes.
+- Su prompt se construye con el nombre del asistente, la empresa, el tono y las instrucciones del wizard.
+- Usa gpt-4.1-mini, que lee su clave de la **variable global `OPENAI_API_KEY` del Langflow del tenant**. Esa variable la gestiona el equipo de Flowsdone, no el gateway.
+
+**Cada paso se guarda al continuar.** `/onboarding?tenant=<id>` retoma el alta en el primer paso pendiente, que calcula `GET /internal/admin/tenants/{id}/onboarding` a partir de lo que existe de verdad (no hay un estado del wizard guardado aparte).
+
+Ese mismo endpoint alimenta la tarjeta **Estado del alta** de la ficha del tenant, que revisa:
+- datos de facturación y cuenta del cliente (activada o pendiente);
+- plan y proyecto;
+- que el flujo del agente predeterminado siga en la carpeta;
+- que exista `OPENAI_API_KEY` en el Langflow del tenant (solo el nombre, nunca el valor);
+- canales conectados.
+
+**Fuera del wizard, a mano:** los canales, incluido WhatsApp/Evolution.
+
 ### Registrar agentes desde la consola (PWA → Agentes)
 
 El flujo de trabajo normal no necesita curl:

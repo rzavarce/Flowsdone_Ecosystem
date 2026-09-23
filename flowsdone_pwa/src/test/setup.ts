@@ -1,8 +1,13 @@
 import '@testing-library/jest-dom/vitest'
 import { afterEach } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 // Los tests se escriben contra los textos en español (el idioma por defecto).
 import { i18n } from '@/core/i18n/i18n'
+
+// Con la suite completa en paralelo, jsdom va lento y pantallas que cargan
+// varias consultas (Tenants, Conversaciones) superan a veces el segundo por
+// defecto de findBy*/waitFor: fallos intermitentes, no reales.
+configure({ asyncUtilTimeout: 3000 })
 
 afterEach(() => {
   cleanup()

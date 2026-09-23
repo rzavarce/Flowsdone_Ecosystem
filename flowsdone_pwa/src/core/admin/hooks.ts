@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/core/auth/useAuth'
 import type {
   ChannelAppProvider,
+  BaseAgentInput,
   CreateAgentInput,
   UpdateAgentInput,
   CreateChannelConnectionInput,
@@ -27,6 +28,7 @@ export const adminKeys = {
   users: ['users'] as const,
   langflowSession: ['langflow-session'] as const,
   langflowFlows: ['langflow-flows'] as const,
+  onboarding: ['onboarding'] as const,
 }
 
 /** Visible tenants with all of their data (slug, status…). */
@@ -226,6 +228,26 @@ export function useDeleteAgent() {
   const api = useAdminApi()
   const qc = useQueryClient()
   return useMutation({ mutationFn: (id: string) => api.deleteAgent(id), onSuccess: () => invalidateAgents(qc) })
+}
+
+/** Creates a project's base agent (new-client wizard). */
+export function useCreateBaseAgent() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: BaseAgentInput) => api.createBaseAgent(input),
+    onSuccess: () => Promise.all([invalidateAgents(qc), qc.invalidateQueries({ queryKey: adminKeys.onboarding })]),
+  })
+}
+
+/** A tenant's onboarding checklist and the wizard step to resume at. */
+export function useOnboarding(tenantId?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.onboarding, tenantId],
+    queryFn: () => api.getOnboarding(tenantId as string),
+    enabled: Boolean(tenantId),
+  })
 }
 
 /** Channel connections visible to the current profile. */

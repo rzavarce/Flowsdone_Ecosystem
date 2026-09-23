@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -600,4 +600,51 @@ class LangflowFlowOut(BaseModel):
     name: str
     description: Optional[str] = None
     agent_id: Optional[UUID] = None
+
+
+class BaseAgentCreate(BaseModel):
+    """Request body for POST /agents/base (new-client wizard).
+
+    Attributes:
+        project_id (UUID): Project to create it in.
+        assistant_name (str): Name the assistant introduces itself with.
+        tone (str): "cercano", "profesional" or "formal".
+        instructions (str): About the business and how to attend.
+    """
+
+    project_id: UUID
+    assistant_name: str = Field(min_length=1, max_length=60)
+    tone: Literal["cercano", "profesional", "formal"] = "cercano"
+    instructions: str = Field(default="", max_length=4000)
+
+
+class OnboardingCheckOut(BaseModel):
+    """One onboarding checklist item.
+
+    Attributes:
+        key (str): "billing", "client_account", "plan", "project", "agent",
+            "openai_key" or "channel".
+        status (str): "ok", "warning", "missing" or "unknown".
+        detail (Optional[str]): What was found.
+    """
+
+    key: str
+    status: str
+    detail: Optional[str] = None
+
+
+class OnboardingOut(BaseModel):
+    """Response of GET /tenants/{tenant_id}/onboarding.
+
+    Attributes:
+        tenant_id (UUID): The tenant.
+        next_step (str): "company", "plan", "project", "agent" or "summary".
+        project_id (Optional[UUID]): Project the wizard works on.
+        checks (List[OnboardingCheckOut]): The checklist.
+    """
+
+    tenant_id: UUID
+    next_step: str
+    project_id: Optional[UUID] = None
+    checks: List[OnboardingCheckOut]
 

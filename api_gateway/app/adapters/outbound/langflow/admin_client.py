@@ -6,6 +6,9 @@ users, and each tenant user's own login token to create their folders.
 
 from __future__ import annotations
 
+import copy
+import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -17,6 +20,44 @@ from app.domain.ports.outbound import (
     LangflowSessionError,
     LangflowTokens,
 )
+
+
+# Langflow 1.4's "Memory Chatbot" starter project (without its notes): chat
+# input -> memory -> prompt -> OpenAI (api_key = the OPENAI_API_KEY global
+# variable, load_from_db) -> chat output. Kept in the repo so what gets
+# created does not depend on which starter projects a Langflow ships.
+_BASE_AGENT_TEMPLATE = Path(__file__).parent / "templates" / "base_agent.json"
+# Conversation turns fed back to the model: enough context for a chat,
+# bounded so a long conversation does not grow the LLM cost per message.
+_BASE_AGENT_MEMORY_MESSAGES = 20
+_BASE_AGENT_TEMPERATURE = 0.3
+
+
+def build_base_agent_flow(name: str, system_prompt: str) -> Dict[str, Any]:
+    """The request body that creates a base agent flow.
+
+    Args:
+        name (str): Flow name.
+        system_prompt (str): The agent's instructions (no template variables).
+
+    Returns:
+        Dict[str, Any]: Flow payload for `POST /api/v1/flows/`.
+    """
+    template = json.loads(_BASE_AGENT_TEMPLATE.read_text(encoding="utf-8"))
+    flow = copy.deepcopy(template)
+    for node in flow["data"]["nodes"]:
+        kind = node["data"].get("type")
+        fields = node["data"]["node"]["template"]
+        if kind == "Prompt":
+            fields["template"]["value"] = f"{system_prompt}\n\nHistorial de la conversación:\n{{memory}}\n"
+        elif kind == "Memory":
+            fields["n_messages"]["value"] = _BASE_AGENT_MEMORY_MESSAGES
+        elif kind == "OpenAIModel":
+            fields["temperature"]["value"] = _BASE_AGENT_TEMPERATURE
+    flow["name"] = name
+    flow["description"] = "Agente base creado por el alta de cliente de Flowsdone."
+    flow["endpoint_name"] = None
+    return flow
 
 
 class LangflowAdminClient(LangflowAdminPort):
@@ -223,4 +264,48 @@ class LangflowAdminClient(LangflowAdminPort):
             if not f.get("is_component") and str(f.get("folder_id")) == folder_id
         ]
         return sorted(flows, key=lambda f: f.name.lower())
+
+    async def create_base_flow(self, access_token: str, folder_id: str, *, name: str, system_prompt: str) -> str:
+        """Create the base chat agent flow in a folder.
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): Folder to create it in.
+            name (str): Flow name.
+            system_prompt (str): The agent's instructions.
+
+        Returns:
+            str: The new flow's id.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "POST",
+            "/api/v1/flows/",
+            json={**build_base_agent_flow(name, system_prompt), "folder_id": folder_id},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code != 201:
+            raise LangflowSessionError(f"langflow rejected create flow (HTTP {response.status_code})")
+        return str(self._json(response, "create flow")["id"])
+
+    async def list_variable_names(self, access_token: str) -> List[str]:
+        """Names of the logged-in user's global variables.
+
+        Args:
+            access_token (str): The user's access token.
+
+        Returns:
+            List[str]: The names (values are never read).
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "GET", "/api/v1/variables/", headers={"Authorization": f"Bearer {access_token}"}
+        )
+        if response.status_code != 200:
+            raise LangflowSessionError(f"langflow rejected list variables (HTTP {response.status_code})")
+        return [str(v["name"]) for v in self._json(response, "list variables")]
 

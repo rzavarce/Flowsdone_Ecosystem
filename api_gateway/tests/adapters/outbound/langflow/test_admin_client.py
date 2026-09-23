@@ -156,3 +156,63 @@ async def test_list_flows_rejected():
     )
     with pytest.raises(LangflowSessionError):
         await client.list_flows("tok", "F1")
+
+
+def test_base_agent_flow_uses_the_prompt_memory_limit_and_openai_variable():
+    from app.adapters.outbound.langflow.admin_client import build_base_agent_flow
+
+    flow = build_base_agent_flow("Fibi", "Eres Fibi.")
+
+    nodes = {n["data"]["type"]: n["data"]["node"]["template"] for n in flow["data"]["nodes"]}
+    assert set(nodes) == {"ChatInput", "ChatOutput", "Memory", "Prompt", "OpenAIModel"}
+    assert nodes["Prompt"]["template"]["value"] == "Eres Fibi.\n\nHistorial de la conversación:\n{memory}\n"
+    assert nodes["Memory"]["n_messages"]["value"] == 20
+    assert nodes["OpenAIModel"]["api_key"]["value"] == "OPENAI_API_KEY"
+    assert nodes["OpenAIModel"]["api_key"]["load_from_db"] is True
+    assert nodes["OpenAIModel"]["model_name"]["value"] == "gpt-4.1-mini"
+    assert flow["name"] == "Fibi" and flow["endpoint_name"] is None
+    assert len(flow["data"]["edges"]) == 4
+    # The template file itself is never modified.
+    assert build_base_agent_flow("Otro", "x")["name"] == "Otro"
+
+
+async def test_create_base_flow_posts_to_the_folder_and_returns_the_id():
+    import json as _json
+
+    import httpx
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["body"] = _json.loads(request.content)
+        seen["auth"] = request.headers.get("authorization")
+        return httpx.Response(201, json={"id": "new-flow"})
+
+    client = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(handler)))
+
+    flow_id = await client.create_base_flow("tok", "F1", name="Fibi", system_prompt="Eres Fibi.")
+
+    assert flow_id == "new-flow"
+    assert seen["body"]["folder_id"] == "F1" and seen["body"]["name"] == "Fibi"
+    assert seen["auth"] == "Bearer tok"
+
+
+async def test_list_variable_names_and_errors():
+    import httpx
+    import pytest
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+    from app.domain.ports.outbound import LangflowSessionError
+
+    ok = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, json=[{"id": "1", "name": "OPENAI_API_KEY", "type": "Credential", "value": None}])
+    )))
+    assert await ok.list_variable_names("tok") == ["OPENAI_API_KEY"]
+
+    bad = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(lambda r: httpx.Response(500))))
+    with pytest.raises(LangflowSessionError):
+        await bad.list_variable_names("tok")
+    with pytest.raises(LangflowSessionError):
+        await bad.create_base_flow("tok", "F1", name="x", system_prompt="y")

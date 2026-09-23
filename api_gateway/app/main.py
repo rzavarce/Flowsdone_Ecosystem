@@ -93,6 +93,7 @@ from app.application.use_cases.handle_outbound_response import HandleOutboundRes
 from app.application.use_cases.ingest_message import IngestMessageUseCase
 from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
 from app.application.use_cases.manage_agents import ListProjectFlowsUseCase, ManageAgentsUseCase
+from app.application.use_cases.onboarding import CreateBaseAgentUseCase, GetOnboardingStatusUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
 from app.application.use_cases.manage_profile import (
     RemoveAvatarUseCase,
@@ -490,6 +491,13 @@ async def lifespan(app: FastAPI):
         channel_connection_repo=app.state.channel_connection_repo,
         flows=app.state.list_project_flows_use_case,
     )
+    app.state.create_base_agent_use_case = CreateBaseAgentUseCase(
+        project_repo=app.state.project_repo,
+        tenant_repo=app.state.tenant_repo,
+        workspace=app.state.prepare_langflow_session_use_case,
+        langflow=langflow_admin,
+        manage_agents=app.state.manage_agents_use_case,
+    )
     app.state.redeem_langflow_ticket_use_case = RedeemLangflowTicketUseCase(
         accounts=langflow_accounts, langflow=langflow_admin, tickets=langflow_tickets
     )
@@ -547,6 +555,17 @@ async def lifespan(app: FastAPI):
     )
     app.state.list_unrated_meters_use_case = ListUnratedMetersUseCase(
         usage_store=usage_store, cost_rates=app.state.cost_rate_repo
+    )
+    app.state.get_onboarding_status_use_case = GetOnboardingStatusUseCase(
+        billing_profiles=app.state.tenant_billing_profile_repo,
+        users=app.state.user_repo,
+        subscriptions=app.state.subscription_repo,
+        plans=app.state.plan_repo,
+        project_repo=app.state.project_repo,
+        agent_repo=app.state.agent_repo,
+        channel_connection_repo=app.state.channel_connection_repo,
+        workspace=app.state.prepare_langflow_session_use_case,
+        langflow=app.state.langflow_admin_client,
     )
     logger.info("billing.dependencies.initialized")
 

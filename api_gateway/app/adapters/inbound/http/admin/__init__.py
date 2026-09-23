@@ -16,6 +16,7 @@ from app.adapters.inbound.http.admin.channel_apps import router as channel_apps_
 from app.adapters.inbound.http.admin.channel_connections import router as channel_connections_router
 from app.adapters.inbound.http.admin.conversations import router as conversations_router
 from app.adapters.inbound.http.admin.langflow import router as langflow_router
+from app.adapters.inbound.http.admin.onboarding import router as onboarding_router
 from app.adapters.inbound.http.admin.projects import router as projects_router
 from app.adapters.inbound.http.admin.tenant_billing import router as tenant_billing_router
 from app.adapters.inbound.http.admin.tenants import router as tenants_router
@@ -36,5 +37,6 @@ for _sub_router in (
     langflow_router,
     conversations_router,
     billing_router,
+    onboarding_router,
 ):
     router.include_router(_sub_router)

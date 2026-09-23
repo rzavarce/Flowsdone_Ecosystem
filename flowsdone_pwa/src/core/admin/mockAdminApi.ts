@@ -4,6 +4,7 @@ import { createMockBilling } from './mockBilling'
 import type {
   Agent,
   LangflowFlow,
+  OnboardingCheck,
   ChannelApp,
   ChannelAppProvider,
   ChannelConnection,
@@ -159,9 +160,11 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     removeWhere(projects, (p) => p.id !== projectId)
   }
 
+  const billing = createMockBilling({ latencyMs, tenants, projects, connections })
+
   return {
     // Conversaciones y facturación: módulo aparte, sobre los mismos datos vivos.
-    ...createMockBilling({ latencyMs, tenants, projects, connections }),
+    ...billing,
     async listTenants() {
       await wait(latencyMs)
       return clone(tenants)
@@ -288,6 +291,35 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       need(agents.find((a) => a.id === id), 'agent')
       if (connections.some((c) => c.agent_id === id)) throw new ApiError(409, 'agent has channels')
       removeWhere(agents, (a) => a.id !== id)
+    },
+    async createBaseAgent(input) {
+      await wait(latencyMs)
+      need(projects.find((p) => p.id === input.project_id), 'project')
+      // Como el gateway: crea el flujo en la carpeta y lo registra como predeterminado.
+      const flowId = `${input.project_id}-flow-base-${++seq}`
+      extraFlows.set(input.project_id, [...(extraFlows.get(input.project_id) ?? []), { id: flowId, name: input.assistant_name }])
+      return this.createAgent({ project_id: input.project_id, name: input.assistant_name, langflow_flow_id: flowId, is_default: true })
+    },
+    async getOnboarding(tenantId) {
+      const tenant = need(tenants.find((t) => t.id === tenantId), 'tenant')
+      const profile = billingProfiles.get(tenantId)
+      const subscription = await billing.getSubscription(tenantId)
+      const own = projects.filter((p) => p.tenant_id === tenantId).sort((a, b) => a.name.localeCompare(b.name))
+      const ownAgents = agents.filter((a) => own.some((p) => p.id === a.project_id))
+      const agent = ownAgents.find((a) => a.is_default) ?? ownAgents[0]
+      const client = users.find((u) => u.role === 'client' && u.tenant_ids.includes(tenantId))
+      const channels = connections.filter((c) => own.some((p) => p.id === c.project_id)).length
+      const checks: OnboardingCheck[] = [
+        { key: 'billing', status: profile?.billing_email ? 'ok' : 'missing', detail: profile?.legal_name ?? null },
+        { key: 'client_account', status: !client ? 'missing' : client.status === 'active' ? 'ok' : 'warning', detail: client?.status ?? null },
+        { key: 'plan', status: subscription ? 'ok' : 'missing', detail: subscription?.plan_name ?? null },
+        { key: 'project', status: own.length ? 'ok' : 'missing', detail: own[0]?.name ?? null },
+        { key: 'agent', status: agent ? 'ok' : 'missing', detail: agent?.name ?? null },
+        { key: 'openai_key', status: 'ok', detail: 'OPENAI_API_KEY' },
+        { key: 'channel', status: channels ? 'ok' : 'warning', detail: String(channels) },
+      ]
+      const next_step = !profile?.billing_email ? 'company' : !subscription ? 'plan' : !own.length ? 'project' : !agent ? 'agent' : 'summary'
+      return clone({ tenant_id: tenant.id, next_step, project_id: own[0]?.id ?? null, checks })
     },
     async listLangflowFlows(projectId) {
       await wait(latencyMs)

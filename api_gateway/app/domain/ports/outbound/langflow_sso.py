@@ -184,6 +184,41 @@ class LangflowAdminPort(Protocol):
         ...
 
 
+    async def create_base_flow(self, access_token: str, folder_id: str, *, name: str, system_prompt: str) -> str:
+        """Create the platform's base chat agent flow in one of the
+        logged-in user's folders (chat input, conversation memory, the
+        prompt, an LLM reading the `OPENAI_API_KEY` global variable, and
+        chat output).
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): Folder to create it in.
+            name (str): Flow name.
+            system_prompt (str): The agent's instructions (no template variables).
+
+        Returns:
+            str: The new flow's id.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
+    async def list_variable_names(self, access_token: str) -> List[str]:
+        """Names of the logged-in user's global variables (never their values).
+
+        Args:
+            access_token (str): The user's access token.
+
+        Returns:
+            List[str]: The names.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
+
 class SsoTicketStorePort(Protocol):
     """Single-use, short-lived tickets that hand a browser over to Langflow."""
 

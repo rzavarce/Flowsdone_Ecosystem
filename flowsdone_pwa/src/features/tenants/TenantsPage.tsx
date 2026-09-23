@@ -1,5 +1,6 @@
-import { Building2, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { Building2, Pause, Pencil, Play, Plus, Trash2, Wand2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -15,6 +16,7 @@ import { useAuth } from '@/core/auth/useAuth'
 import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
+import { OnboardingCard } from '@/features/onboarding/OnboardingCard'
 import { BillingProfileCard } from './BillingProfileCard'
 import { SubscriptionCard } from './SubscriptionCard'
 import { UsageCard } from './UsageCard'
@@ -109,10 +111,19 @@ export function TenantsPage() {
       description={canManageTenants ? t('tenants.descriptionAll') : t('tenants.descriptionOwn')}
       actions={
         canManageTenants && (
-          <Button onClick={() => setDialog({ kind: 'tenant', tenant: null })} disabled={view.isLoading}>
-            <Plus className="size-4" aria-hidden="true" />
-            {t('tenants.new')}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setDialog({ kind: 'tenant', tenant: null })} disabled={view.isLoading}>
+              <Plus className="size-4" aria-hidden="true" />
+              {t('tenants.new')}
+            </Button>
+            <Link
+              to="/onboarding"
+              className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg bg-cta px-5 text-sm font-medium text-cta-foreground shadow-theme-xs hover:brightness-95"
+            >
+              <Wand2 className="size-4" aria-hidden="true" />
+              {t('onboarding.start')}
+            </Link>
+          </div>
         )
       }
     />
@@ -227,6 +238,7 @@ export function TenantsPage() {
 
           {canManageBilling && (
             <>
+              <OnboardingCard tenantId={tenant.id} canResume={canManageTenants} />
               {/* Asignar/cambiar el plan: solo admin (POLICY["billing"] write en el gateway). */}
               <SubscriptionCard tenantId={tenant.id} tenantName={tenant.name} canEdit={can(user, 'platform:manage')} />
               <UsageCard tenantId={tenant.id} />

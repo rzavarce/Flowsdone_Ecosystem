@@ -14,6 +14,7 @@ import { ChannelsPage } from '@/features/channels/ChannelsPage'
 import { CompanyPage } from '@/features/company/CompanyPage'
 import { ConversationsPage } from '@/features/conversations/ConversationsPage'
 import { NotFoundPage } from '@/features/NotFoundPage'
+import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 import { PlansPage } from '@/features/plans/PlansPage'
 import { ProfilePage } from '@/features/profile/ProfilePage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -74,6 +75,7 @@ export const routes = [
       { path: '/conversations', element: guarded('conversations:manage', <ConversationsPage />) },
       { path: '/channels', element: guarded('channels:manage', <ChannelsPage />) },
       { path: '/tenants', element: guarded('projects:manage', <TenantsPage />) },
+      { path: '/onboarding', element: guarded('tenants:manage', <OnboardingPage />) },
       { path: '/users', element: guarded('users:manage', <UsersPage />) },
       { path: '/agents', element: guarded('agents:edit', <AgentsPage />) },
       { path: '/company', element: guarded('company:view', <CompanyPage />) },
