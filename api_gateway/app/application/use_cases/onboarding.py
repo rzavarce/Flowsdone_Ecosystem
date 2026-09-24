@@ -172,7 +172,7 @@ class GetOnboardingStatusUseCase:
             agent_repo (AgentRepositoryPort): Their agents.
             channel_connection_repo (ChannelConnectionRepositoryPort): Their channels.
             workspace (PrepareLangflowSessionUseCase): Opens the tenant's Langflow.
-            langflow (LangflowAdminPort): Flows and variable names.
+            langflow (LangflowAdminPort): Lists the folders' flows.
         """
         self._billing = billing_profiles
         self._users = users
@@ -217,7 +217,7 @@ class GetOnboardingStatusUseCase:
 
         agents = [a for p in projects for a in await self._agents.list_by_project(p.id)]
         default = next((a for a in agents if a.is_default), agents[0] if agents else None)
-        checks.extend(await self._langflow_checks(tenant_id, default))
+        checks.append(await self._agent_check(tenant_id, default))
 
         channels = [c for p in projects for c in await self._channels.list_by_project(p.id)]
         checks.append(OnboardingCheck("channel", "ok" if channels else "warning", str(len(channels))))
@@ -236,31 +236,28 @@ class GetOnboardingStatusUseCase:
             tenant_id=tenant_id, next_step=step, project_id=project.id if project else None, checks=checks
         )
 
-    async def _langflow_checks(self, tenant_id: UUID, agent: Optional[Agent]) -> List[OnboardingCheck]:
-        """The checks that need the tenant's Langflow: the default agent's
+    async def _agent_check(self, tenant_id: UUID, agent: Optional[Agent]) -> OnboardingCheck:
+        """The check that needs the tenant's Langflow: the default agent's
         flow still exists (in its project's folder or in the default folder,
-        where the base agent is created), and its LLM has an API key (the
-        base agent is created without one; it is set by hand per client).
+        where the base agent is created). Its model and API key are each
+        tenant's own business, so they are not checked.
 
         Args:
             tenant_id (UUID): The tenant.
             agent (Optional[Agent]): Its default agent, if any.
 
         Returns:
-            List[OnboardingCheck]: The "agent" and "openai_key" checks.
+            OnboardingCheck: The "agent" check.
         """
         if agent is None:
-            return [OnboardingCheck("agent", "missing"), OnboardingCheck("openai_key", "missing")]
+            return OnboardingCheck("agent", "missing")
         try:
             workspace = await self._workspace.open_workspace(tenant_id)
             token = workspace.tokens.access_token
             folders = [workspace.folders.get(agent.project_id), await self._langflow.default_folder(token)]
             flows = [f for folder in folders if folder for f in await self._langflow.list_flows(token, folder)]
-            if not any(f.id == agent.langflow_flow_id for f in flows):
-                return [OnboardingCheck("agent", "warning", agent.name), OnboardingCheck("openai_key", "unknown")]
-            configured = await self._langflow.llm_key_configured(token, agent.langflow_flow_id)
-            key_status: CheckStatus = "missing" if configured is False else "ok"
-            return [OnboardingCheck("agent", "ok", agent.name), OnboardingCheck("openai_key", key_status)]
         except (LangflowSessionError, LangflowTargetNotFoundError):
             logger.warning("onboarding.langflow_unavailable", extra={"tenant_id": str(tenant_id)})
-            return [OnboardingCheck("agent", "unknown", agent.name), OnboardingCheck("openai_key", "unknown")]
+            return OnboardingCheck("agent", "unknown", agent.name)
+        found = any(f.id == agent.langflow_flow_id for f in flows)
+        return OnboardingCheck("agent", "ok" if found else "warning", agent.name)

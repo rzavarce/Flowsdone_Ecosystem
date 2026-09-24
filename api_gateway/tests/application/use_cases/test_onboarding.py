@@ -23,12 +23,11 @@ pytestmark = pytest.mark.anyio
 
 
 class OnboardingLangflow(FlowsLangflow):
-    """Adds flow creation and variable names to the fake Langflow."""
+    """Adds flow creation and a failure switch to the fake Langflow."""
 
     def __init__(self) -> None:
         super().__init__()
         self.created: list = []
-        self.keys: dict = {}
         self.fail = False
 
     async def create_base_flow(self, access_token, folder_id, *, name, system_prompt):
@@ -41,11 +40,6 @@ class OnboardingLangflow(FlowsLangflow):
         if self.fail:
             raise LangflowSessionError("down")
         return await super().list_flows(access_token, folder_id)
-
-    async def llm_key_configured(self, access_token, flow_id):
-        if self.fail:
-            raise LangflowSessionError("down")
-        return self.keys.get(flow_id, False)
 
 
 def _world():
@@ -98,7 +92,7 @@ async def test_a_new_tenant_starts_at_the_company_step_with_everything_missing()
     assert status.next_step == "company" and status.project_id is None
     assert {c.key: c.status for c in status.checks} == {
         "billing": "missing", "client_account": "missing", "plan": "missing", "project": "missing",
-        "agent": "missing", "openai_key": "missing", "channel": "warning",
+        "agent": "missing", "channel": "warning",
     }
 
 
@@ -117,7 +111,6 @@ async def test_the_wizard_resumes_at_each_missing_step_and_ends_in_summary():
 
     await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="cercano", instructions="")
     x["users"].add(make_user(role="client", status="pending", tenant_ids=[tenant.id]))
-    x["w"].langflow.keys = {f["id"]: True for f in x["w"].langflow.created}  # key set in the editor
     x["connections"].add(make_channel_connection(project_id=project.id))
 
     status = await x["status"].execute(tenant.id)
@@ -126,18 +119,21 @@ async def test_the_wizard_resumes_at_each_missing_step_and_ends_in_summary():
     assert _check(status, "billing").detail == "Acme SL"
     assert _check(status, "plan").detail == "Pro"
     assert (_check(status, "client_account").status, _check(status, "client_account").detail) == ("warning", "pending")
-    assert _check(status, "agent").status == "ok" and _check(status, "openai_key").status == "ok"
+    assert _check(status, "agent").status == "ok"
     assert _check(status, "channel").status == "ok"
 
 
-async def test_a_base_agent_without_api_key_is_flagged():
+async def test_the_agents_model_and_api_key_are_not_checked():
+    # Each tenant manages its own models and keys: a base agent (created
+    # without a key) is simply "ok", and there is no key check at all.
     x = _world()
     project = await x["w"].add_project("Atención")
     await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="cercano", instructions="")
 
     status = await x["status"].execute(x["w"].tenant.id)
 
-    assert _check(status, "agent").status == "ok" and _check(status, "openai_key").status == "missing"
+    assert _check(status, "agent").status == "ok"
+    assert "openai_key" not in {c.key for c in status.checks}
 
 
 async def test_an_agent_whose_flow_is_gone_is_a_warning_and_langflow_down_is_unknown():
@@ -150,4 +146,4 @@ async def test_an_agent_whose_flow_is_gone_is_a_warning_and_langflow_down_is_unk
 
     x["w"].langflow.fail = True
     status = await x["status"].execute(x["w"].tenant.id)
-    assert _check(status, "agent").status == "unknown" and _check(status, "openai_key").status == "unknown"
+    assert _check(status, "agent").status == "unknown"

@@ -19,7 +19,6 @@ const FIX_AT: Record<OnboardingCheck['key'], string> = {
   plan: '/tenants',
   project: '/tenants',
   agent: '/agents',
-  openai_key: '/agents',
   channel: '/channels',
 }
 

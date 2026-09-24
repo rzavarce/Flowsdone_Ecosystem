@@ -722,7 +722,7 @@ export const es = {
       defaultName: 'Atención al cliente',
     },
     agent: {
-      description: 'Un asistente con memoria de la conversación. Para que empiece a responder, pon después la clave de OpenAI del cliente en el editor de flujos.',
+      description: 'Un asistente con memoria de la conversación.',
       existing: 'El proyecto ya tiene el agente {{name}}.',
       assistantName: 'Nombre del asistente',
       assistantNameHint: 'Con este nombre se presentará a los clientes.',
@@ -760,11 +760,6 @@ export const es = {
         warning: 'Su flujo ya no está en la carpeta del proyecto en Langflow.',
         missing: 'No tiene agente.',
         unknown: 'No se pudo comprobar: Langflow no responde.',
-      },
-      openai_key: {
-        label: 'Clave de OpenAI del agente',
-        missing: 'El agente no tiene clave de OpenAI y no responderá: ábrelo en Agentes → Editor de flujos y pon la clave del cliente en el componente OpenAI.',
-        unknown: 'No se pudo comprobar: Langflow no responde o el flujo del agente no está.',
       },
       channel: { label: 'Canales', warning: 'Sin canales: conéctalo a mano en Canales.' },
     },

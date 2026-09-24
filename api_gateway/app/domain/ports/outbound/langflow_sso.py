@@ -241,22 +241,6 @@ class LangflowAdminPort(Protocol):
         """
         ...
 
-    async def llm_key_configured(self, access_token: str, flow_id: str) -> Optional[bool]:
-        """Whether a flow's LLM components have an API key set (never the key itself).
-
-        Args:
-            access_token (str): The owner's access token.
-            flow_id (str): The flow.
-
-        Returns:
-            Optional[bool]: True if all have one, False if any is empty,
-            None if the flow has no LLM component with a key.
-
-        Raises:
-            LangflowSessionError: If Langflow rejects the request.
-        """
-        ...
-
     async def rename_flow(self, access_token: str, flow_id: str, name: str) -> None:
         """Rename a flow (Langflow's editor then shows the new name).
 

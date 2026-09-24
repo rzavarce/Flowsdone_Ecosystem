@@ -379,36 +379,6 @@ class LangflowAdminClient(LangflowAdminPort):
             raise LangflowSessionError(f"langflow rejected create flow (HTTP {response.status_code})")
         return str(self._json(response, "create flow")["id"])
 
-    async def llm_key_configured(self, access_token: str, flow_id: str) -> Optional[bool]:
-        """Whether a flow's LLM components have an API key set (a value or
-        a global variable name) - never reads the key itself.
-
-        Args:
-            access_token (str): The owner's access token.
-            flow_id (str): The flow.
-
-        Returns:
-            Optional[bool]: True if every component with an `api_key` field
-            has one, False if any is empty, None if the flow has none.
-
-        Raises:
-            LangflowSessionError: If Langflow rejects the request.
-        """
-        response = await self._request(
-            "GET", f"/api/v1/flows/{flow_id}", headers={"Authorization": f"Bearer {access_token}"}
-        )
-        if response.status_code != 200:
-            raise LangflowSessionError(f"langflow rejected get flow (HTTP {response.status_code})")
-        nodes = ((self._json(response, "get flow").get("data") or {}).get("nodes")) or []
-        keys = [
-            node["data"]["node"]["template"]["api_key"].get("value")
-            for node in nodes
-            if "api_key" in ((node.get("data") or {}).get("node") or {}).get("template", {})
-        ]
-        if not keys:
-            return None
-        return all(isinstance(k, str) and k.strip() for k in keys)
-
     async def rename_flow(self, access_token: str, flow_id: str, name: str) -> None:
         """Rename a flow.
 
