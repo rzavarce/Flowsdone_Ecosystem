@@ -735,7 +735,9 @@ export const es = {
       },
       instructions: 'Sobre el negocio',
       instructionsPlaceholder: 'Qué hacéis, horarios, zona de servicio, cómo contactar con una persona, qué no debe hacer el asistente…',
-      instructionsHint: 'Cuanto más concreto, mejor responde.',
+      instructionsHint: 'Es un texto de partida: complétalo o cámbialo con lo que hacéis, horarios, zona de servicio… Cuanto más concreto, mejor responde.',
+      defaultInstructions:
+        'Formas parte del equipo de atención de {{company}}. Trabajas como un empleado más de apoyo, tanto para los clientes como para cualquier usuario que escriba: resuelves dudas, orientas en consultas y gestiones sobre los productos y servicios de {{company}}, y lo haces siempre de forma cordial, paciente y resolutiva.\n\n- Saluda con amabilidad y pregunta en qué puedes ayudar.\n- Responde solo con información que conozcas de {{company}}; si no la tienes, dilo y ofrece que una persona del equipo le contacte.\n- Si la persona prefiere hablar con alguien del equipo, pídele su nombre y cómo contactarle.\n- Mantén un trato respetuoso y tranquilo, aunque la persona esté molesta.',
       creating: 'Creando el agente en Langflow…',
     },
     summary: {

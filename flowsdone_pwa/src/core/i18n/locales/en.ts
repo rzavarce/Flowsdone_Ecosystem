@@ -734,7 +734,9 @@ export const en: Messages<typeof es> = {
       },
       instructions: 'About the business',
       instructionsPlaceholder: 'What you do, opening hours, service area, how to reach a person, what the assistant must not do…',
-      instructionsHint: 'The more specific, the better it answers.',
+      instructionsHint: 'This is a starting text: complete or change it with what you do, opening hours, service area… The more specific, the better it answers.',
+      defaultInstructions:
+        "You are part of {{company}}'s support team. You work like any other support employee, for customers and for anyone else who writes in: you answer questions and help with enquiries and requests about {{company}}'s products and services, always in a friendly, patient and helpful way.\n\n- Greet people warmly and ask how you can help.\n- Only answer with information you know about {{company}}; if you don't have it, say so and offer to have someone from the team get in touch.\n- If the person would rather talk to someone from the team, ask for their name and how to reach them.\n- Stay respectful and calm, even if the person is upset.",
       creating: 'Creating the agent in Langflow…',
     },
     summary: {
