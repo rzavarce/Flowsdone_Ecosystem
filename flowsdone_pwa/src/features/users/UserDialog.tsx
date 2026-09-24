@@ -31,6 +31,8 @@ const FORM_ID = 'user-form'
 
 /**
  * Create and edit an `admin`/`tenant_manager`/`botmaster`/`consultant` user (admin only).
+ * It also edits a tenant's `client` account (from the tenant's screen): then
+ * role and tenants are fixed and not shown.
  *
  * No password field: on creation, the user is left `pending` and gets an
  * email to activate and choose their own (see `ProvisionUserUseCase`). The
@@ -62,7 +64,9 @@ export function UserDialog({ user, onClose, onSaved }: UserDialogProps) {
 
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error
-  const needsTenants = role !== 'admin'
+  // La cuenta cliente va atada a su tenant: ni rol ni tenants se tocan aquí.
+  const isClient = user?.role === 'client'
+  const needsTenants = !isClient && role !== 'admin'
   const errors = {
     email: editing || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim()) ? '' : t('common.validEmail'),
     name: name.trim() ? '' : t('common.nameRequired'),
@@ -98,9 +102,8 @@ export function UserDialog({ user, onClose, onSaved }: UserDialogProps) {
           id: user.id,
           patch: {
             name: name.trim(),
-            role,
             status: active ? 'active' : 'disabled',
-            tenant_ids: needsTenants ? tenantIds : [],
+            ...(isClient ? {} : { role, tenant_ids: needsTenants ? tenantIds : [] }),
             ...extra,
           },
         })
@@ -127,7 +130,7 @@ export function UserDialog({ user, onClose, onSaved }: UserDialogProps) {
     <Dialog
       open
       onClose={pending || avatar.isPending ? () => {} : onClose}
-      title={editing ? t('users.form.editTitle') : t('users.new')}
+      title={isClient ? t('tenants.clientAccount.editTitle') : editing ? t('users.form.editTitle') : t('users.new')}
       description={editing ? user.email : t('users.form.createDescription')}
       footer={
         <>
@@ -163,15 +166,17 @@ export function UserDialog({ user, onClose, onSaved }: UserDialogProps) {
         <Field label={t('common.name')} error={submitted ? errors.name : undefined}>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('profile.fields.fullName')} />
         </Field>
-        <Field label={t('profile.fields.role')}>
-          <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            {ASSIGNABLE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_META[r].label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {!isClient && (
+          <Field label={t('profile.fields.role')}>
+            <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              {ASSIGNABLE_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_META[r].label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         {editing && (
           <Field label={t('common.status')}>
             <Select value={active ? 'active' : 'disabled'} onChange={(e) => setActive(e.target.value === 'active')}>

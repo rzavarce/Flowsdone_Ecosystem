@@ -18,8 +18,10 @@ from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError, 
 from app.domain.models.agent import Agent
 from app.domain.ports.outbound import (
     AgentRepositoryPort,
+    AlreadyExistsError,
     ChannelConnectionRepositoryPort,
     LangflowAdminPort,
+    LangflowSessionError,
     ProjectRepositoryPort,
 )
 
@@ -115,6 +117,25 @@ class ListProjectFlowsUseCase:
             for f in await self._langflow.list_flows(workspace.tokens.access_token, folder_id)
         ]
 
+    async def rename(self, project_id: UUID, flow_id: str, name: str) -> None:
+        """Rename one of the project's flows in its tenant's Langflow.
+
+        Args:
+            project_id (UUID): The project.
+            flow_id (str): The flow.
+            name (str): Its new name.
+
+        Raises:
+            LangflowTargetNotFoundError: If the project (or its tenant) does not exist.
+            AlreadyExistsError: If the tenant already has a flow with that name.
+            LangflowSessionError: If Langflow fails.
+        """
+        project = await self._projects.get_by_id(project_id)
+        if project is None:
+            raise LangflowTargetNotFoundError("project not found")
+        workspace = await self._workspace.open_workspace(project.tenant_id)
+        await self._langflow.rename_flow(workspace.tokens.access_token, flow_id, name)
+
 
 class ManageAgentsUseCase:
     """Create, edit and delete a project's agents with the rules the plain
@@ -196,9 +217,15 @@ class ManageAgentsUseCase:
     async def update(self, agent: Agent, *, verify_flow: bool = True, **fields: Any) -> Optional[Agent]:
         """Edit an agent.
 
+        A new name is also given to its flow in Langflow, so the console and
+        the editor show the same one. If Langflow refuses it, the agent is
+        left as it was.
+
         Args:
             agent (Agent): The agent as it is now.
-            verify_flow (bool): Check a new flow is in the project's folder.
+            verify_flow (bool): Check a new flow is in the project's folder
+                (and rename the flow along with the agent). False only for
+                machine callers, whose flows may live outside the tenant folders.
             **fields (Any): Fields to change (unset ones are not passed).
 
         Returns:
@@ -206,13 +233,21 @@ class ManageAgentsUseCase:
 
         Raises:
             FlowNotInProjectError: If the new flow is not in the folder.
-            AlreadyExistsError: If the new name is taken in the project.
-            LangflowSessionError: If Langflow fails while verifying.
+            AlreadyExistsError: If the new name is taken in the project, or
+                by another flow of the tenant in Langflow.
+            LangflowSessionError: If Langflow fails.
         """
         new_flow = fields.get("langflow_flow_id")
         if verify_flow and new_flow and new_flow != agent.langflow_flow_id:
             await self._require_flow(agent.project_id, new_flow)
         updated = await self._agents.update(agent.id, **fields)
+        new_name = fields.get("name")
+        if updated is not None and verify_flow and new_name and new_name != agent.name:
+            try:
+                await self._flows.rename(agent.project_id, updated.langflow_flow_id, new_name)
+            except (AlreadyExistsError, LangflowSessionError, LangflowTargetNotFoundError):
+                await self._agents.update(agent.id, **{key: getattr(agent, key) for key in fields})
+                raise
         if updated is not None and fields.get("is_default"):
             await self._clear_other_defaults(updated)
         return updated

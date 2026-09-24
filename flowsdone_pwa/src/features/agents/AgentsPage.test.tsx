@@ -13,7 +13,7 @@ const LANGFLOW_URL = 'https://agents.example.test/langflow-sso?ticket=abc'
 const selectTenant = (id: string) => userEvent.selectOptions(screen.getByRole('combobox', { name: 'Tenant activo' }), id)
 const session = (url = LANGFLOW_URL) => vi.fn().mockResolvedValue({ url })
 /** The editor lives in its own tab (the "Agents" list opens first). */
-const toEditor = async () => userEvent.click(await screen.findByRole('tab', { name: 'Editor de Langflow' }))
+const toEditor = async () => userEvent.click(await screen.findByRole('tab', { name: 'Editor de flujos' }))
 
 async function open(role: Role, adminApi: AdminApi = api()) {
   renderApp('/agents', fakeAuthApi(makeUser(role)), adminApi)

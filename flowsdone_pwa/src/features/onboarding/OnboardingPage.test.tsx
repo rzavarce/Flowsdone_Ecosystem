@@ -93,13 +93,13 @@ describe('Alta de cliente (wizard)', { timeout: 30_000 }, () => {
   it('en Tenants: el admin tiene el acceso al wizard y la checklist; el gestor solo la checklist', async () => {
     const { unmount } = renderApp('/tenants', fakeAuthApi(makeUser('admin')), api())
     expect(await screen.findByRole('link', { name: 'Alta de cliente' })).toHaveAttribute('href', '/onboarding')
-    expect(await screen.findByText('Estado del alta')).toBeInTheDocument()
+    expect(await screen.findByText('Puesta en marcha')).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: 'Continuar alta' })).toHaveAttribute('href', expect.stringContaining('/onboarding?tenant='))
     expect(screen.getByText('Falta el email de facturación.')).toBeInTheDocument()
     unmount()
 
     renderApp('/tenants', fakeAuthApi(makeUser('tenant_manager')), api())
-    expect(await screen.findByText('Estado del alta')).toBeInTheDocument()
+    expect(await screen.findByText('Puesta en marcha')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Alta de cliente' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Continuar alta' })).not.toBeInTheDocument()
   })

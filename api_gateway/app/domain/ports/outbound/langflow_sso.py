@@ -220,6 +220,20 @@ class LangflowAdminPort(Protocol):
         """
         ...
 
+    async def rename_flow(self, access_token: str, flow_id: str, name: str) -> None:
+        """Rename a flow (Langflow's editor then shows the new name).
+
+        Args:
+            access_token (str): The owner's access token.
+            flow_id (str): The flow.
+            name (str): Its new name.
+
+        Raises:
+            AlreadyExistsError: If the owner already has a flow with that name.
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
 
 class SsoTicketStorePort(Protocol):
     """Single-use, short-lived tickets that hand a browser over to Langflow."""

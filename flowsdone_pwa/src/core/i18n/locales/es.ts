@@ -439,13 +439,13 @@ export const es = {
     fullscreen: 'Ver a pantalla completa',
     exitFullscreen: 'Salir de pantalla completa',
     editorTitle: 'Editor de agentes (Langflow)',
-    tabs: { list: 'Agentes', editor: 'Editor de Langflow' },
+    tabs: { list: 'Agentes', editor: 'Editor de flujos' },
     list: {
       description: 'Un agente conecta un flujo de Langflow con un proyecto: los canales del proyecto responden con él.',
       loading: 'Cargando agentes',
       loadError: 'No se pudieron cargar los agentes: {{error}}',
       register: 'Registrar agente',
-      howTo: 'Para añadir un agente: importa o crea su flujo en la pestaña "Editor de Langflow", dentro de la carpeta del proyecto, y después regístralo aquí.',
+      howTo: 'Para añadir un agente: importa o crea su flujo en la pestaña "Editor de flujos", dentro de la carpeta del proyecto, y después regístralo aquí.',
       noProjects: 'Este tenant no tiene proyectos todavía. Créalo en Tenants antes de registrar agentes.',
       empty: 'Sin agentes en este proyecto.',
       default: 'Predeterminado',
@@ -462,7 +462,7 @@ export const es = {
       flowHint: 'Flujos de la carpeta del proyecto en Langflow.',
       choose: 'Elige un flujo',
       loadingFlows: 'Cargando flujos de Langflow',
-      noFlows: 'No hay flujos en la carpeta de este proyecto. Impórtalo primero en la pestaña "Editor de Langflow".',
+      noFlows: 'No hay flujos en la carpeta de este proyecto. Impórtalo primero en la pestaña "Editor de flujos".',
       registered: '{{name}} (ya registrado)',
       name: 'Nombre del agente',
       makeDefault: 'Agente predeterminado del proyecto',
@@ -577,6 +577,7 @@ export const es = {
       none: 'Este tenant no tiene cuenta de cliente.',
       lastLogin: 'Último acceso: {{date}}',
       neverLogged: 'Todavía no ha entrado en la consola.',
+      editTitle: 'Editar la cuenta del cliente',
     },
     searchPlaceholder: 'Nombre o identificador',
     noMatches: 'Ningún tenant coincide con la búsqueda.',
@@ -721,7 +722,7 @@ export const es = {
       defaultName: 'Atención al cliente',
     },
     agent: {
-      description: 'Un asistente con memoria de la conversación. Para que empiece a responder, pon después la clave de OpenAI del cliente en el editor de Langflow.',
+      description: 'Un asistente con memoria de la conversación. Para que empiece a responder, pon después la clave de OpenAI del cliente en el editor de flujos.',
       existing: 'El proyecto ya tiene el agente {{name}}.',
       assistantName: 'Nombre del asistente',
       assistantNameHint: 'Con este nombre se presentará a los clientes.',
@@ -741,7 +742,7 @@ export const es = {
       description: 'Esto es lo que tiene el cliente. Lo pendiente se completa a mano desde cada sección.',
       done: 'El alta está completa.',
     },
-    card: { title: 'Estado del alta', description: 'Lo que necesita el cliente para funcionar.' },
+    card: { title: 'Puesta en marcha', description: 'Lo que el cliente ya tiene listo y lo que le falta para empezar a operar.' },
     status: { ok: 'Listo', warning: 'Revisar', missing: 'Falta', unknown: 'Sin comprobar' },
     checks: {
       billing: { label: 'Datos de facturación', missing: 'Falta el email de facturación.' },
@@ -760,7 +761,7 @@ export const es = {
       },
       openai_key: {
         label: 'Clave de OpenAI del agente',
-        missing: 'El agente no tiene clave de OpenAI y no responderá: ábrelo en Agentes → Editor de Langflow y pon la clave del cliente en el componente OpenAI.',
+        missing: 'El agente no tiene clave de OpenAI y no responderá: ábrelo en Agentes → Editor de flujos y pon la clave del cliente en el componente OpenAI.',
         unknown: 'No se pudo comprobar: Langflow no responde o el flujo del agente no está.',
       },
       channel: { label: 'Canales', warning: 'Sin canales: conéctalo a mano en Canales.' },
@@ -914,7 +915,7 @@ export const es = {
       },
       agents: {
         q: '¿Dónde se editan los agentes?',
-        a: 'En Agentes, primero elige el tenant en la barra superior. En la pestaña "Editor de Langflow" importas o creas el flujo dentro de la carpeta del proyecto; en la pestaña "Agentes" lo registras como agente para poder conectarle canales.',
+        a: 'En Agentes, primero elige el tenant en la barra superior. En la pestaña "Editor de flujos" importas o creas el flujo dentro de la carpeta del proyecto; en la pestaña "Agentes" lo registras como agente para poder conectarle canales.',
       },
       access: {
         q: 'No veo una sección que necesito',

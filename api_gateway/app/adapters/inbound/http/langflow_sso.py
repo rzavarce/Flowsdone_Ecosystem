@@ -13,6 +13,8 @@ the cookies land on the same host Langflow is served from (host-only, no
 
 from __future__ import annotations
 
+import secrets
+
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
@@ -98,7 +100,12 @@ async def langflow_sso(request: Request, ticket: str = Query(default="", max_len
         return _error(502, "No se pudo abrir Langflow. Vuelve a intentarlo en unos segundos.")
     if landing is None:
         return _error(400, "El enlace caducó o ya se usó. Recarga la página de Agentes.")
-    response = RedirectResponse(f"{settings.LANGFLOW_PUBLIC_URL}{landing.path}", status_code=303)
+    # A fresh query string on every landing: Langflow serves its page without
+    # Cache-Control, so browsers would otherwise keep showing a cached copy
+    # inside the iframe after the page changes (e.g. a new image deploy).
+    separator = "&" if "?" in landing.path else "?"
+    target = f"{settings.LANGFLOW_PUBLIC_URL}{landing.path}{separator}fd={secrets.token_hex(4)}"
+    response = RedirectResponse(target, status_code=303)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     _set_langflow_cookies(response, landing)

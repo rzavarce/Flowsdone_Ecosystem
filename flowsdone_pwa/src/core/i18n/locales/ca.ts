@@ -438,13 +438,13 @@ export const ca: Messages<typeof es> = {
     fullscreen: 'Veure a pantalla completa',
     exitFullscreen: 'Sortir de la pantalla completa',
     editorTitle: "Editor d'agents (Langflow)",
-    tabs: { list: 'Agents', editor: 'Editor de Langflow' },
+    tabs: { list: 'Agents', editor: 'Editor de fluxos' },
     list: {
       description: "Un agent connecta un flux de Langflow amb un projecte: els canals del projecte hi responen.",
       loading: 'Carregant agents',
       loadError: "No s'han pogut carregar els agents: {{error}}",
       register: 'Registrar agent',
-      howTo: "Per afegir un agent: importa o crea el seu flux a la pestanya \"Editor de Langflow\", dins la carpeta del projecte, i després registra'l aquí.",
+      howTo: "Per afegir un agent: importa o crea el seu flux a la pestanya \"Editor de fluxos\", dins la carpeta del projecte, i després registra'l aquí.",
       noProjects: "Aquest tenant encara no té projectes. Crea'n un a Tenants abans de registrar agents.",
       empty: 'Sense agents en aquest projecte.',
       default: 'Predeterminat',
@@ -461,7 +461,7 @@ export const ca: Messages<typeof es> = {
       flowHint: 'Fluxos de la carpeta del projecte a Langflow.',
       choose: 'Tria un flux',
       loadingFlows: 'Carregant fluxos de Langflow',
-      noFlows: "No hi ha fluxos a la carpeta d'aquest projecte. Importa'l primer a la pestanya \"Editor de Langflow\".",
+      noFlows: "No hi ha fluxos a la carpeta d'aquest projecte. Importa'l primer a la pestanya \"Editor de fluxos\".",
       registered: '{{name}} (ja registrat)',
       name: "Nom de l'agent",
       makeDefault: 'Agent predeterminat del projecte',
@@ -576,6 +576,7 @@ export const ca: Messages<typeof es> = {
       none: 'Aquest tenant no té compte de client.',
       lastLogin: 'Darrer accés: {{date}}',
       neverLogged: 'Encara no ha entrat a la consola.',
+      editTitle: 'Editar el compte del client',
     },
     searchPlaceholder: 'Nom o identificador',
     noMatches: 'Cap tenant coincideix amb la cerca.',
@@ -720,7 +721,7 @@ export const ca: Messages<typeof es> = {
       defaultName: 'Atenció al client',
     },
     agent: {
-      description: "Un assistent amb memòria de la conversa. Perquè comenci a respondre, posa després la clau d'OpenAI del client a l'editor de Langflow.",
+      description: "Un assistent amb memòria de la conversa. Perquè comenci a respondre, posa després la clau d'OpenAI del client a l'editor de fluxos.",
       existing: "El projecte ja té l'agent {{name}}.",
       assistantName: "Nom de l'assistent",
       assistantNameHint: 'Amb aquest nom es presentarà als clients.',
@@ -740,7 +741,7 @@ export const ca: Messages<typeof es> = {
       description: 'Això és el que té el client. El que falta es completa a mà des de cada secció.',
       done: "L'alta està completa.",
     },
-    card: { title: "Estat de l'alta", description: 'El que necessita el client per funcionar.' },
+    card: { title: 'Posada en marxa', description: 'El que el client ja té a punt i el que encara li falta per començar a operar.' },
     status: { ok: 'Fet', warning: 'Revisar', missing: 'Falta', unknown: 'Sense comprovar' },
     checks: {
       billing: { label: 'Dades de facturació', missing: "Falta l'email de facturació." },
@@ -759,7 +760,7 @@ export const ca: Messages<typeof es> = {
       },
       openai_key: {
         label: "Clau d'OpenAI de l'agent",
-        missing: "L'agent no té clau d'OpenAI i no respondrà: obre'l a Agents → Editor de Langflow i posa la clau del client al component OpenAI.",
+        missing: "L'agent no té clau d'OpenAI i no respondrà: obre'l a Agents → Editor de fluxos i posa la clau del client al component OpenAI.",
         unknown: "No s'ha pogut comprovar: Langflow no respon o el flux de l'agent no hi és.",
       },
       channel: { label: 'Canals', warning: "Sense canals: connecta'l a mà a Canals." },
@@ -913,7 +914,7 @@ export const ca: Messages<typeof es> = {
       },
       agents: {
         q: "On s'editen els agents?",
-        a: "A Agents, primer tria el tenant a la barra superior. A la pestanya \"Editor de Langflow\" importes o crees el flux dins la carpeta del projecte; a la pestanya \"Agents\" el registres com a agent per poder-hi connectar canals.",
+        a: "A Agents, primer tria el tenant a la barra superior. A la pestanya \"Editor de fluxos\" importes o crees el flux dins la carpeta del projecte; a la pestanya \"Agents\" el registres com a agent per poder-hi connectar canals.",
       },
       access: {
         q: 'No veig una secció que necessito',

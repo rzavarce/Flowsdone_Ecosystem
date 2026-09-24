@@ -15,12 +15,13 @@ type Tab = 'list' | 'editor'
  * `botmaster` - the route already requires `agents:edit` in `router.tsx`).
  * Two tabs over the tenant chosen in the selector:
  *
+ * - **Flow editor** (opened by default): the embedded Langflow editor,
+ *   opened as the tenant's own Langflow user (only sees that tenant's
+ *   folders). Flows are imported or built here, then registered in the
+ *   Agents tab.
  * - **Agents**: the tenant's agents per project - registering a flow of the
  *   project's Langflow folder as an agent, editing, making default,
  *   suspending and deleting them (`AgentsPanel`).
- * - **Langflow editor**: the embedded editor, opened as the tenant's own
- *   Langflow user (only sees that tenant's folders). Flows are imported or
- *   built here, then registered in the first tab.
  *
  * The editor has a known security boundary, not specific to this screen:
  * whoever edits can add a component with Python code that runs inside the
@@ -33,7 +34,7 @@ type Tab = 'list' | 'editor'
 export function AgentsPage() {
   const { t } = useTranslation()
   const { current } = useTenant()
-  const [tab, setTab] = useState<Tab>('list')
+  const [tab, setTab] = useState<Tab>('editor')
 
   return (
     <div className="flex h-full flex-col">
@@ -43,7 +44,7 @@ export function AgentsPage() {
       ) : (
         <>
           <div role="tablist" aria-label={t('nav.agents')} className="mb-6 inline-flex self-start rounded-xl bg-surface-muted p-1">
-            {(['list', 'editor'] as const).map((id) => (
+            {(['editor', 'list'] as const).map((id) => (
               <button
                 key={id}
                 role="tab"

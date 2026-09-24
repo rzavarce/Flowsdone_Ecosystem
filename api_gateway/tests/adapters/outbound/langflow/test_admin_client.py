@@ -271,3 +271,36 @@ async def test_llm_key_configured_reads_only_whether_api_key_fields_are_set():
         await client({}, 404).llm_key_configured("tok", "f")
     with pytest.raises(LangflowSessionError):
         await client({}, 500).create_base_flow("tok", "F1", name="x", system_prompt="y")
+
+
+async def test_rename_flow_patches_the_name_and_reports_a_taken_one():
+    import json as _json
+
+    import httpx
+    import pytest
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+    from app.domain.ports.outbound import AlreadyExistsError, LangflowSessionError
+
+    seen = {}
+
+    def client(status, body):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.update(method=request.method, path=request.url.path, body=_json.loads(request.content),
+                        auth=request.headers.get("authorization"))
+            return httpx.Response(status, json=body)
+
+        return LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(handler)))
+
+    await client(200, {"id": "f1"}).rename_flow("tok", "f1", "Recepción")
+    assert seen == {"method": "PATCH", "path": "/api/v1/flows/f1", "body": {"name": "Recepción"}, "auth": "Bearer tok"}
+
+    # SQLite answers 400 "Name must be unique"; Postgres a 500 with the database error.
+    with pytest.raises(AlreadyExistsError):
+        await client(400, {"detail": "Name must be unique"}).rename_flow("tok", "f1", "x")
+    with pytest.raises(AlreadyExistsError):
+        await client(500, {"detail": 'duplicate key value violates unique constraint "unique_flow_name"'}).rename_flow("tok", "f1", "x")
+    with pytest.raises(LangflowSessionError):
+        await client(404, {"detail": "Flow not found"}).rename_flow("tok", "f1", "x")
+    with pytest.raises(LangflowSessionError):
+        await client(500, {"detail": "boom"}).rename_flow("tok", "f1", "x")

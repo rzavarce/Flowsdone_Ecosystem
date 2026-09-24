@@ -61,8 +61,9 @@ describe('menú y acceso por perfil', () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
     expect(await h1('Agentes')).toBeInTheDocument()
     // Un solo tenant asignado: se auto-selecciona (TenantProvider), sin pedir elegir uno,
-    // y abre en la pestaña de agentes registrados (el editor está en la otra).
-    expect(await screen.findByRole('tab', { name: 'Agentes', selected: true })).toBeInTheDocument()
+    // y abre en el editor de flujos; los agentes registrados están en la otra pestaña.
+    expect(await screen.findByRole('tab', { name: 'Editor de flujos', selected: true })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Agentes' }))
     expect(await screen.findByText('Recepción', undefined, { timeout: 5000 })).toBeInTheDocument()
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Principal' })
     expect(within(sidebar!).getByRole('link', { name: 'Agentes' })).toHaveAttribute('aria-current', 'page')

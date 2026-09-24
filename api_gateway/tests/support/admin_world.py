@@ -251,6 +251,10 @@ class World:
                 return [ProjectFlow(id=f, name=f.upper(), description=None, agent_id=agents.get(f))
                         for f in world.langflow_flows.get(project_id, [])]
 
+            async def rename(self, project_id, flow_id, name):
+                world.renamed_flows.append((project_id, flow_id, name))
+
+        self.renamed_flows: List[tuple] = []
         flows = _Flows()
         manage = ManageAgentsUseCase(agent_repo=self.agents, channel_connection_repo=self.connections, flows=flows)
 

@@ -15,6 +15,7 @@ import httpx
 
 from app.core.config import settings
 from app.domain.ports.outbound import (
+    AlreadyExistsError,
     LangflowAdminPort,
     LangflowFlowSummary,
     LangflowSessionError,
@@ -349,4 +350,32 @@ class LangflowAdminClient(LangflowAdminPort):
         if not keys:
             return None
         return all(isinstance(k, str) and k.strip() for k in keys)
+
+    async def rename_flow(self, access_token: str, flow_id: str, name: str) -> None:
+        """Rename a flow.
+
+        Flow names are unique per Langflow user (so per tenant, across its
+        project folders). Langflow reports a clash as a 400 on SQLite and as
+        a 500 carrying the database error on Postgres; both mention "unique".
+
+        Args:
+            access_token (str): The owner's access token.
+            flow_id (str): The flow.
+            name (str): Its new name.
+
+        Raises:
+            AlreadyExistsError: If the owner already has a flow with that name.
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "PATCH",
+            f"/api/v1/flows/{flow_id}",
+            json={"name": name},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        if response.status_code == 200:
+            return
+        if response.status_code in (400, 500) and "unique" in response.text.lower():
+            raise AlreadyExistsError(f"langflow flow name taken: {name}")
+        raise LangflowSessionError(f"langflow rejected rename flow (HTTP {response.status_code})")
 
