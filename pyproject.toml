@@ -13,7 +13,11 @@ dependencies = [
     "pydantic-settings>=2.14.1",
     "python-dotenv>=1.2.2",
     "python-json-logger>=4.1.0",
-    "sqlalchemy>=2.0.50",
+    # [asyncio] pulls in greenlet, which SQLAlchemy 2.1 no longer installs by
+    # default (without it the async engine cannot even be imported). Kept
+    # below 2.1 until that release is tested: the images and CI install from
+    # this file, not from uv.lock.
+    "sqlalchemy[asyncio]>=2.0.50,<2.1",
     "uvicorn[standard]>=0.49.0",
     "opentelemetry-sdk>=1.30.0",
     "opentelemetry-exporter-otlp-proto-http>=1.30.0",
