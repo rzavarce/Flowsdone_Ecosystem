@@ -47,7 +47,11 @@ describe('Alta de cliente (wizard)', { timeout: 30_000 }, () => {
     expect(spies.project).toHaveBeenCalledWith({ tenant_id: tenantId, name: 'Atención al cliente', slug: 'atencion-al-cliente' })
     expect(screen.getByLabelText('Nombre del asistente')).toHaveValue('Asistente de Farmasi Iberia')
     await userEvent.click(screen.getByRole('radio', { name: /Formal/ }))
-    await userEvent.type(screen.getByLabelText('Sobre el negocio'), 'Cosmética y bienestar.')
+    // Viene con un texto de partida con el nombre de la empresa, que se puede cambiar.
+    const about = screen.getByLabelText<HTMLTextAreaElement>('Sobre el negocio')
+    expect(about.value).toContain('Formas parte del equipo de atención de Farmasi Iberia.')
+    await userEvent.clear(about)
+    await userEvent.type(about, 'Cosmética y bienestar.')
     await next()
 
     await heading('Resumen')
@@ -81,6 +85,25 @@ describe('Alta de cliente (wizard)', { timeout: 30_000 }, () => {
     await userEvent.click(screen.getByRole('button', { name: 'Atrás' }))
     await heading('Agente')
     expect(await screen.findByText(/ya tiene el agente Recepción/)).toBeInTheDocument()
+  })
+
+  it('el agente se puede crear tal cual: nombre y texto de partida con el nombre de la empresa', async () => {
+    const admin = api()
+    await admin.updateTenantBilling('t3', { billing_email: 'f@aurora.com' })
+    await admin.putSubscription('t3', { plan_id: 'plan-pro', overage_mode: null, spending_cap_micros: null })
+    await admin.createProject({ tenant_id: 't3', name: 'Tienda', slug: 'tienda' })
+    const agent = vi.spyOn(admin, 'createBaseAgent')
+    renderApp('/onboarding?tenant=t3', fakeAuthApi(makeUser('admin')), admin)
+
+    await heading('Agente')
+    expect(await screen.findByDisplayValue('Asistente de Tienda Aurora')).toBeInTheDocument()
+    await next()
+
+    await heading('Resumen')
+    const [input] = agent.mock.calls[0]!
+    expect(input.assistant_name).toBe('Asistente de Tienda Aurora')
+    expect(input.instructions).toContain('Formas parte del equipo de atención de Tienda Aurora.')
+    expect(input.instructions).toContain('ofrece que una persona del equipo le contacte')
   })
 
   it('un tenant sin facturación retoma en Empresa con solo los datos de facturación', async () => {

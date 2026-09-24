@@ -734,7 +734,9 @@ export const ca: Messages<typeof es> = {
       },
       instructions: 'Sobre el negoci',
       instructionsPlaceholder: "Què feu, horaris, zona de servei, com contactar amb una persona, què no ha de fer l'assistent…",
-      instructionsHint: 'Com més concret, millor respon.',
+      instructionsHint: "És un text de partida: completa'l o canvia'l amb el que feu, horaris, zona de servei… Com més concret, millor respon.",
+      defaultInstructions:
+        "Formes part de l'equip d'atenció de {{company}}. Treballes com un empleat més de suport, tant per als clients com per a qualsevol usuari que escrigui: resols dubtes i orientes en consultes i gestions sobre els productes i serveis de {{company}}, i ho fas sempre de manera cordial, pacient i resolutiva.\n\n- Saluda amb amabilitat i pregunta en què pots ajudar.\n- Respon només amb informació que coneguis de {{company}}; si no la tens, digues-ho i ofereix que una persona de l'equip el contacti.\n- Si la persona prefereix parlar amb algú de l'equip, demana-li el nom i com contactar-la.\n- Mantén un tracte respectuós i tranquil, encara que la persona estigui molesta.",
       creating: "Creant l'agent a Langflow…",
     },
     summary: {

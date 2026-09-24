@@ -17,6 +17,10 @@ const TONES: AgentTone[] = ['cercano', 'profesional', 'formal']
  * instructions are built from these answers, created in the project's
  * Langflow folder and registered as its default agent. If the project
  * already has an agent, the step just shows it.
+ *
+ * The name and "about the business" come prefilled from the company name
+ * (a starting text to adjust, so the step can be completed as is); they
+ * follow that name until the user edits them.
  */
 export function AgentStep({
   projectId,
@@ -32,9 +36,13 @@ export function AgentStep({
   const { t } = useTranslation()
   const agents = useAgents()
   const create = useCreateBaseAgent()
-  const [assistantName, setAssistantName] = useState<string>(t('onboarding.agent.defaultName', { company: companyName }))
+  // null = sin tocar: se muestra el texto por defecto, que sigue al nombre de
+  // la empresa aunque este llegue después de montar el paso.
+  const [editedName, setAssistantName] = useState<string | null>(null)
   const [tone, setTone] = useState<AgentTone>('cercano')
-  const [instructions, setInstructions] = useState('')
+  const [editedInstructions, setInstructions] = useState<string | null>(null)
+  const assistantName = editedName ?? t('onboarding.agent.defaultName', { company: companyName })
+  const instructions = editedInstructions ?? t('onboarding.agent.defaultInstructions', { company: companyName })
   const [error, setError] = useState<string | null>(null)
   if (agents.isPending) return <Spinner label={t('onboarding.loading')} className="py-16" />
   const existing = agents.data?.find((a) => a.project_id === projectId)
