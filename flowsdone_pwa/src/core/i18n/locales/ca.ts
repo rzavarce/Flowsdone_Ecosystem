@@ -721,7 +721,7 @@ export const ca: Messages<typeof es> = {
       defaultName: 'Atenció al client',
     },
     agent: {
-      description: "Un assistent amb memòria de la conversa. Perquè comenci a respondre, posa després la clau d'OpenAI del client a l'editor de fluxos.",
+      description: 'Un assistent amb memòria de la conversa.',
       existing: "El projecte ja té l'agent {{name}}.",
       assistantName: "Nom de l'assistent",
       assistantNameHint: 'Amb aquest nom es presentarà als clients.',
@@ -759,11 +759,6 @@ export const ca: Messages<typeof es> = {
         warning: 'El seu flux ja no és a la carpeta del projecte a Langflow.',
         missing: 'No té agent.',
         unknown: "No s'ha pogut comprovar: Langflow no respon.",
-      },
-      openai_key: {
-        label: "Clau d'OpenAI de l'agent",
-        missing: "L'agent no té clau d'OpenAI i no respondrà: obre'l a Agents → Editor de fluxos i posa la clau del client al component OpenAI.",
-        unknown: "No s'ha pogut comprovar: Langflow no respon o el flux de l'agent no hi és.",
       },
       channel: { label: 'Canals', warning: "Sense canals: connecta'l a mà a Canals." },
     },

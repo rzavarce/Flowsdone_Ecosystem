@@ -721,7 +721,7 @@ export const en: Messages<typeof es> = {
       defaultName: 'Customer service',
     },
     agent: {
-      description: "An assistant with conversation memory. For it to start answering, then set the client's OpenAI key in the flow editor.",
+      description: 'An assistant with conversation memory.',
       existing: 'The project already has the agent {{name}}.',
       assistantName: 'Assistant name',
       assistantNameHint: 'The name it introduces itself with to customers.',
@@ -759,11 +759,6 @@ export const en: Messages<typeof es> = {
         warning: "Its flow is no longer in the project's Langflow folder.",
         missing: 'No agent.',
         unknown: 'Could not check: Langflow is not responding.',
-      },
-      openai_key: {
-        label: "Agent's OpenAI key",
-        missing: "The agent has no OpenAI key and won't answer: open it in Agents → Flow editor and set the client's key in the OpenAI component.",
-        unknown: "Could not check: Langflow is not responding or the agent's flow is gone.",
       },
       channel: { label: 'Channels', warning: 'No channels: connect one by hand under Channels.' },
     },

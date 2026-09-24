@@ -137,7 +137,7 @@ export interface BaseAgentInput {
 }
 
 /** Onboarding checklist item keys. */
-export type OnboardingCheckKey = 'billing' | 'client_account' | 'plan' | 'project' | 'agent' | 'openai_key' | 'channel'
+export type OnboardingCheckKey = 'billing' | 'client_account' | 'plan' | 'project' | 'agent' | 'channel'
 
 /** One onboarding checklist item. `unknown`: Langflow could not be reached to check it. */
 export interface OnboardingCheck {

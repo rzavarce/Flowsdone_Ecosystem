@@ -245,32 +245,18 @@ async def test_create_base_flow_posts_to_the_folder_and_returns_the_id():
     assert seen["auth"] == "Bearer tok"
 
 
-async def test_llm_key_configured_reads_only_whether_api_key_fields_are_set():
+async def test_create_base_flow_rejected():
     import httpx
     import pytest
 
     from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
     from app.domain.ports.outbound import LangflowSessionError
 
-    def flow(*keys):
-        nodes = [{"data": {"node": {"template": {"api_key": {"value": k}}}}} for k in keys]
-        nodes.append({"data": {"node": {"template": {"input_value": {"value": "x"}}}}})
-        return {"id": "f", "data": {"nodes": nodes}}
-
-    def client(body, status=200):
-        return LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(
-            lambda r: httpx.Response(status, json=body)
-        )))
-
-    assert await client(flow("sk-abc")).llm_key_configured("tok", "f") is True
-    assert await client(flow("OPENAI_API_KEY")).llm_key_configured("tok", "f") is True  # a global variable
-    assert await client(flow("sk-abc", "  ")).llm_key_configured("tok", "f") is False
-    assert await client(flow("")).llm_key_configured("tok", "f") is False
-    assert await client(flow()).llm_key_configured("tok", "f") is None
+    client = LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(
+        lambda r: httpx.Response(500, json={})
+    )))
     with pytest.raises(LangflowSessionError):
-        await client({}, 404).llm_key_configured("tok", "f")
-    with pytest.raises(LangflowSessionError):
-        await client({}, 500).create_base_flow("tok", "F1", name="x", system_prompt="y")
+        await client.create_base_flow("tok", "F1", name="x", system_prompt="y")
 
 
 async def test_rename_flow_patches_the_name_and_reports_a_taken_one():
