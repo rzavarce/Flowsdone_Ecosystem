@@ -15,7 +15,7 @@ from app.application.use_cases.manage_agents import (
     ManageAgentsUseCase,
 )
 from app.domain.models.agent import Agent
-from app.domain.ports.outbound import LangflowFlowSummary
+from app.domain.ports.outbound import AlreadyExistsError, LangflowFlowSummary, LangflowSessionError
 from api_gateway.tests.application.use_cases.test_langflow_sso import FakeLangflow, World
 from api_gateway.tests.support.admin_world import InMemoryRepo
 from api_gateway.tests.support.fakes import make_channel_connection
@@ -30,10 +30,17 @@ class FlowsLangflow(FakeLangflow):
         super().__init__()
         self.flows_by_folder: dict = {}
         self.listed: list = []
+        self.renamed: list = []
+        self.rename_error: Exception | None = None
 
     async def list_flows(self, access_token, folder_id):
         self.listed.append((access_token, folder_id))
         return self.flows_by_folder.get(folder_id, [])
+
+    async def rename_flow(self, access_token, flow_id, name):
+        if self.rename_error:
+            raise self.rename_error
+        self.renamed.append((access_token, flow_id, name))
 
 
 def _setup():
@@ -135,6 +142,41 @@ async def test_update_verifies_only_a_changed_flow():
     assert renamed.name == "Nuevo nombre" and moved.langflow_flow_id == "f2"
     with pytest.raises(FlowNotInProjectError):
         await manage.update(moved, langflow_flow_id="ajeno")
+
+
+async def test_renaming_an_agent_renames_its_flow_in_langflow():
+    w, _, _, _, manage = _setup()
+    project, _ = await _project_with_flows(w, "f1")
+    agent = await manage.create(project_id=project.id, name="A", langflow_flow_id="f1")
+
+    await manage.update(agent, name="Recepción")
+    await manage.update(agent, is_default=True)  # no name change: Langflow untouched
+
+    assert w.langflow.renamed == [("access-tenant-acme", "f1", "Recepción")]
+
+
+async def test_machine_callers_do_not_rename_flows():
+    w, _, _, _, manage = _setup()
+    project, _ = await _project_with_flows(w)
+    agent = await manage.create(project_id=project.id, name="Legacy", langflow_flow_id="anywhere", verify_flow=False)
+
+    renamed = await manage.update(agent, verify_flow=False, name="Legacy 2")
+
+    assert renamed.name == "Legacy 2" and w.langflow.renamed == []
+
+
+@pytest.mark.parametrize("error", [AlreadyExistsError("taken"), LangflowSessionError("down")])
+async def test_a_rename_langflow_refuses_leaves_the_agent_as_it_was(error):
+    w, agents, _, _, manage = _setup()
+    project, _ = await _project_with_flows(w, "f1")
+    agent = await manage.create(project_id=project.id, name="A", langflow_flow_id="f1")
+    w.langflow.rename_error = error
+
+    with pytest.raises(type(error)):
+        await manage.update(agent, name="Otro", config={"x": 1})
+
+    kept = await agents.get_by_id(agent.id)
+    assert kept.name == "A" and kept.config == {}
 
 
 async def test_an_agent_with_channels_cannot_be_deleted():

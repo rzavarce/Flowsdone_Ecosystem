@@ -1,4 +1,5 @@
-import { Mail } from 'lucide-react'
+import { Mail, Pencil } from 'lucide-react'
+import { useState } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Avatar } from '@/components/ui/Avatar'
 import { Badge, type BadgeTone } from '@/components/ui/Badge'
@@ -9,6 +10,7 @@ import type { UserRecord } from '@/core/admin/types'
 import { useAdminApi } from '@/core/admin/useAdminApi'
 import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
+import { UserDialog } from '@/features/users/UserDialog'
 import { useClientAccount } from './useClientAccount'
 import { useTranslation } from 'react-i18next'
 
@@ -17,13 +19,15 @@ const STATUS_TONE: Record<UserRecord['status'], BadgeTone> = { active: 'success'
 /**
  * The tenant's client account (admin only): who it is, whether they have
  * activated their access yet and when they last signed in, with "resend
- * activation email" while it is pending. Client accounts are hidden from the
- * Users screen, so this is where they are looked after.
+ * activation email" while it is pending and a form to edit it (name, status,
+ * contact details, photo). Client accounts are hidden from the Users screen,
+ * so this is where they are looked after.
  */
 export function ClientAccountCard({ tenantId }: { tenantId: string }) {
   const { t } = useTranslation()
   const api = useAdminApi()
   const { users, account, resendActivation, resending, feedback, clearFeedback } = useClientAccount(tenantId)
+  const [editing, setEditing] = useState(false)
 
   return (
     <Card>
@@ -50,14 +54,21 @@ export function ClientAccountCard({ tenantId }: { tenantId: string }) {
                   : t('tenants.clientAccount.neverLogged')}
               </span>
             </span>
-            {account.status === 'pending' && (
-              <Button size="sm" variant="secondary" onClick={() => void resendActivation()} disabled={resending}>
-                <Mail className="size-4" aria-hidden="true" />
-                {resending ? t('users.resend.pending') : t('users.resend.action')}
+            <span className="flex flex-wrap gap-2">
+              {account.status === 'pending' && (
+                <Button size="sm" variant="secondary" onClick={() => void resendActivation()} disabled={resending}>
+                  <Mail className="size-4" aria-hidden="true" />
+                  {resending ? t('users.resend.pending') : t('users.resend.action')}
+                </Button>
+              )}
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+                <Pencil className="size-4" aria-hidden="true" />
+                {t('common.edit')}
               </Button>
-            )}
+            </span>
           </div>
         )}
+        {editing && account && <UserDialog user={account} onClose={() => setEditing(false)} />}
         {feedback && (
           <Alert tone={feedback.tone} onDismiss={clearFeedback}>
             {feedback.message}

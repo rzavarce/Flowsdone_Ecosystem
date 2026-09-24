@@ -639,6 +639,8 @@ En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langfl
 - **Variables del `.env` del VPS** (las lee el gateway): `LANGFLOW_PUBLIC_URL=https://agents.flowsdone.com` y `LANGFLOW_SSO_BASE_URL=https://agents.flowsdone.com`. Con `https` las cookies salen `Secure`. Si faltan, el gateway usa las de local (`localhost`) y el editor no cargará en producción.
 - **Local:** gateway (`localhost:8000`) y Langflow (`localhost:7860`) comparten cookies porque las cookies ignoran el puerto; los defaults ya sirven.
 - **Migración:** `0006_langflow_sso` (la aplica el deploy).
+- **Promos de Langflow ocultas.** La imagen (`dockers/Dockerfile.langflow`) añade al `index.html` de Langflow la hoja `dockers/langflow/flowsdone-langflow.css`, que oculta el panel «Get started» y los contadores de GitHub/Discord. No se modifica código de Langflow. Los selectores son de Langflow 1.4.0: al actualizar la imagen, revísalos (si la página cambia, el build falla). Como Langflow sirve su página sin `Cache-Control`, el gateway añade `?fd=<aleatorio>` a la redirección del SSO para que el iframe no muestre una copia en caché.
+- **Renombrar un agente** en la consola renombra también su flujo en Langflow. Los nombres de flujo son únicos por tenant: si ya hay otro flujo con ese nombre, la consola responde 409 y el agente no cambia.
 
 **Llevar los agentes que ya existen a su tenant.** Los flujos actuales son del usuario `langflow`; el usuario del tenant no los ve hasta que se le asignan. Langflow no tiene API para cambiar el propietario, así que:
 

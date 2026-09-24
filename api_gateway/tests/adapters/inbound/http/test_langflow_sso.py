@@ -3,6 +3,7 @@ public endpoint sets on the browser."""
 
 from __future__ import annotations
 
+import re
 from uuid import uuid4
 
 import pytest
@@ -136,9 +137,12 @@ async def test_redeeming_redirects_into_langflow_with_its_session_cookies(monkey
     response = await _get(redeem)
 
     assert response.status_code == 303
-    assert response.headers["location"] == "https://agents.example.com/all/folder/f1"
+    location = response.headers["location"]
+    assert re.fullmatch(r"https://agents\.example\.com/all/folder/f1\?fd=[0-9a-f]{8}", location)
     assert response.headers["cache-control"] == "no-store"
     assert redeem.tickets == ["abc"]
+    # A different URL on every landing, so no browser serves Langflow's page from cache.
+    assert (await _get(FakeRedeem(_landing()))).headers["location"] != location
     cookies = {c.split("=")[0]: c for c in response.headers.get_list("set-cookie")}
     access, refresh = cookies["access_token_lf"], cookies["refresh_token_lf"]
     assert "acc" in access and "HttpOnly" not in access  # Langflow's frontend reads it from JS

@@ -10,6 +10,8 @@ async function setup(tenant = 't1') {
   const admin = createMockAdminApi({ latencyMs: 0, seed: SEED })
   renderApp('/agents', fakeAuthApi(makeUser('admin')), admin)
   await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Tenant activo' }, { timeout: 5000 }), tenant)
+  // La página abre en el editor de flujos; el registro de agentes está en la otra pestaña.
+  await userEvent.click(await screen.findByRole('tab', { name: 'Agentes' }))
   return admin
 }
 

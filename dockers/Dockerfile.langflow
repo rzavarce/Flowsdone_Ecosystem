@@ -5,3 +5,9 @@ USER root
 RUN /app/.venv/bin/uv pip install --python /app/.venv/bin/python3 \
     --reinstall-package weaviate-client \
     python-toon "langfuse<3" "weaviate-client<4"
+
+# Hide Langflow's community promos ("Get started" checklist, GitHub/Discord
+# counters) in the editor embedded in the console: only a <style> block is
+# added to its index.html, no Langflow code is changed.
+COPY dockers/langflow/inject_css.py dockers/langflow/flowsdone-langflow.css /opt/flowsdone/
+RUN /app/.venv/bin/python3 /opt/flowsdone/inject_css.py /opt/flowsdone/flowsdone-langflow.css

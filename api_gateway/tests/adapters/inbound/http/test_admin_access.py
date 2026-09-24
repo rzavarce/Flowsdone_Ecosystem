@@ -286,6 +286,7 @@ async def test_botmaster_edits_agents_of_their_tenant_only(world):
         foreign = await _call(c, "PATCH", f"/agents/{world.agent_b.id}", token=token, json={"name": "hacked"})
         wf_write = await _call(c, "PATCH", f"/workflows/{world.workflow_a.id}", token=token, json={"name": "x"})
     assert ok.status_code == 200 and ok.json()["name"] == "renamed"
+    assert world.renamed_flows == [(world.agent_a.project_id, world.agent_a.langflow_flow_id, "renamed")]
     assert foreign.status_code == 404
     assert wf_write.status_code == 403  # workflows: solo lectura para botmaster
 

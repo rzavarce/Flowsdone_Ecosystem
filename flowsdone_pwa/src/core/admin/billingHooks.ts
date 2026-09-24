@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ConversationFilters, CostRateInput, PlanInput, Subscription, SubscriptionInput } from './types'
+import { invalidateOnboarding } from './hooks'
 import { useAdminApi } from './useAdminApi'
 
 /** Cache keys of the conversations and billing screens. */
@@ -139,6 +140,7 @@ export function useSaveSubscription() {
       Promise.all(
         [billingKeys.subscription, billingKeys.statement].map((key) => qc.invalidateQueries({ queryKey: [...key, tenantId] })).concat(
           qc.invalidateQueries({ queryKey: billingKeys.plans }),
+          invalidateOnboarding(qc),
         ),
       ),
   })

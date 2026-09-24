@@ -1,0 +1,17 @@
+/*
+ * Flowsdone: hides Langflow's community promos from the editor embedded in
+ * the console. Injected into Langflow's index.html at build time (see
+ * dockers/Dockerfile.langflow). Selectors target Langflow 1.4.0's markup:
+ * review them when upgrading the image.
+ */
+
+/* Sidebar "Get started" checklist (star the repo, join Discord...) and the rule under it. */
+div:has(> div > [data-testid="get_started_progress_title"]),
+div:has(> div > [data-testid="get_started_progress_title"]) + div:has(> hr) {
+  display: none !important;
+}
+
+/* Header GitHub stars / Discord members counters. */
+[data-testid="header_right_section_wrapper"] > .whitespace-nowrap.lg\:inline {
+  display: none !important;
+}

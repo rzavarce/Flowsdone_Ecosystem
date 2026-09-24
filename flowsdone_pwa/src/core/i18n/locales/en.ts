@@ -438,13 +438,13 @@ export const en: Messages<typeof es> = {
     fullscreen: 'View full screen',
     exitFullscreen: 'Exit full screen',
     editorTitle: 'Agent editor (Langflow)',
-    tabs: { list: 'Agents', editor: 'Langflow editor' },
+    tabs: { list: 'Agents', editor: 'Flow editor' },
     list: {
       description: "An agent ties a Langflow flow to a project: the project's channels answer with it.",
       loading: 'Loading agents',
       loadError: 'Could not load the agents: {{error}}',
       register: 'Register agent',
-      howTo: 'To add an agent: import or build its flow in the "Langflow editor" tab, inside the project\'s folder, then register it here.',
+      howTo: 'To add an agent: import or build its flow in the "Flow editor" tab, inside the project\'s folder, then register it here.',
       noProjects: 'This tenant has no projects yet. Create one under Tenants before registering agents.',
       empty: 'No agents in this project.',
       default: 'Default',
@@ -461,7 +461,7 @@ export const en: Messages<typeof es> = {
       flowHint: "Flows in the project's Langflow folder.",
       choose: 'Pick a flow',
       loadingFlows: 'Loading Langflow flows',
-      noFlows: 'No flows in this project\'s folder. Import one first in the "Langflow editor" tab.',
+      noFlows: 'No flows in this project\'s folder. Import one first in the "Flow editor" tab.',
       registered: '{{name}} (already registered)',
       name: 'Agent name',
       makeDefault: "Project's default agent",
@@ -576,6 +576,7 @@ export const en: Messages<typeof es> = {
       none: 'This tenant has no client account.',
       lastLogin: 'Last login: {{date}}',
       neverLogged: 'Has not signed in to the console yet.',
+      editTitle: 'Edit the client account',
     },
     searchPlaceholder: 'Name or identifier',
     noMatches: 'No tenant matches the search.',
@@ -720,7 +721,7 @@ export const en: Messages<typeof es> = {
       defaultName: 'Customer service',
     },
     agent: {
-      description: "An assistant with conversation memory. For it to start answering, then set the client's OpenAI key in the Langflow editor.",
+      description: "An assistant with conversation memory. For it to start answering, then set the client's OpenAI key in the flow editor.",
       existing: 'The project already has the agent {{name}}.',
       assistantName: 'Assistant name',
       assistantNameHint: 'The name it introduces itself with to customers.',
@@ -740,7 +741,7 @@ export const en: Messages<typeof es> = {
       description: 'This is what the client has. Anything pending is completed by hand from each section.',
       done: 'Onboarding is complete.',
     },
-    card: { title: 'Onboarding status', description: 'What the client needs to work.' },
+    card: { title: 'Go-live readiness', description: 'What the client already has in place and what is still missing to start operating.' },
     status: { ok: 'Done', warning: 'Review', missing: 'Missing', unknown: 'Not checked' },
     checks: {
       billing: { label: 'Billing data', missing: 'The billing email is missing.' },
@@ -759,7 +760,7 @@ export const en: Messages<typeof es> = {
       },
       openai_key: {
         label: "Agent's OpenAI key",
-        missing: "The agent has no OpenAI key and won't answer: open it in Agents → Langflow editor and set the client's key in the OpenAI component.",
+        missing: "The agent has no OpenAI key and won't answer: open it in Agents → Flow editor and set the client's key in the OpenAI component.",
         unknown: "Could not check: Langflow is not responding or the agent's flow is gone.",
       },
       channel: { label: 'Channels', warning: 'No channels: connect one by hand under Channels.' },
@@ -913,7 +914,7 @@ export const en: Messages<typeof es> = {
       },
       agents: {
         q: 'Where are agents edited?',
-        a: 'In Agents, first pick the tenant in the top bar. In the "Langflow editor" tab you import or build the flow inside the project\'s folder; in the "Agents" tab you register it as an agent so channels can be connected to it.',
+        a: 'In Agents, first pick the tenant in the top bar. In the "Flow editor" tab you import or build the flow inside the project\'s folder; in the "Agents" tab you register it as an agent so channels can be connected to it.',
       },
       access: {
         q: "I can't see a section I need",

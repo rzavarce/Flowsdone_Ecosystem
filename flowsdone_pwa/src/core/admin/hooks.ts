@@ -48,11 +48,26 @@ export function useProjects(tenantId?: string, enabled = true) {
 }
 
 /**
- * Invalidates whatever a cascade delete may have left stale (projects, agents and channels).
+ * Invalidates the onboarding checklists: they're computed from billing,
+ * the client account, the plan, projects, agents and channels, so any change
+ * to those must refresh them.
+ * @param qc - The cache client.
+ */
+export function invalidateOnboarding(qc: ReturnType<typeof useQueryClient>) {
+  return qc.invalidateQueries({ queryKey: adminKeys.onboarding })
+}
+
+/**
+ * Invalidates whatever a cascade delete may have left stale (projects, agents,
+ * channels and the onboarding checklists that count them).
  * @param qc - The cache client.
  */
 function invalidateTree(qc: ReturnType<typeof useQueryClient>) {
-  return Promise.all([adminKeys.projects, adminKeys.agents, adminKeys.connections].map((queryKey) => qc.invalidateQueries({ queryKey })))
+  return Promise.all(
+    [adminKeys.projects, adminKeys.agents, adminKeys.connections, adminKeys.onboarding].map((queryKey) =>
+      qc.invalidateQueries({ queryKey }),
+    ),
+  )
 }
 
 /** Creates a tenant, then refreshes the list and the session's tenant selector. */
@@ -112,7 +127,7 @@ export function useUpdateTenantBilling() {
     mutationFn: ({ tenantId, patch }: { tenantId: string; patch: UpdateTenantBillingInput }) =>
       api.updateTenantBilling(tenantId, patch),
     onSuccess: (_data, { tenantId }) =>
-      qc.invalidateQueries({ queryKey: [...adminKeys.tenantBilling, tenantId] }),
+      Promise.all([qc.invalidateQueries({ queryKey: [...adminKeys.tenantBilling, tenantId] }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -128,7 +143,7 @@ export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateUserInput) => api.createUser(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.users }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -138,7 +153,7 @@ export function useUpdateUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateUserInput }) => api.updateUser(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.users }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -148,7 +163,7 @@ export function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.deleteUser(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.users }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -159,7 +174,7 @@ export function useUserAvatar() {
   return useMutation({
     mutationFn: ({ id, image }: { id: string; image: Blob | null }) =>
       image ? api.uploadUserAvatar(id, image) : api.removeUserAvatar(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.users }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.users }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -175,7 +190,7 @@ export function useUpdateProject() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateProjectInput }) => api.updateProject(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.projects }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.projects }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -207,7 +222,7 @@ export function useProjectFlows(projectId?: string) {
 
 /** Refreshes agents and the flows' "already registered" marks after a change. */
 function invalidateAgents(qc: ReturnType<typeof useQueryClient>) {
-  return Promise.all([adminKeys.agents, adminKeys.langflowFlows].map((queryKey) => qc.invalidateQueries({ queryKey })))
+  return Promise.all([adminKeys.agents, adminKeys.langflowFlows, adminKeys.onboarding].map((queryKey) => qc.invalidateQueries({ queryKey })))
 }
 
 /** Registers a flow of a project's Langflow folder as an agent. */
@@ -240,7 +255,7 @@ export function useCreateBaseAgent() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: BaseAgentInput) => api.createBaseAgent(input),
-    onSuccess: () => Promise.all([invalidateAgents(qc), qc.invalidateQueries({ queryKey: adminKeys.onboarding })]),
+    onSuccess: () => invalidateAgents(qc),
   })
 }
 
@@ -266,7 +281,7 @@ export function useCreateProject() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateProjectInput) => api.createProject(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.projects }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.projects }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -276,7 +291,7 @@ export function useCreateConnection() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateChannelConnectionInput) => api.createChannelConnection(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.connections }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.connections }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -287,7 +302,7 @@ export function useUpdateConnection() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateChannelConnectionInput }) =>
       api.updateChannelConnection(id, patch),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.connections }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.connections }), invalidateOnboarding(qc)]),
   })
 }
 
@@ -297,7 +312,7 @@ export function useDeleteConnection() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.deleteChannelConnection(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.connections }),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: adminKeys.connections }), invalidateOnboarding(qc)]),
   })
 }
 
