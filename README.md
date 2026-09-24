@@ -664,6 +664,7 @@ Página estática en `api_gateway/app/static/flowsdone/` (`index.html`, `styles.
 - **Contenido:** servicios, canales, forma de trabajo, sectores, planes (Starter/Pro/Business con los precios del catálogo), preguntas frecuentes y contacto. Si cambian los planes en *Planes*, hay que actualizar también esta página.
 - **Formulario de contacto:** envía a `POST /public/contact` (router `flowsdone-contact`, sin reescritura). El gateway manda el mensaje por Resend a `CONTACT_EMAIL_TO`, con *reply-to* al email del interesado para contestarle directamente desde el correo. Tiene un límite de `CONTACT_MAX_PER_IP` envíos por IP cada `CONTACT_WINDOW_SECONDS` y un campo trampa oculto contra bots. Sin `CONTACT_EMAIL_TO` responde 503.
 - **Local:** `http://localhost:8000/static/flowsdone/index.html`.
+- **DNS:** `flowsdone.com` (registro A `@`) y `www.flowsdone.com` (A o CNAME a `flowsdone.com`) deben apuntar a la IP del VPS. Traefik pide un único certificado para los dos, así que si falta uno no se emite ninguno. `www` redirige con 301 a `flowsdone.com` (middleware `flowsdone-www-redirect`).
 
 ### Consola web (PWA) — `app.flowsdone.com`
 

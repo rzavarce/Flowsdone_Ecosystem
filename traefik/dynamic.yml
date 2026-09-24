@@ -15,6 +15,14 @@ http:
         regex: "^/(.*)"
         replacement: "/static/flowsdone/$1"
 
+    # Una sola dirección para la landing: www.flowsdone.com -> flowsdone.com
+    # (301, conserva la ruta). Es la URL canónica que declara la página.
+    flowsdone-www-redirect:
+      redirectRegex:
+        regex: "^https?://www\\.flowsdone\\.com/(.*)"
+        replacement: "https://flowsdone.com/${1}"
+        permanent: true
+
     # Consola web (PWA). HSTS se pone acá porque es Traefik quien termina TLS
     # (el nginx del contenedor solo ve http). SIN includeSubdomains a propósito:
     # los demás subdominios (webchat, langfuse…) tienen su propio ciclo de vida
@@ -126,6 +134,7 @@ http:
         certresolver: myresolver
       service: webchat-svc
       middlewares:
+        - flowsdone-www-redirect
         - flowsdone-static
 
     # Consola web (PWA React servida por nginx dentro del contenedor `pwa`).
