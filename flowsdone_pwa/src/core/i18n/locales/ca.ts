@@ -601,7 +601,7 @@ export const ca: Messages<typeof es> = {
       channels_other: '{{count}} canals',
     },
     delete: {
-      description: "S'elimina el tenant i TOT el que conté.",
+      description: "S'elimina el tenant i TOT el que conté: també el compte del client i tots els seus fluxos de l'editor de fluxos.",
       confirm: 'Eliminar el tenant',
       cascade:
         "S'esborraran en cascada <strong>{{summary}}</strong>. Els canals deixaran de respondre immediatament. Si només el vols pausar, fes servir <strong>Suspendre</strong>.",

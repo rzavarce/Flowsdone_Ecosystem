@@ -602,7 +602,7 @@ export const es = {
       channels_other: '{{count}} canales',
     },
     delete: {
-      description: 'Se elimina el tenant y TODO lo que contiene.',
+      description: 'Se elimina el tenant y TODO lo que contiene: también la cuenta del cliente y todos sus flujos del editor de flujos.',
       confirm: 'Eliminar tenant',
       cascade:
         'Se borrarán en cascada <strong>{{summary}}</strong>. Los canales dejarán de responder de inmediato. Si solo quieres pausarlo, usa <strong>Suspender</strong>.',

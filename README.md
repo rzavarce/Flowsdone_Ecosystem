@@ -654,6 +654,7 @@ En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langfl
 - El ticket viaja en la URL: queda en los logs de acceso de Traefik, pero solo vale una vez y 30 s.
 - Al cerrar sesión en la consola, las cookies de Langflow siguen vivas en el navegador hasta que caducan (1 h la de acceso).
 - Si renombras un proyecto, su carpeta en Langflow conserva el nombre antiguo.
+- **Borrar un tenant** borra primero su usuario de Langflow (con todas sus carpetas y flujos) y después sus cuentas `client` (las que no pertenecen a otro tenant), para que su email y su slug se puedan volver a usar. Si Langflow falla, no se borra nada (502).
 - **Borrar un proyecto** borra primero su carpeta en Langflow, con todos sus flujos. Si Langflow falla, el proyecto no se borra (la consola responde 502). Si la carpeta ya no existía, se sigue sin error.
 
 ### Consola web (PWA) — `app.flowsdone.com`
