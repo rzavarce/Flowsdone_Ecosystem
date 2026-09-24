@@ -35,8 +35,12 @@ WizardStep = Literal["company", "plan", "project", "agent", "summary"]
 
 class CreateBaseAgentUseCase:
     """Creates a project's base agent: a chat flow with conversation
-    memory and a system prompt built from the wizard's answers, in the
-    project's Langflow folder, registered as the project's default agent.
+    memory and a system prompt built from the wizard's answers, registered
+    as the project's default agent.
+
+    The flow goes to the tenant's default Langflow folder (the editor's
+    "Starter Project"), not to the project's folder: it is what the client
+    sees first when opening the editor.
     """
 
     def __init__(
@@ -90,14 +94,15 @@ class CreateBaseAgentUseCase:
             assistant_name=assistant_name, company_name=tenant.name, tone=tone, instructions=instructions
         )
         workspace = await self._workspace.open_workspace(tenant.id)
+        folder_id = await self._langflow.default_folder(workspace.tokens.access_token)
         flow_id = await self._langflow.create_base_flow(
             workspace.tokens.access_token,
-            workspace.folders[project_id],
+            folder_id,
             name=spec.assistant_name,
             system_prompt=build_system_prompt(spec),
         )
         logger.info("onboarding.base_agent.flow_created", extra={"project_id": str(project_id), "flow_id": flow_id})
-        # Just created in the project's folder: no need to list it back.
+        # Just created, and outside the project's folder on purpose: not verified.
         return await self._agents.create(
             project_id=project_id, name=spec.assistant_name, langflow_flow_id=flow_id, is_default=True, verify_flow=False
         )
@@ -233,8 +238,9 @@ class GetOnboardingStatusUseCase:
 
     async def _langflow_checks(self, tenant_id: UUID, agent: Optional[Agent]) -> List[OnboardingCheck]:
         """The checks that need the tenant's Langflow: the default agent's
-        flow still exists, and its LLM has an API key (the base agent is
-        created without one; it is set by hand per client).
+        flow still exists (in its project's folder or in the default folder,
+        where the base agent is created), and its LLM has an API key (the
+        base agent is created without one; it is set by hand per client).
 
         Args:
             tenant_id (UUID): The tenant.
@@ -247,11 +253,12 @@ class GetOnboardingStatusUseCase:
             return [OnboardingCheck("agent", "missing"), OnboardingCheck("openai_key", "missing")]
         try:
             workspace = await self._workspace.open_workspace(tenant_id)
-            folder = workspace.folders.get(agent.project_id)
-            flows = await self._langflow.list_flows(workspace.tokens.access_token, folder) if folder else []
+            token = workspace.tokens.access_token
+            folders = [workspace.folders.get(agent.project_id), await self._langflow.default_folder(token)]
+            flows = [f for folder in folders if folder for f in await self._langflow.list_flows(token, folder)]
             if not any(f.id == agent.langflow_flow_id for f in flows):
                 return [OnboardingCheck("agent", "warning", agent.name), OnboardingCheck("openai_key", "unknown")]
-            configured = await self._langflow.llm_key_configured(workspace.tokens.access_token, agent.langflow_flow_id)
+            configured = await self._langflow.llm_key_configured(token, agent.langflow_flow_id)
             key_status: CheckStatus = "missing" if configured is False else "ok"
             return [OnboardingCheck("agent", "ok", agent.name), OnboardingCheck("openai_key", key_status)]
         except (LangflowSessionError, LangflowTargetNotFoundError):

@@ -636,7 +636,7 @@ export const ca: Messages<typeof es> = {
         description: "Crea'n el primer per poder connectar canals i agents.",
       },
       delete: {
-        description: "S'elimina el projecte i el que conté.",
+        description: "S'elimina el projecte i el que conté, també la seva carpeta i els seus fluxos a l'editor de fluxos.",
         confirm: 'Eliminar el projecte',
         cascade: "S'esborraran en cascada <strong>{{summary}}</strong>. Els canals deixaran de respondre.",
       },

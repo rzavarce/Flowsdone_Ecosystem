@@ -235,6 +235,22 @@ async def test_projects_are_isolated_by_tenant(world):
     assert delete_other.status_code == create_in_other.status_code == 404
     # y nada cambió en el tenant ajeno
     assert world.projects.items[world.project_b.id].name == "PB"
+    assert world.deleted_langflow_folders == []
+
+
+async def test_deleting_a_project_goes_through_langflow_and_keeps_it_if_langflow_fails(world):
+    from app.domain.ports.outbound import LangflowSessionError
+
+    token = await world.token("tenant_manager")
+    async with world.client() as c:
+        world.langflow_delete_error = LangflowSessionError("down")
+        failed = await _call(c, "DELETE", f"/projects/{world.project_a.id}", token=token)
+        world.langflow_delete_error = None
+        deleted = await _call(c, "DELETE", f"/projects/{world.project_a.id}", token=token)
+        again = await _call(c, "DELETE", f"/projects/{world.project_a.id}", token=token)
+    assert failed.status_code == 502
+    assert deleted.status_code == 204 and world.deleted_langflow_folders == [world.project_a.id]
+    assert again.status_code == 404
 
 
 @pytest.mark.parametrize("resource,repo,mine,theirs,patch", [

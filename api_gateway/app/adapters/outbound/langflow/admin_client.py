@@ -26,6 +26,10 @@ from app.domain.ports.outbound import (
 # Langflow 1.4's "Memory Chatbot" starter project (without its notes): chat
 # input -> memory -> prompt -> OpenAI -> chat output. Kept in the repo so what
 # gets created does not depend on which starter projects a Langflow ships.
+# Langflow's per-user default folder (DEFAULT_FOLDER_NAME in Langflow 1.4);
+# its editor labels it "Starter Project".
+DEFAULT_FOLDER_NAME = "My Projects"
+
 _BASE_AGENT_TEMPLATE = Path(__file__).parent / "templates" / "base_agent.json"
 # Conversation turns fed back to the model: enough context for a chat,
 # bounded so a long conversation does not grow the LLM cost per message.
@@ -256,6 +260,44 @@ class LangflowAdminClient(LangflowAdminPort):
         if response.status_code != 201:
             raise LangflowSessionError(f"langflow rejected create project (HTTP {response.status_code})")
         return str(self._json(response, "create project")["id"])
+
+    async def default_folder(self, access_token: str) -> str:
+        """Id of the logged-in user's default folder.
+
+        Langflow creates it for every user on login, named "My Projects"
+        (its editor shows it as "Starter Project"). If it is missing anyway
+        (deleted by hand), it is created again.
+
+        Args:
+            access_token (str): The user's access token.
+
+        Returns:
+            str: The folder id.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        folders = await self.list_projects(access_token)
+        found = next((folder_id for folder_id, name in folders.items() if name == DEFAULT_FOLDER_NAME), None)
+        return found or await self.create_project(access_token, DEFAULT_FOLDER_NAME)
+
+    async def delete_project(self, access_token: str, folder_id: str) -> None:
+        """Delete one of the logged-in user's projects (folders); Langflow
+        deletes the flows inside it too.
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): The folder. One that no longer exists (e.g.
+                deleted by hand in the editor) is not an error.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "DELETE", f"/api/v1/projects/{folder_id}", headers={"Authorization": f"Bearer {access_token}"}
+        )
+        if response.status_code not in (204, 404):
+            raise LangflowSessionError(f"langflow rejected delete project (HTTP {response.status_code})")
 
     async def list_flows(self, access_token: str, folder_id: str) -> List[LangflowFlowSummary]:
         """Flows (not components) in one of the logged-in user's folders.

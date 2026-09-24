@@ -82,6 +82,10 @@ class FakeLangflow:
         self.folders[folder_id] = name
         return folder_id
 
+    async def delete_project(self, access_token, folder_id):
+        self.calls.append("delete_project")
+        self.folders.pop(folder_id, None)
+
 
 class FakeTickets:
     def __init__(self) -> None:

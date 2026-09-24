@@ -69,14 +69,14 @@ def _check(status, key):
     return next(c for c in status.checks if c.key == key)
 
 
-async def test_base_agent_is_created_in_the_project_folder_as_default_with_the_company_prompt():
+async def test_base_agent_is_created_in_the_default_folder_as_default_with_the_company_prompt():
     x = _world()
     project = await x["w"].add_project("Atención")
 
     agent = await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="profesional", instructions="Fibra óptica.")
 
     [created] = x["w"].langflow.created
-    assert created["folder"] == x["w"].accounts.folders[project.id]
+    assert created["folder"] == "default-folder"  # the editor's "Starter Project"
     assert created["prompt"].startswith("Eres Fibi, el asistente virtual de Acme.")
     assert "Fibra óptica." in created["prompt"]
     assert agent.langflow_flow_id == created["id"] and agent.is_default and agent.name == "Fibi"

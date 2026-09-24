@@ -277,8 +277,22 @@ class World:
                 return OnboardingStatus(tenant_id=tenant_id, next_step="plan", project_id=None,
                                         checks=[OnboardingCheck("billing", "ok", "Acme")])
 
+        class _DeleteProject:
+            """Deletes the project, like DeleteProjectUseCase after its Langflow folder."""
+
+            async def execute(self, project_id):
+                if world.langflow_delete_error:
+                    raise world.langflow_delete_error
+                deleted = await world.projects.delete(project_id)
+                if deleted:
+                    world.deleted_langflow_folders.append(project_id)
+                return deleted
+
+        self.deleted_langflow_folders: List[Any] = []
+        self.langflow_delete_error: Optional[Exception] = None
         self.base_agent = _BaseAgent()
         return dict(
+            delete_project_use_case=_DeleteProject(),
             create_base_agent_use_case=self.base_agent,
             get_onboarding_status_use_case=_Onboarding(),
             list_project_flows_use_case=flows,
