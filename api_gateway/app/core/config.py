@@ -144,6 +144,14 @@ class Settings(BaseModel):
     ACCOUNT_ACTIVATION_TTL_SECONDS: int = 86400  # 24h
     PASSWORD_RESET_TTL_SECONDS: int = 3600  # 1h - more sensitive than activation, shorter-lived
 
+    # Public contact form of the landing page (flowsdone.com -> POST
+    # /public/contact). Requests are emailed to CONTACT_EMAIL_TO; without it
+    # the endpoint answers 503. At most CONTACT_MAX_PER_IP requests per IP
+    # every CONTACT_WINDOW_SECONDS.
+    CONTACT_EMAIL_TO: Optional[str] = None
+    CONTACT_MAX_PER_IP: int = 5
+    CONTACT_WINDOW_SECONDS: int = 3600
+
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
     # per-bot Telegram secret_token no longer live here - they are
@@ -302,6 +310,10 @@ settings = Settings(
     EMAIL_FROM_NAME=os.getenv("EMAIL_FROM_NAME", "Flowsdone"),
     ACCOUNT_ACTIVATION_TTL_SECONDS=int(os.getenv("ACCOUNT_ACTIVATION_TTL_SECONDS", "86400")),
     PASSWORD_RESET_TTL_SECONDS=int(os.getenv("PASSWORD_RESET_TTL_SECONDS", "3600")),
+
+    CONTACT_EMAIL_TO=os.getenv("CONTACT_EMAIL_TO") or None,
+    CONTACT_MAX_PER_IP=int(os.getenv("CONTACT_MAX_PER_IP", "5")),
+    CONTACT_WINDOW_SECONDS=int(os.getenv("CONTACT_WINDOW_SECONDS", "3600")),
 
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 

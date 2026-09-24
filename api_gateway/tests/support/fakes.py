@@ -1184,8 +1184,13 @@ class FakeEmailSender:
     def __init__(self) -> None:
         self.sent: List[Dict[str, Any]] = []
 
-    async def send_template(self, *, to: str, template: str, context: Dict[str, Any], subject: str) -> None:
-        self.sent.append({"to": to, "template": template, "context": context, "subject": subject})
+    async def send_template(
+        self, *, to: str, template: str, context: Dict[str, Any], subject: str, reply_to: Optional[str] = None
+    ) -> None:
+        sent = {"to": to, "template": template, "context": context, "subject": subject}
+        if reply_to is not None:
+            sent["reply_to"] = reply_to
+        self.sent.append(sent)
 
 
 class FakeTenantBillingProfileRepo:

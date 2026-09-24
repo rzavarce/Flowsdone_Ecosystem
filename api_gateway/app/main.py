@@ -17,6 +17,7 @@ from app.adapters.inbound.http.auth import router as auth_router
 from app.adapters.inbound.http.me import router as me_router
 from app.adapters.inbound.http.errors import register_error_handlers
 from app.adapters.inbound.http.channels import router as channels_router
+from app.adapters.inbound.http.contact import router as contact_router
 from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
@@ -106,6 +107,7 @@ from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUser
 from app.application.use_cases.provision_user import ProvisionUserUseCase
 from app.application.use_cases.request_password_reset import RequestPasswordResetUseCase
 from app.application.use_cases.reset_password import ResetPasswordUseCase
+from app.application.use_cases.send_contact_request import SendContactRequestUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
 from app.core.config import settings
@@ -388,6 +390,14 @@ async def lifespan(app: FastAPI):
     # never be redeemed as one another (different key prefixes).
     email_sender = ResendEmailAdapter()
     app.state.email_sender = email_sender
+    app.state.send_contact_request_use_case = SendContactRequestUseCase(
+        email_sender=email_sender,
+        # Own instance of the Redis counters; keys are prefixed "contact:".
+        throttle=RedisLoginThrottle(redis_client),
+        recipient=settings.CONTACT_EMAIL_TO,
+        max_per_ip=settings.CONTACT_MAX_PER_IP,
+        window_seconds=settings.CONTACT_WINDOW_SECONDS,
+    )
     activation_tokens = RedisAccountTokenStore(redis_client, prefix="auth:activate:")
     reset_tokens = RedisAccountTokenStore(redis_client, prefix="auth:reset:")
     app.state.provision_user_use_case = ProvisionUserUseCase(
@@ -742,3 +752,4 @@ app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(langflow_sso_router)
+app.include_router(contact_router)
