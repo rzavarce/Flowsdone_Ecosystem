@@ -304,3 +304,50 @@ async def test_rename_flow_patches_the_name_and_reports_a_taken_one():
         await client(404, {"detail": "Flow not found"}).rename_flow("tok", "f1", "x")
     with pytest.raises(LangflowSessionError):
         await client(500, {"detail": "boom"}).rename_flow("tok", "f1", "x")
+
+
+async def test_delete_project_deletes_the_folder_and_tolerates_a_missing_one():
+    import httpx
+    import pytest
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+    from app.domain.ports.outbound import LangflowSessionError
+
+    seen = []
+
+    def client(status):
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append((request.method, request.url.path, request.headers.get("authorization")))
+            return httpx.Response(status)
+
+        return LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(handler)))
+
+    await client(204).delete_project("tok", "F1")
+    await client(404).delete_project("tok", "F1")  # already gone (deleted in the editor)
+    assert seen[0] == ("DELETE", "/api/v1/projects/F1", "Bearer tok")
+    with pytest.raises(LangflowSessionError):
+        await client(500).delete_project("tok", "F1")
+
+
+async def test_default_folder_is_my_projects_and_is_recreated_if_missing():
+    import httpx
+
+    from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
+
+    def client(folders):
+        posted = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "GET":
+                return httpx.Response(200, json=folders)
+            posted.append(request.content)
+            return httpx.Response(201, json={"id": "new"})
+
+        return LangflowAdminClient(httpx.AsyncClient(base_url="http://lf", transport=httpx.MockTransport(handler))), posted
+
+    found, posted = client([{"id": "p1", "name": "Soporte"}, {"id": "d1", "name": "My Projects"}])
+    assert await found.default_folder("tok") == "d1" and posted == []
+
+    missing, posted = client([{"id": "p1", "name": "Soporte"}])
+    assert await missing.default_folder("tok") == "new"
+    assert b'"My Projects"' in posted[0]

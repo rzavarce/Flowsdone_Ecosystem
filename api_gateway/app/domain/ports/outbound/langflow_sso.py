@@ -167,6 +167,31 @@ class LangflowAdminPort(Protocol):
         """
         ...
 
+    async def default_folder(self, access_token: str) -> str:
+        """Id of the logged-in user's default folder (the editor's "Starter Project").
+
+        Args:
+            access_token (str): The user's access token.
+
+        Returns:
+            str: The folder id (created if missing).
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
+    async def delete_project(self, access_token: str, folder_id: str) -> None:
+        """Delete one of the logged-in user's projects (folders) with all its flows.
+
+        Args:
+            access_token (str): The user's access token.
+            folder_id (str): The folder. One that no longer exists is not an error.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
 
     async def list_flows(self, access_token: str, folder_id: str) -> List[LangflowFlowSummary]:
         """Flows (not components) in one of the logged-in user's folders.

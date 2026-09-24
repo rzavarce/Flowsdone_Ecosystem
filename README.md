@@ -386,7 +386,7 @@ Es un wizard de formularios, solo para el admin, con cinco pasos:
 | **Empresa** | El tenant, su cuenta `client` (recibe el email de activación) y sus datos de facturación. El `billing_email` es obligatorio, porque ahí llegan los avisos de cuota |
 | **Plan** | La suscripción: plan, modo de excedente y tope de gasto |
 | **Proyecto** | El proyecto y su carpeta en el Langflow del tenant |
-| **Agente** | Un **agente base** en la carpeta del proyecto, registrado como predeterminado (`POST /internal/admin/agents/base`). Ver detalle debajo |
+| **Agente** | Un **agente base** en la carpeta por defecto del tenant en Langflow (la que el editor muestra como «Starter Project»; en la base de datos, «My Projects»), registrado como agente predeterminado del proyecto (`POST /internal/admin/agents/base`). Aparece en el listado del proyecto, pero borrar el proyecto no borra ese flujo. Ver detalle debajo |
 | **Resumen** | La checklist del cliente |
 
 El **agente base** se crea a partir de la plantilla "Memory Chatbot" de Langflow 1.4, guardada en `adapters/outbound/langflow/templates/base_agent.json`:
@@ -410,7 +410,7 @@ Ese mismo endpoint alimenta la tarjeta **Estado del alta** de la ficha del tenan
 
 El flujo de trabajo normal no necesita curl:
 
-1. **Pestaña *Editor de Langflow*:** importa (o crea) el flujo **dentro de la carpeta del proyecto**. Cada tenant tiene su usuario de Langflow y una carpeta por proyecto.
+1. **Pestaña *Editor de flujos*:** importa (o crea) el flujo **dentro de la carpeta del proyecto**. Cada tenant tiene su usuario de Langflow y una carpeta por proyecto.
 2. **Pestaña *Agentes* → *Registrar agente*:** eliges el proyecto y el flujo de una lista con los flujos de esa carpeta (`GET /internal/admin/langflow/flows?project_id=`). Los que ya están registrados aparecen deshabilitados.
 
 **Reglas** (en `ManageAgentsUseCase`):
@@ -654,6 +654,7 @@ En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langfl
 - El ticket viaja en la URL: queda en los logs de acceso de Traefik, pero solo vale una vez y 30 s.
 - Al cerrar sesión en la consola, las cookies de Langflow siguen vivas en el navegador hasta que caducan (1 h la de acceso).
 - Si renombras un proyecto, su carpeta en Langflow conserva el nombre antiguo.
+- **Borrar un proyecto** borra primero su carpeta en Langflow, con todos sus flujos. Si Langflow falla, el proyecto no se borra (la consola responde 502). Si la carpeta ya no existía, se sigue sin error.
 
 ### Consola web (PWA) — `app.flowsdone.com`
 

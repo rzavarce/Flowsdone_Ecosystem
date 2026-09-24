@@ -13,6 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import ProjectCreate, ProjectOut, ProjectUpdate
+from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError
+from app.domain.ports.outbound import LangflowSessionError
 
 router = APIRouter(prefix="/projects", tags=["admin:projects"])
 
@@ -137,17 +139,23 @@ async def delete_project(
 ) -> None:
     """Delete a project.
 
+    Its Langflow folder (and the flows in it) is deleted first; if Langflow
+    fails, the project is kept.
+
     Args:
         project_id (UUID): Id of the project to delete.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.project_repo`.
+            `request.app.state.delete_project_use_case`.
         access (AdminAccess): The authenticated caller.
 
     Raises:
         HTTPException: 404 if the project does not exist or is outside the
-            caller's tenants.
+            caller's tenants; 502 if Langflow fails.
     """
     await access.project(project_id)
-    deleted = await request.app.state.project_repo.delete(project_id)
+    try:
+        deleted = await request.app.state.delete_project_use_case.execute(project_id)
+    except (LangflowSessionError, LangflowTargetNotFoundError) as exc:
+        raise HTTPException(status_code=502, detail=f"langflow unavailable: {exc}") from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="project not found")

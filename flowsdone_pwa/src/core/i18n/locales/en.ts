@@ -636,7 +636,7 @@ export const en: Messages<typeof es> = {
         description: 'Create the first one to connect channels and agents.',
       },
       delete: {
-        description: 'The project and everything in it will be deleted.',
+        description: 'The project and everything in it will be deleted, including its folder and flows in the flow editor.',
         confirm: 'Delete project',
         cascade: 'This will cascade-delete <strong>{{summary}}</strong>. Channels will stop answering.',
       },

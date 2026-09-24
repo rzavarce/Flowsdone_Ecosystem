@@ -37,6 +37,9 @@ class FlowsLangflow(FakeLangflow):
         self.listed.append((access_token, folder_id))
         return self.flows_by_folder.get(folder_id, [])
 
+    async def default_folder(self, access_token):
+        return "default-folder"
+
     async def rename_flow(self, access_token, flow_id, name):
         if self.rename_error:
             raise self.rename_error
@@ -88,6 +91,19 @@ async def test_lists_the_project_folder_flows_marking_registered_ones():
 
     assert [(f.id, f.agent_id) for f in result] == [("f1", None), ("f2", agent.id)]
     assert w.langflow.listed[-1] == ("access-tenant-acme", folder)
+
+
+async def test_registered_flows_in_the_default_folder_are_listed_too():
+    w, agents, _, flows, _ = _setup()
+    project, _ = await _project_with_flows(w, "f1")
+    w.langflow.flows_by_folder["default-folder"] = [
+        LangflowFlowSummary(id="base", name="Asistente"), LangflowFlowSummary(id="ajeno", name="Otro"),
+    ]
+    agent = await agents.create(project_id=project.id, name="Asistente", langflow_flow_id="base", config={}, is_default=True)
+
+    result = await flows.execute(project.id)
+
+    assert [(f.id, f.agent_id) for f in result] == [("base", agent.id), ("f1", None)]
 
 
 async def test_listing_flows_of_an_unknown_project_fails():

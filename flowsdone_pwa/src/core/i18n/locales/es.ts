@@ -637,7 +637,7 @@ export const es = {
         description: 'Crea el primero para poder conectar canales y agentes.',
       },
       delete: {
-        description: 'Se elimina el proyecto y lo que contiene.',
+        description: 'Se elimina el proyecto y lo que contiene, también su carpeta y sus flujos en el editor de flujos.',
         confirm: 'Eliminar proyecto',
         cascade: 'Se borrarán en cascada <strong>{{summary}}</strong>. Los canales dejarán de responder.',
       },

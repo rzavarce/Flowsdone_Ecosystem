@@ -67,7 +67,9 @@ class ProjectFlow:
 
 class ListProjectFlowsUseCase:
     """Lists the flows in a project's Langflow folder, marking which ones
-    are already registered as agents of the project."""
+    are already registered as agents of the project. Flows of the project's
+    agents that live in the tenant's default folder (the base agent's) are
+    included too."""
 
     def __init__(
         self,
@@ -111,10 +113,18 @@ class ListProjectFlowsUseCase:
         folder_id = workspace.folders.get(project_id)
         if folder_id is None:
             return []
+        token = workspace.tokens.access_token
         registered = {a.langflow_flow_id: a.id for a in await self._agents.list_by_project(project_id)}
+        flows = await self._langflow.list_flows(token, folder_id)
+        # The base agent's flow lives in the default folder ("Starter
+        # Project"): list it too, but only the ones registered for this project.
+        in_folder = {f.id for f in flows}
+        if any(flow_id not in in_folder for flow_id in registered):
+            default = await self._langflow.list_flows(token, await self._langflow.default_folder(token))
+            flows += [f for f in default if f.id in registered and f.id not in in_folder]
         return [
             ProjectFlow(id=f.id, name=f.name, description=f.description, agent_id=registered.get(f.id))
-            for f in await self._langflow.list_flows(workspace.tokens.access_token, folder_id)
+            for f in sorted(flows, key=lambda f: f.name.lower())
         ]
 
     async def rename(self, project_id: UUID, flow_id: str, name: str) -> None:
