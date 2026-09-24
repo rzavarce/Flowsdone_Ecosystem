@@ -7,7 +7,7 @@ live are adapter concerns - see `adapters/outbound/email/`.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Protocol
+from typing import Any, Dict, Optional, Protocol
 
 
 class EmailSendError(Exception):
@@ -29,6 +29,7 @@ class EmailSenderPort(Protocol):
         template: str,
         context: Dict[str, Any],
         subject: str,
+        reply_to: Optional[str] = None,
     ) -> None:
         """Render a template and send it.
 
@@ -38,6 +39,8 @@ class EmailSenderPort(Protocol):
                 the adapter inside its own templates directory.
             context (Dict[str, Any]): Data made available to the template.
             subject (str): Email subject line.
+            reply_to (Optional[str]): Address that replies go to (e.g. the
+                person who filled in the contact form).
 
         Raises:
             EmailSendError: If the provider rejects the email or is

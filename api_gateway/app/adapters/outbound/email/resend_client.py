@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
@@ -71,6 +71,7 @@ class ResendEmailAdapter(EmailSenderPort):
         template: str,
         context: Dict[str, Any],
         subject: str,
+        reply_to: Optional[str] = None,
     ) -> None:
         """Render `template` and send it via the Resend API.
 
@@ -79,6 +80,7 @@ class ResendEmailAdapter(EmailSenderPort):
             template (str): Template name (see `_render`).
             context (Dict[str, Any]): Data made available to the template.
             subject (str): Email subject line.
+            reply_to (Optional[str]): Address that replies go to, if any.
 
         Raises:
             EmailSendError: If `RESEND_API_KEY` is not configured, the
@@ -93,6 +95,8 @@ class ResendEmailAdapter(EmailSenderPort):
             "subject": subject,
             "html": html,
         }
+        if reply_to:
+            body["reply_to"] = reply_to
         try:
             response = await self._client.post(
                 _API_URL,

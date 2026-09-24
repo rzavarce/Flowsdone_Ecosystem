@@ -657,6 +657,14 @@ En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langfl
 - **Borrar un tenant** borra primero su usuario de Langflow (con todas sus carpetas y flujos) y después sus cuentas `client` (las que no pertenecen a otro tenant), para que su email y su slug se puedan volver a usar. Si Langflow falla, no se borra nada (502).
 - **Borrar un proyecto** borra primero su carpeta en Langflow, con todos sus flujos. Si Langflow falla, el proyecto no se borra (la consola responde 502). Si la carpeta ya no existía, se sigue sin error.
 
+### Landing page — `flowsdone.com`
+
+Página estática en `api_gateway/app/static/flowsdone/` (`index.html`, `styles.css`, `main.js` y `brand/`), sin framework ni build. La sirve el gateway: el router `flowsdone` de Traefik reescribe cada ruta a `/static/flowsdone/…`.
+
+- **Contenido:** servicios, canales, forma de trabajo, sectores, planes (Starter/Pro/Business con los precios del catálogo), preguntas frecuentes y contacto. Si cambian los planes en *Planes*, hay que actualizar también esta página.
+- **Formulario de contacto:** envía a `POST /public/contact` (router `flowsdone-contact`, sin reescritura). El gateway manda el mensaje por Resend a `CONTACT_EMAIL_TO`, con *reply-to* al email del interesado para contestarle directamente desde el correo. Tiene un límite de `CONTACT_MAX_PER_IP` envíos por IP cada `CONTACT_WINDOW_SECONDS` y un campo trampa oculto contra bots. Sin `CONTACT_EMAIL_TO` responde 503.
+- **Local:** `http://localhost:8000/static/flowsdone/index.html`.
+
 ### Consola web (PWA) — `app.flowsdone.com`
 
 Ruta `pwa` en `traefik/dynamic.yml` → servicio `pwa-svc` (`http://pwa:80`, el nginx del contenedor `pwa`), con HSTS (sin `includeSubdomains`). La SPA y la API comparten origen: nginx reenvía `/api/auth/*` al gateway (lista blanca; el resto de `/api/*` da 404), así que **no hay CORS** y la cookie de sesión queda aislada en ese host. Traefik ya sobrescribe `X-Forwarded-For` con la IP real y nginx la respeta solo desde la red interna, por lo que el límite de intentos por IP funciona detrás del proxy.

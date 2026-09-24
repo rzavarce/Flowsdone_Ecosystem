@@ -1,396 +1,515 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Flowsdone</title>
-<meta name="description" content="Flowsdone: la capa de IA que orquesta workflows, agentes y mensajería en tiempo real sobre los canales que ya usás. Sitio en construcción." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233DA8FF'/%3E%3Cpath d='M9 21 L16 9 L23 21' stroke='%23060a12' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --void:#070b13;
-    --surface:#0d1520;
-    --surface-raised:#121b28;
-    --line:#1e2a3c;
-    --ink:#e9edf5;
-    --muted:#8391a8;
-    --blue:#4fb2ff;
-    --blue-deep:#2c7fd6;
-    --green:#3ee8ab;
-    --green-deep:#1fb98a;
-    --danger:#ff8a8a;
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flowsdone · Agentes de IA para atender a tus clientes en todos tus canales</title>
+  <meta name="description" content="Flowsdone crea asistentes virtuales con IA entrenados con la información de tu negocio. Atienden a tus clientes 24/7 por WhatsApp, Instagram, tu web y el teléfono, y pasan la conversación a tu equipo cuando hace falta." />
+  <link rel="canonical" href="https://flowsdone.com/" />
+  <meta name="theme-color" content="#04141F" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Flowsdone" />
+  <meta property="og:title" content="Flowsdone · Agentes de IA para atender a tus clientes" />
+  <meta property="og:description" content="Asistentes virtuales con IA en WhatsApp, Instagram, tu web y el teléfono. Atención 24/7 con la información real de tu negocio." />
+  <meta property="og:url" content="https://flowsdone.com/" />
+  <meta property="og:locale" content="es_ES" />
+  <link rel="icon" type="image/svg+xml" href="brand/flowsdone-mark.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Flowsdone",
+    "url": "https://flowsdone.com/",
+    "logo": "https://flowsdone.com/brand/flowsdone-mark.svg",
+    "description": "Plataforma de agentes de IA que atienden a los clientes de las empresas en WhatsApp, Instagram, web y teléfono."
   }
-  *{ box-sizing:border-box; }
-  html{ color-scheme:dark; }
-  body{
-    margin:0;
-    background:var(--void);
-    color:var(--ink);
-    font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    position:relative;
-    overflow-x:hidden;
-  }
-
-  .bg{
-    position:fixed;
-    inset:0;
-    width:100%;
-    height:100%;
-    z-index:0;
-    pointer-events:none;
-  }
-  .bg path{
-    fill:none;
-    stroke-width:1.6;
-    opacity:.55;
-    filter:blur(.4px);
-    stroke-dasharray:14 10;
-    animation:flow 5s linear infinite;
-  }
-  .bg path.g{ animation-duration:6.4s; }
-  .bg path.b2{ animation-duration:4.2s; animation-direction:reverse; }
-  .bg path.g2{ animation-duration:7s; animation-direction:reverse; }
-  .bg circle.node{ filter:blur(6px); }
-  .bg circle.core{ filter:none; }
-  @keyframes flow{
-    to{ stroke-dashoffset:-240; }
-  }
-  @media (prefers-reduced-motion: reduce){
-    .bg path{ animation:none; }
-    .status .dot{ animation:none; }
-  }
-
-  .veil{
-    position:fixed;
-    inset:0;
-    z-index:0;
-    pointer-events:none;
-    background:
-      radial-gradient(60% 45% at 18% 8%, rgba(79,178,255,.14), transparent 60%),
-      radial-gradient(55% 40% at 88% 92%, rgba(62,232,171,.12), transparent 60%);
-  }
-
-  .wrap{
-    position:relative;
-    z-index:1;
-    max-width:820px;
-    margin:0 auto;
-    padding:56px 28px 90px;
-  }
-
-  .topbar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    font-family:"IBM Plex Mono", ui-monospace, monospace;
-    font-size:13px;
-    letter-spacing:.02em;
-    color:var(--muted);
-    margin-bottom:88px;
-  }
-  .mark{ display:inline-flex; align-items:center; gap:9px; color:var(--ink); font-weight:500; }
-  .mark svg{ width:18px; height:18px; flex-shrink:0; }
-  .status{ display:inline-flex; align-items:center; gap:7px; }
-  .status .dot{
-    width:7px; height:7px; border-radius:50%;
-    background:var(--green);
-    box-shadow:0 0 10px 1px var(--green);
-    animation:pulse 2.4s ease-in-out infinite;
-  }
-  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.3; } }
-
-  h1{
-    font-family:"Fraunces", ui-serif, Georgia, serif;
-    font-weight:600;
-    font-size:clamp(34px, 5.6vw, 54px);
-    line-height:1.14;
-    letter-spacing:-0.01em;
-    margin:0;
-    text-wrap:balance;
-    max-width:15ch;
-  }
-  h1 em{
-    font-style:italic;
-    font-weight:600;
-    background:linear-gradient(95deg, var(--blue), var(--green));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-  }
-
-  p.lead{
-    font-size:17px;
-    line-height:1.7;
-    color:var(--muted);
-    max-width:58ch;
-    margin:20px 0 0;
-  }
-
-  .stages{
-    list-style:none;
-    margin:64px 0 0;
-    padding:0;
-    border-left:1px solid var(--line);
-  }
-  .stages li{ position:relative; padding:2px 0 28px 28px; }
-  .stages li:last-child{ padding-bottom:2px; }
-  .stages li::before{
-    content:"";
-    position:absolute;
-    left:-5.5px; top:6px;
-    width:9px; height:9px;
-    border-radius:50%;
-    background:var(--stage-c, var(--blue));
-    box-shadow:0 0 12px 1px var(--stage-c, var(--blue));
-  }
-  .stages li:nth-child(1){ --stage-c: var(--blue); }
-  .stages li:nth-child(2){ --stage-c: var(--green); }
-  .stages li:nth-child(3){ --stage-c: var(--blue); }
-  .stages li:nth-child(4){ --stage-c: var(--green); }
-  .stage-head{ display:flex; align-items:baseline; gap:10px; font-family:"IBM Plex Mono", ui-monospace, monospace; }
-  .stage-index{ font-size:12px; color:var(--stage-c, var(--blue)); }
-  .stage-name{ font-family:"IBM Plex Sans", sans-serif; font-weight:600; font-size:15px; color:var(--ink); }
-  .stage-desc{ margin:4px 0 0; font-size:14px; color:var(--muted); max-width:52ch; }
-
-  .contact{
-    margin-top:96px;
-    padding-top:56px;
-    border-top:1px solid var(--line);
-  }
-  .contact-head{ max-width:52ch; }
-  .contact-eyebrow{
-    font-family:"IBM Plex Mono", ui-monospace, monospace;
-    font-size:12px;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-    color:var(--green);
-  }
-  .contact h2{
-    font-family:"Fraunces", ui-serif, Georgia, serif;
-    font-weight:600;
-    font-size:clamp(24px, 3.4vw, 32px);
-    margin:10px 0 8px;
-    text-wrap:balance;
-  }
-  .contact p{ color:var(--muted); font-size:15px; line-height:1.6; margin:0; }
-
-  form{
-    margin-top:32px;
-    display:grid;
-    gap:16px;
-    max-width:520px;
-  }
-  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  label{
-    display:block;
-    font-family:"IBM Plex Mono", ui-monospace, monospace;
-    font-size:12px;
-    color:var(--muted);
-    margin-bottom:7px;
-  }
-  input, textarea{
-    width:100%;
-    background:var(--surface);
-    border:1px solid var(--line);
-    border-radius:8px;
-    padding:11px 13px;
-    color:var(--ink);
-    font-family:"IBM Plex Sans", sans-serif;
-    font-size:14px;
-    transition:border-color .15s ease, box-shadow .15s ease;
-  }
-  input::placeholder, textarea::placeholder{ color:#4d5a70; }
-  textarea{ resize:vertical; min-height:104px; }
-  input:focus, textarea:focus{
-    outline:none;
-    border-color:var(--blue);
-    box-shadow:0 0 0 3px rgba(79,178,255,.18);
-  }
-
-  button{
-    justify-self:start;
-    display:inline-flex;
-    align-items:center;
-    gap:9px;
-    margin-top:4px;
-    padding:12px 22px;
-    border:none;
-    border-radius:8px;
-    background:linear-gradient(95deg, var(--blue), var(--green));
-    color:#06121b;
-    font-family:"IBM Plex Sans", sans-serif;
-    font-weight:600;
-    font-size:14px;
-    cursor:pointer;
-    transition:filter .15s ease, transform .15s ease;
-  }
-  button:hover{ filter:brightness(1.08); }
-  button:active{ transform:translateY(1px); }
-  button:disabled{ opacity:.6; cursor:default; filter:none; }
-
-  .form-msg{
-    font-family:"IBM Plex Mono", ui-monospace, monospace;
-    font-size:13px;
-    margin-top:2px;
-    min-height:18px;
-  }
-  .form-msg.ok{ color:var(--green); }
-  .form-msg.err{ color:var(--danger); }
-  .form-msg a{ color:inherit; }
-
-  footer{
-    font-family:"IBM Plex Mono", ui-monospace, monospace;
-    font-size:12px;
-    color:var(--muted);
-    margin-top:72px;
-    padding-top:18px;
-    border-top:1px solid var(--line);
-  }
-
-  @media (max-width:520px){
-    .row2{ grid-template-columns:1fr; }
-  }
-</style>
+  </script>
 </head>
 <body>
-  <svg class="bg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <path class="b" stroke="#4fb2ff" d="M -50 130 C 300 60, 500 260, 820 160 S 1350 40, 1650 190" />
-    <path class="g" stroke="#3ee8ab" d="M -50 340 C 260 420, 560 220, 860 360 S 1360 460, 1650 320" />
-    <path class="b2" stroke="#4fb2ff" d="M -50 560 C 300 520, 480 700, 800 600 S 1300 500, 1650 640" />
-    <path class="g2" stroke="#3ee8ab" d="M -50 760 C 320 820, 620 660, 900 780 S 1380 880, 1650 760" />
-    <path class="b" stroke="#4fb2ff" d="M 120 -40 C 180 220, 60 420, 220 640 S 160 860, 260 940" />
-    <path class="g" stroke="#3ee8ab" d="M 1420 -40 C 1360 220, 1480 420, 1340 640 S 1420 860, 1360 940" />
+  <a class="skip" href="#main">Saltar al contenido</a>
 
-    <circle class="node" cx="820" cy="160" r="9" fill="#4fb2ff" />
-    <circle class="core" cx="820" cy="160" r="3" fill="#eaf6ff" />
-    <circle class="node" cx="860" cy="360" r="9" fill="#3ee8ab" />
-    <circle class="core" cx="860" cy="360" r="3" fill="#eafff6" />
-    <circle class="node" cx="220" cy="640" r="8" fill="#4fb2ff" />
-    <circle class="core" cx="220" cy="640" r="3" fill="#eaf6ff" />
-    <circle class="node" cx="1340" cy="640" r="8" fill="#3ee8ab" />
-    <circle class="core" cx="1340" cy="640" r="3" fill="#eafff6" />
-  </svg>
-  <div class="veil"></div>
-
-  <div class="wrap">
-    <div class="topbar">
-      <span class="mark">
-        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="32" height="32" rx="7" fill="url(#g1)"/>
-          <defs>
-            <linearGradient id="g1" x1="0" y1="0" x2="32" y2="32">
-              <stop offset="0" stop-color="#4fb2ff"/>
-              <stop offset="1" stop-color="#3ee8ab"/>
-            </linearGradient>
-          </defs>
-          <path d="M9 21 L16 9 L23 21" stroke="#06121b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        flowsdone
-      </span>
-      <span class="status"><span class="dot"></span>en construcción</span>
+  <header class="site-header" data-header>
+    <div class="container header-inner">
+      <a class="brand" href="#inicio" aria-label="Flowsdone, inicio">
+        <img src="brand/flowsdone-mark.svg" alt="" width="36" height="36" />
+        <span class="brand-name">Flows<span>done</span></span>
+      </a>
+      <nav class="nav" aria-label="Principal" data-nav>
+        <a href="#servicios">Servicios</a>
+        <a href="#canales">Canales</a>
+        <a href="#como-trabajamos">Cómo trabajamos</a>
+        <a href="#planes">Planes</a>
+        <a href="#preguntas">Preguntas</a>
+        <a class="nav-login" href="https://app.flowsdone.com">Acceso clientes</a>
+        <a class="btn btn-primary btn-sm" href="#contacto">Hablemos</a>
+      </nav>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir el menú" data-nav-toggle>
+        <span></span><span></span><span></span>
+      </button>
     </div>
+    <nav class="mobile-nav" id="menu-movil" aria-label="Menú" hidden data-mobile-nav>
+      <a href="#servicios">Servicios</a>
+      <a href="#canales">Canales</a>
+      <a href="#como-trabajamos">Cómo trabajamos</a>
+      <a href="#planes">Planes</a>
+      <a href="#preguntas">Preguntas</a>
+      <a href="https://app.flowsdone.com">Acceso clientes</a>
+      <a class="btn btn-primary" href="#contacto">Hablemos</a>
+    </nav>
+  </header>
 
-    <div>
-      <h1>La capa de IA que conecta tu <em>operación</em>.</h1>
-      <p class="lead">
-        Flowsdone es una plataforma de servicios de IA generativa: orquesta
-        workflows automatizados y agentes conversacionales, y los conecta
-        en tiempo real con los canales que ya usás — WhatsApp, tu propio
-        webchat, y lo que sigue. Estamos construyendo esta página; la
-        plataforma ya está en marcha.
-      </p>
-    </div>
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero" id="inicio">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow eyebrow-dark">Inteligencia artificial para la atención al cliente</p>
+          <h1>Agentes de IA que atienden a tus clientes, <span class="grad">en todos tus canales</span></h1>
+          <p class="lead">
+            Flowsdone pone a trabajar asistentes virtuales entrenados con la información de tu negocio en WhatsApp,
+            Instagram, tu web y el teléfono. Responden al momento, las 24 horas, y pasan la conversación a tu equipo
+            cuando hace falta.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary btn-lg" href="#contacto">Solicita una demo</a>
+            <a class="btn btn-ghost btn-lg" href="#servicios">Ver servicios</a>
+          </div>
+          <ul class="hero-points" aria-label="Ventajas principales">
+            <li>Atención 24/7 sin ampliar el equipo</li>
+            <li>Respuestas con los datos reales de tu negocio</li>
+            <li>Planes con precio cerrado desde 29 €/mes</li>
+          </ul>
+        </div>
 
-    <ul class="stages">
-      <li>
-        <div class="stage-head"><span class="stage-index">01</span><span class="stage-name">Workflows</span></div>
-        <p class="stage-desc">Automatizaciones y procesos orquestados de punta a punta.</p>
-      </li>
-      <li>
-        <div class="stage-head"><span class="stage-index">02</span><span class="stage-name">Agentes</span></div>
-        <p class="stage-desc">IA que ejecuta tareas y toma decisiones dentro de esos workflows.</p>
-      </li>
-      <li>
-        <div class="stage-head"><span class="stage-index">03</span><span class="stage-name">Mensajería en tiempo real</span></div>
-        <p class="stage-desc">Conversaciones entregadas al instante, sin fricción.</p>
-      </li>
-      <li>
-        <div class="stage-head"><span class="stage-index">04</span><span class="stage-name">Integraciones</span></div>
-        <p class="stage-desc">WhatsApp, webchat propio y los canales donde ya está tu gente.</p>
-      </li>
-    </ul>
-
-    <section class="contact">
-      <div class="contact-head">
-        <span class="contact-eyebrow">Conectemos</span>
-        <h2>¿Tenés un flujo que te gustaría automatizar?</h2>
-        <p>Contanos qué necesitás y te respondemos apenas lo leamos.</p>
+        <div class="hero-visual" aria-label="Ejemplo de conversación con un asistente de Flowsdone" role="img">
+          <div class="phone">
+            <div class="phone-top">
+              <span class="avatar" aria-hidden="true">L</span>
+              <div>
+                <p class="phone-name">Lía · Clínica Sonrisa</p>
+                <p class="phone-status">Asistente virtual · en línea</p>
+              </div>
+            </div>
+            <div class="chat">
+              <p class="msg in">Hola, ¿tenéis cita para una limpieza dental esta semana?</p>
+              <p class="msg out">¡Hola! Soy Lía, la asistente de Clínica Sonrisa. Tengo hueco el jueves a las 10:30 o el viernes a las 17:00. ¿Cuál te viene mejor?</p>
+              <p class="msg in">El jueves, perfecto.</p>
+              <p class="msg out">Genial. ¿Me dices tu nombre completo y un teléfono? Lo paso a recepción para confirmarte la cita.</p>
+              <p class="msg typing" aria-hidden="true"><span></span><span></span><span></span></p>
+            </div>
+          </div>
+          <div class="float-card float-a" aria-hidden="true">
+            <strong>Respuesta en segundos</strong><span>a cualquier hora</span>
+          </div>
+          <div class="float-card float-b" aria-hidden="true">
+            <strong>Derivación a una persona</strong><span>cuando el caso lo pide</span>
+          </div>
+        </div>
       </div>
-
-      <form id="contact-form">
-        <div class="row2">
-          <div>
-            <label for="cf-name">Nombre</label>
-            <input id="cf-name" name="name" type="text" placeholder="Tu nombre" required />
-          </div>
-          <div>
-            <label for="cf-email">Email</label>
-            <input id="cf-email" name="email" type="email" placeholder="vos@empresa.com" required />
-          </div>
-        </div>
-        <div>
-          <label for="cf-message">Mensaje</label>
-          <textarea id="cf-message" name="message" placeholder="Contanos brevemente qué querés automatizar o integrar…" required></textarea>
-        </div>
-        <button type="submit" id="cf-submit">Enviar mensaje</button>
-        <p class="form-msg" id="cf-msg" role="status" aria-live="polite"></p>
-      </form>
+      <div class="container channels-strip" aria-label="Canales disponibles">
+        <span>WhatsApp</span><span>Instagram</span><span>Messenger</span><span>Telegram</span><span>Chat web</span><span>Teléfono</span><span>X</span><span>TikTok</span>
+      </div>
     </section>
 
-    <footer>© 2026 Flowsdone</footer>
-  </div>
+    <!-- PROBLEMA -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Por qué Flowsdone</p>
+          <h2>Tus clientes escriben a cualquier hora. Tu equipo no puede estar siempre.</h2>
+          <p>
+            Consultas repetidas, mensajes que llegan de noche o en fin de semana, varios canales abiertos a la vez…
+            Cada respuesta que tarda es una oportunidad que se enfría. Flowsdone se encarga de lo repetitivo para que tu
+            equipo dedique su tiempo a lo que de verdad lo necesita.
+          </p>
+        </div>
+        <div class="grid-3">
+          <article class="card pain">
+            <h3>Respuestas al momento</h3>
+            <p>El asistente contesta en segundos, también fuera de horario, festivos y fines de semana.</p>
+          </article>
+          <article class="card pain">
+            <h3>Menos carga para tu equipo</h3>
+            <p>Resuelve las preguntas frecuentes, toma datos y deja a tu equipo solo los casos que requieren a una persona.</p>
+          </article>
+          <article class="card pain">
+            <h3>Todo en un mismo sitio</h3>
+            <p>WhatsApp, redes sociales, web y teléfono atendidos por el mismo asistente y con el mismo criterio.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-  <script>
-    const form = document.getElementById('contact-form');
-    const btn = document.getElementById('cf-submit');
-    const msg = document.getElementById('cf-msg');
+    <!-- SERVICIOS -->
+    <section class="section section-alt" id="servicios">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Servicios</p>
+          <h2>Todo lo que necesitas para atender con inteligencia artificial</h2>
+          <p>Diseñamos, ponemos en marcha y cuidamos tu asistente. Tú decides hasta dónde llega.</p>
+        </div>
+        <div class="grid-3 services">
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7v3l-2 3h18l-2-3v-3a7 7 0 0 0-7-7Z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/></svg></div>
+            <h3>Asistentes virtuales con IA</h3>
+            <p>Conversan de forma natural, con el tono de tu marca y la información de tu negocio.</p>
+            <ul>
+              <li>Resuelven dudas sobre productos, servicios y horarios</li>
+              <li>Toman datos, gestionan citas o pedidos</li>
+              <li>Recuerdan el hilo de la conversación</li>
+              <li>Pasan el caso a una persona cuando hace falta</li>
+            </ul>
+          </article>
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H8l-4 4Z"/><path d="M8 9h8M8 12h5"/></svg></div>
+            <h3>Atención multicanal</h3>
+            <p>Un solo asistente en todos los canales donde están tus clientes.</p>
+            <ul>
+              <li>WhatsApp con el número de tu empresa</li>
+              <li>Instagram, Facebook Messenger y Telegram</li>
+              <li>Chat propio para tu página web</li>
+              <li>X y TikTok</li>
+            </ul>
+          </article>
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg></div>
+            <h3>Asistente telefónico de voz</h3>
+            <p>Atiende llamadas con voz natural, entiende lo que se le dice y responde al instante.</p>
+            <ul>
+              <li>Recepción de llamadas 24/7</li>
+              <li>Información, reservas y toma de recados</li>
+              <li>Mismo conocimiento que en el chat</li>
+              <li>Incluido en los planes Pro y Business</li>
+            </ul>
+          </article>
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6Z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></div>
+            <h3>Respuestas con tu documentación</h3>
+            <p>El asistente consulta tus catálogos, preguntas frecuentes, políticas y manuales.</p>
+            <ul>
+              <li>Responde con información real, no inventada</li>
+              <li>Búsqueda semántica sobre tus documentos</li>
+              <li>Se actualiza cuando cambian tus contenidos</li>
+              <li>Si no sabe algo, lo dice y deriva</li>
+            </ul>
+          </article>
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6H14a4 4 0 0 1 4 4v5.5M6 8.5V15a3 3 0 0 0 3 3h6.5"/></svg></div>
+            <h3>Automatización de procesos</h3>
+            <p>Conectamos el asistente con tus herramientas para que las conversaciones se conviertan en acciones.</p>
+            <ul>
+              <li>Registro de contactos y oportunidades</li>
+              <li>Avisos al equipo y seguimientos</li>
+              <li>Integración con tus sistemas por API</li>
+              <li>Flujos a medida de tu negocio</li>
+            </ul>
+          </article>
+          <article class="card service">
+            <div class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+            <h3>Consola de gestión</h3>
+            <p>Tu propio panel para ver qué pasa y tener el control.</p>
+            <ul>
+              <li>Conversaciones con su transcripción completa</li>
+              <li>Consumo del mes y facturación</li>
+              <li>Usuarios y permisos para tu equipo</li>
+              <li>Editor visual de flujos para ajustar el asistente</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msg.className = 'form-msg';
-      msg.textContent = '';
-      btn.disabled = true;
-      btn.textContent = 'Enviando…';
+    <!-- CANALES -->
+    <section class="section section-dark" id="canales">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow eyebrow-dark">Canales</p>
+          <h2>Donde tus clientes ya están</h2>
+          <p>Conectamos tus canales y el asistente responde en todos con el mismo criterio. Una conversación, un historial.</p>
+        </div>
+        <ul class="channel-grid">
+          <li><strong>WhatsApp</strong><span>El canal preferido de tus clientes, con el número de tu empresa.</span></li>
+          <li><strong>Instagram</strong><span>Mensajes directos atendidos al momento.</span></li>
+          <li><strong>Facebook Messenger</strong><span>Las consultas de tu página, respondidas.</span></li>
+          <li><strong>Telegram</strong><span>Un bot con la personalidad de tu marca.</span></li>
+          <li><strong>Chat web</strong><span>Un chat propio para tu página, sin depender de terceros.</span></li>
+          <li><strong>Teléfono</strong><span>Un asistente de voz que atiende tus llamadas.</span></li>
+          <li><strong>X</strong><span>Mensajes directos de tu cuenta.</span></li>
+          <li><strong>TikTok</strong><span>Consultas desde tu perfil.</span></li>
+        </ul>
+      </div>
+    </section>
 
-      const payload = {
-        name: form.name.value.trim(),
-        email: form.email.value.trim(),
-        message: form.message.value.trim(),
-        source: 'flowsdone-landing',
-      };
+    <!-- CÓMO TRABAJAMOS -->
+    <section class="section" id="como-trabajamos">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Cómo trabajamos</p>
+          <h2>De la primera llamada a tu asistente funcionando</h2>
+          <p>Te acompañamos en todo el proceso. No necesitas conocimientos técnicos.</p>
+        </div>
+        <ol class="steps">
+          <li>
+            <span class="step-num">1</span>
+            <h3>Conocemos tu negocio</h3>
+            <p>Una llamada para entender qué preguntan tus clientes, qué debe resolver el asistente y cuándo debe intervenir una persona.</p>
+          </li>
+          <li>
+            <span class="step-num">2</span>
+            <h3>Diseñamos tu asistente</h3>
+            <p>Lo configuramos con tu información, tu tono y tus reglas, y elegimos juntos el plan que encaja.</p>
+          </li>
+          <li>
+            <span class="step-num">3</span>
+            <h3>Conectamos tus canales</h3>
+            <p>WhatsApp, redes, web o teléfono. Hacemos pruebas contigo antes de abrirlo a tus clientes.</p>
+          </li>
+          <li>
+            <span class="step-num">4</span>
+            <h3>Lo mejoramos con el uso</h3>
+            <p>Revisamos las conversaciones reales y ajustamos las respuestas para que cada mes funcione mejor.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
 
-      try {
-        const res = await fetch('https://auto.flowsdone.com/webhook/flowsdone-contact', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('bad status');
+    <!-- SECTORES -->
+    <section class="section section-alt">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">A quién ayudamos</p>
+          <h2>Pensado para negocios que reciben muchas consultas</h2>
+        </div>
+        <div class="grid-3 sectors">
+          <article class="card sector">
+            <h3>Clínicas y centros de salud</h3>
+            <p>Citas, horarios, tratamientos y preparación de visitas, sin saturar la recepción.</p>
+          </article>
+          <article class="card sector">
+            <h3>Comercios y tiendas online</h3>
+            <p>Productos, disponibilidad, envíos, devoluciones y seguimiento de pedidos.</p>
+          </article>
+          <article class="card sector">
+            <h3>Inmobiliarias</h3>
+            <p>Información de inmuebles, filtrado de interesados y agenda de visitas.</p>
+          </article>
+          <article class="card sector">
+            <h3>Telecomunicaciones</h3>
+            <p>Cobertura, tarifas, altas e incidencias de primer nivel, a cualquier hora.</p>
+          </article>
+          <article class="card sector">
+            <h3>Empresas de servicios</h3>
+            <p>Presupuestos, reservas y atención postventa con respuestas consistentes.</p>
+          </article>
+          <article class="card sector">
+            <h3>Tu sector</h3>
+            <p>Si tus clientes preguntan mucho y lo mismo, un asistente te ahorra tiempo. Cuéntanos tu caso.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-        msg.className = 'form-msg ok';
-        msg.textContent = '¡Listo! Te vamos a responder pronto.';
-        form.reset();
-      } catch (err) {
-        msg.className = 'form-msg err';
-        msg.innerHTML = 'No pudimos enviar el mensaje. Escribinos directo a <a href="mailto:rogerzavarce@gmail.com">rogerzavarce@gmail.com</a>.';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Enviar mensaje';
-      }
-    });
-  </script>
+    <!-- CONFIANZA -->
+    <section class="section">
+      <div class="container trust">
+        <div class="section-head left">
+          <p class="eyebrow">Control y confianza</p>
+          <h2>Tu asistente, tus datos, tus reglas</h2>
+          <p>Flowsdone está construido para empresas: cada una tiene su propio espacio, su historial y su consumo a la vista.</p>
+        </div>
+        <ul class="trust-list">
+          <li><strong>Espacio aislado por empresa.</strong> Tus conversaciones, agentes y canales no se mezclan con los de nadie más.</li>
+          <li><strong>Credenciales cifradas.</strong> Las claves de conexión de tus canales se guardan cifradas.</li>
+          <li><strong>Historial ordenado.</strong> Cada conversación queda registrada con su transcripción durante 6 meses.</li>
+          <li><strong>Factura predecible.</strong> Precio mensual cerrado, consumo visible en tu consola y topes de gasto configurables.</li>
+          <li><strong>Siempre con una persona detrás.</strong> El asistente sabe cuándo pasar el caso a tu equipo.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- PLANES -->
+    <section class="section section-alt" id="planes">
+      <div class="container">
+        <div class="section-head">
+          <p class="eyebrow">Planes</p>
+          <h2>Precios claros, sin sorpresas</h2>
+          <p>Cuota mensual con mensajes incluidos. Cambia de plan cuando quieras. Precios sin IVA.</p>
+        </div>
+        <div class="plans">
+          <article class="card plan">
+            <h3>Starter</h3>
+            <p class="plan-desc">Un asistente para empezar, solo texto.</p>
+            <p class="price"><span>29 €</span>/mes</p>
+            <ul>
+              <li>1.000 mensajes atendidos al mes</li>
+              <li>Canales de texto</li>
+              <li>Tope de consumo: nunca pagas de más</li>
+              <li>Consola de gestión</li>
+            </ul>
+            <a class="btn btn-outline" href="#contacto" data-plan="Starter">Empezar con Starter</a>
+          </article>
+          <article class="card plan plan-featured">
+            <p class="badge">El más elegido</p>
+            <h3>Pro</h3>
+            <p class="plan-desc">Varios canales y voz.</p>
+            <p class="price"><span>99 €</span>/mes</p>
+            <ul>
+              <li>5.000 mensajes de texto al mes</li>
+              <li>300 turnos de voz al mes</li>
+              <li>Excedente: 0,02 € por mensaje y 0,08 € por turno de voz</li>
+              <li>Tope de gasto configurable</li>
+            </ul>
+            <a class="btn btn-primary" href="#contacto" data-plan="Pro">Elegir Pro</a>
+          </article>
+          <article class="card plan">
+            <h3>Business</h3>
+            <p class="plan-desc">Volumen alto y más modelos de IA.</p>
+            <p class="price"><span>299 €</span>/mes</p>
+            <ul>
+              <li>20.000 mensajes de texto al mes</li>
+              <li>1.500 turnos de voz al mes</li>
+              <li>Excedente: 0,015 € por mensaje y 0,07 € por turno de voz</li>
+              <li>Más opciones de modelos de IA</li>
+            </ul>
+            <a class="btn btn-outline" href="#contacto" data-plan="Business">Elegir Business</a>
+          </article>
+        </div>
+        <p class="plans-note">
+          ¿Necesitas más volumen, integraciones específicas o varios asistentes?
+          <a href="#contacto" data-plan="A medida">Te preparamos una propuesta a medida.</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="preguntas">
+      <div class="container narrow">
+        <div class="section-head">
+          <p class="eyebrow">Preguntas frecuentes</p>
+          <h2>Lo que suelen preguntarnos</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>¿Necesito conocimientos técnicos?</summary>
+            <p>No. Nosotros configuramos el asistente, conectamos los canales y lo dejamos funcionando. Tú nos cuentas cómo trabaja tu negocio.</p>
+          </details>
+          <details>
+            <summary>¿Qué cuenta como un mensaje?</summary>
+            <p>Cada mensaje de un cliente que el asistente responde. En voz, cada turno de conversación. Puedes ver tu consumo en la consola en todo momento.</p>
+          </details>
+          <details>
+            <summary>¿Qué pasa si el asistente no sabe responder algo?</summary>
+            <p>Lo dice con sinceridad y ofrece que una persona de tu equipo se ponga en contacto. Tiene instrucciones de no inventar precios, horarios ni datos.</p>
+          </details>
+          <details>
+            <summary>¿Puedo usar el número de WhatsApp de mi empresa?</summary>
+            <p>Sí. Conectamos tu número y el asistente responde desde él, así tus clientes siguen escribiendo al mismo sitio de siempre.</p>
+          </details>
+          <details>
+            <summary>¿Qué ocurre si llego al límite de mensajes?</summary>
+            <p>En Starter el asistente se detiene hasta el mes siguiente, para que la factura sea siempre la misma. En Pro y Business se cobra el excedente por mensaje, con el tope de gasto que tú elijas.</p>
+          </details>
+          <details>
+            <summary>¿Cuánto se tarda en ponerlo en marcha?</summary>
+            <p>Depende de los canales y de lo que deba hacer el asistente. Lo concretamos contigo en la primera llamada.</p>
+          </details>
+          <details>
+            <summary>¿Puedo cambiar de plan?</summary>
+            <p>Sí, en cualquier momento. Y si ningún plan encaja, preparamos una propuesta a medida.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTACTO -->
+    <section class="section section-dark" id="contacto">
+      <div class="container contact-grid">
+        <div class="contact-copy">
+          <p class="eyebrow eyebrow-dark">Contacto</p>
+          <h2>Hablemos de tu asistente</h2>
+          <p>Cuéntanos qué necesitas y te respondemos por email para concertar una llamada. Sin compromiso.</p>
+          <ul class="contact-points">
+            <li>Te explicamos qué puede hacer un asistente en tu negocio</li>
+            <li>Te recomendamos el plan que mejor encaja</li>
+            <li>Te enseñamos una demo en tu canal preferido</li>
+          </ul>
+          <p class="contact-client">¿Ya eres cliente? <a href="https://app.flowsdone.com">Entra en tu consola</a>.</p>
+        </div>
+
+        <form class="contact-form" data-contact-form novalidate>
+          <div class="field-row">
+            <div class="field">
+              <label for="c-name">Nombre <span aria-hidden="true">*</span></label>
+              <input id="c-name" name="name" type="text" autocomplete="name" required minlength="2" maxlength="120" />
+            </div>
+            <div class="field">
+              <label for="c-email">Email <span aria-hidden="true">*</span></label>
+              <input id="c-email" name="email" type="email" autocomplete="email" required maxlength="254" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="c-company">Empresa</label>
+              <input id="c-company" name="company" type="text" autocomplete="organization" maxlength="160" />
+            </div>
+            <div class="field">
+              <label for="c-phone">Teléfono</label>
+              <input id="c-phone" name="phone" type="tel" autocomplete="tel" maxlength="40" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="c-interest">¿Qué te interesa?</label>
+            <select id="c-interest" name="interest">
+              <option value="agents">Agentes de IA para atención al cliente</option>
+              <option value="channels">Atención multicanal (WhatsApp, Instagram, web…)</option>
+              <option value="voice">Asistente telefónico de voz</option>
+              <option value="knowledge">Asistente con la documentación de mi empresa</option>
+              <option value="automation">Automatización de procesos</option>
+              <option value="plans">Planes y precios</option>
+              <option value="other">Otro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="c-message">Mensaje <span aria-hidden="true">*</span></label>
+            <textarea id="c-message" name="message" rows="5" required minlength="10" maxlength="4000" placeholder="Qué hace tu negocio, por qué canales te escriben tus clientes y qué te gustaría resolver."></textarea>
+          </div>
+          <div class="hp" aria-hidden="true">
+            <label for="c-website">No rellenes este campo</label>
+            <input id="c-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+          </div>
+          <label class="consent">
+            <input type="checkbox" name="consent" required />
+            <span>Acepto que Flowsdone use estos datos solo para responder a mi consulta.</span>
+          </label>
+          <button class="btn btn-primary btn-lg btn-block" type="submit" data-submit>Enviar mensaje</button>
+          <p class="form-status" role="status" aria-live="polite" data-status></p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a class="brand" href="#inicio" aria-label="Flowsdone, inicio">
+        <img src="brand/flowsdone-mark.svg" alt="" width="32" height="32" />
+        <span class="brand-name">Flows<span>done</span></span>
+      </a>
+      <p class="footer-tag">Intelligence in motion</p>
+      <nav class="footer-nav" aria-label="Pie de página">
+        <a href="#servicios">Servicios</a>
+        <a href="#planes">Planes</a>
+        <a href="#contacto">Contacto</a>
+        <a href="https://app.flowsdone.com">Acceso clientes</a>
+      </nav>
+      <p class="footer-copy">© <span data-year>2026</span> Flowsdone</p>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
 </body>
 </html>

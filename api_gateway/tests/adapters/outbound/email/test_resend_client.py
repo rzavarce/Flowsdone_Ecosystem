@@ -94,3 +94,34 @@ async def test_network_failure_raises():
             context={"name": "A", "link": "https://x", "ttl_hours": 1},
             subject="s",
         )
+
+
+async def test_the_contact_request_template_escapes_input_and_sets_reply_to():
+    import json
+
+    adapter, seen = _adapter(lambda r: httpx.Response(200, json={"id": "email_2"}))
+
+    await adapter.send_template(
+        to="team@flowsdone.com",
+        template="contact_request",
+        context={"name": "Ana <b>", "email": "ana@tienda.es", "company": "Tienda", "phone": None,
+                 "interest_label": "Planes y precios", "message": "Hola\nquiero info"},
+        subject="Nuevo contacto desde la web: Ana (Tienda)",
+        reply_to="ana@tienda.es",
+    )
+
+    body = json.loads(seen[0].content)
+    assert body["reply_to"] == "ana@tienda.es"
+    assert "Ana &lt;b&gt;" in body["html"] and "<b>" not in body["html"].split("Nombre")[1][:200]
+    assert "Planes y precios" in body["html"] and "Teléfono" not in body["html"]
+
+
+async def test_no_reply_to_unless_given():
+    import json
+
+    adapter, seen = _adapter(lambda r: httpx.Response(200, json={"id": "email_3"}))
+    await adapter.send_template(
+        to="c@x.com", template="account_activation",
+        context={"name": "C", "link": "https://x", "ttl_hours": 24}, subject="S",
+    )
+    assert "reply_to" not in json.loads(seen[0].content)
