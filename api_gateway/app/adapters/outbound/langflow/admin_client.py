@@ -200,6 +200,22 @@ class LangflowAdminClient(LangflowAdminPort):
             raise LangflowSessionError(f"langflow rejected update user (HTTP {updated.status_code})")
         return str(user_id)
 
+    async def delete_user(self, langflow_user_id: str) -> None:
+        """Delete a Langflow user; Langflow deletes its folders and flows too.
+
+        Args:
+            langflow_user_id (str): Id of the user inside Langflow. One that
+                no longer exists is not an error.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "DELETE", f"/api/v1/users/{langflow_user_id}", headers=self._key_headers()
+        )
+        if response.status_code not in (200, 204, 404):
+            raise LangflowSessionError(f"langflow rejected delete user (HTTP {response.status_code})")
+
     async def login(self, username: str, password: str) -> LangflowTokens:
         """Log a user in.
 

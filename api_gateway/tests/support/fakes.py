@@ -969,7 +969,7 @@ def make_user(**overrides: Any) -> User:
 
 
 class FakeTenantRepo:
-    """In-memory TenantRepositoryPort: create/list/list_by_ids/get_by_id."""
+    """In-memory TenantRepositoryPort: create/list/list_by_ids/get_by_id/delete."""
 
     def __init__(self, tenants: Optional[List[Tenant]] = None) -> None:
         self.tenants = list(tenants or [])
@@ -989,6 +989,11 @@ class FakeTenantRepo:
 
     async def get_by_id(self, tenant_id: UUID) -> Optional[Tenant]:
         return next((t for t in self.tenants if t.id == tenant_id), None)
+
+    async def delete(self, tenant_id: UUID) -> bool:
+        before = len(self.tenants)
+        self.tenants = [t for t in self.tenants if t.id != tenant_id]
+        return len(self.tenants) < before
 
 
 class FakePasswordHasher:

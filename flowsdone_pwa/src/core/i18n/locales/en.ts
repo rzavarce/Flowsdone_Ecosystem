@@ -601,7 +601,7 @@ export const en: Messages<typeof es> = {
       channels_other: '{{count}} channels',
     },
     delete: {
-      description: 'The tenant and EVERYTHING in it will be deleted.',
+      description: "The tenant and EVERYTHING in it will be deleted, including the client's account and all its flows in the flow editor.",
       confirm: 'Delete tenant',
       cascade:
         'This will cascade-delete <strong>{{summary}}</strong>. Channels will stop answering immediately. If you only want to pause it, use <strong>Suspend</strong>.',

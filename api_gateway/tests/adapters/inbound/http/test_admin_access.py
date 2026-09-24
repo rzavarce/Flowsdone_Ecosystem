@@ -537,3 +537,13 @@ async def test_only_admins_touch_other_users_photos(world):
             headers = {**cookie(token), **CSRF}
             assert (await c.put(f"{BASE}/users/{target.id}/avatar", headers=headers, content=PNG)).status_code == 403
             assert (await c.get(f"{BASE}/users/{target.id}/avatar", headers=cookie(token))).status_code == 403
+
+
+async def test_a_deleted_tenant_can_be_created_again_with_the_same_client_email(world):
+    async with world.client() as c:
+        created = await _call(c, "POST", "/tenants", api_key=settings.ADMIN_API_KEY, json=_new_tenant())
+        tenant_id = created.json()["id"]
+        deleted = await _call(c, "DELETE", f"/tenants/{tenant_id}", api_key=settings.ADMIN_API_KEY)
+        again = await _call(c, "POST", "/tenants", api_key=settings.ADMIN_API_KEY, json=_new_tenant())
+    assert created.status_code == 201 and deleted.status_code == 204
+    assert again.status_code == 201  # the client account went with the tenant

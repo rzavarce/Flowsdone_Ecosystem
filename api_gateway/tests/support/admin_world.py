@@ -18,6 +18,7 @@ from app.application.use_cases.create_tenant import CreateTenantUseCase
 from app.application.use_cases.create_user import CreateUserUseCase
 from app.application.use_cases.get_current_user import GetCurrentUserUseCase
 from app.application.use_cases.manage_profile import RemoveAvatarUseCase, SetAvatarUseCase
+from app.application.use_cases.delete_tenant import DeleteTenantUseCase
 from app.application.use_cases.manage_users import DeleteUserUseCase, UpdateUserUseCase
 from app.application.use_cases.provision_user import ProvisionUserUseCase
 from app.core.config import settings
@@ -62,6 +63,13 @@ CSRF = {"X-Requested-With": "fd-console"}
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
+
+
+class _NoLangflowAccounts:
+    """No tenant has opened Langflow in the HTTP tests' world."""
+
+    async def get(self, tenant_id):
+        return None
 
 class InMemoryRepo:
     """Generic id-keyed store behind the admin repository ports.
@@ -230,6 +238,11 @@ class World:
             create_user_use_case=CreateUserUseCase(user_repo=self.users, tenant_repo=self.tenants, hasher=self.hasher),
             update_user_use_case=UpdateUserUseCase(user_repo=self.users, tenant_repo=self.tenants, hasher=self.hasher, sessions=self.sessions),
             delete_user_use_case=DeleteUserUseCase(user_repo=self.users, sessions=self.sessions),
+            delete_tenant_use_case=DeleteTenantUseCase(
+                tenant_repo=self.tenants, user_repo=self.users,
+                delete_user=DeleteUserUseCase(user_repo=self.users, sessions=self.sessions),
+                accounts=_NoLangflowAccounts(), langflow=None,
+            ),
             user_avatar_repo=self.avatars,
             set_avatar_use_case=SetAvatarUseCase(avatar_repo=self.avatars),
             remove_avatar_use_case=RemoveAvatarUseCase(avatar_repo=self.avatars),

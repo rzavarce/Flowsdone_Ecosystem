@@ -351,3 +351,18 @@ async def test_default_folder_is_my_projects_and_is_recreated_if_missing():
     missing, posted = client([{"id": "p1", "name": "Soporte"}])
     assert await missing.default_folder("tok") == "new"
     assert b'"My Projects"' in posted[0]
+
+
+async def test_delete_user_uses_the_gateway_key_and_tolerates_a_missing_user():
+    import pytest
+
+    from app.domain.ports.outbound import LangflowSessionError
+
+    for status in (200, 404):
+        client, seen = _client(lambda r, s=status: httpx.Response(s, json={}))
+        await client.delete_user("u1")
+        assert (seen[0].method, seen[0].url.path, seen[0].headers["x-api-key"]) == ("DELETE", "/api/v1/users/u1", "gateway-key")
+
+    client, _ = _client(lambda r: httpx.Response(403, json={}))
+    with pytest.raises(LangflowSessionError):
+        await client.delete_user("u1")

@@ -93,6 +93,7 @@ from app.application.use_cases.handle_outbound_response import HandleOutboundRes
 from app.application.use_cases.ingest_message import IngestMessageUseCase
 from app.application.use_cases.langflow_sso import PrepareLangflowSessionUseCase, RedeemLangflowTicketUseCase
 from app.application.use_cases.delete_project import DeleteProjectUseCase
+from app.application.use_cases.delete_tenant import DeleteTenantUseCase
 from app.application.use_cases.manage_agents import ListProjectFlowsUseCase, ManageAgentsUseCase
 from app.application.use_cases.onboarding import CreateBaseAgentUseCase, GetOnboardingStatusUseCase
 from app.application.use_cases.logout_user import LogoutUserUseCase
@@ -485,6 +486,13 @@ async def lifespan(app: FastAPI):
         project_repo=app.state.project_repo,
         agent_repo=app.state.agent_repo,
         workspace=app.state.prepare_langflow_session_use_case,
+        langflow=langflow_admin,
+    )
+    app.state.delete_tenant_use_case = DeleteTenantUseCase(
+        tenant_repo=app.state.tenant_repo,
+        user_repo=user_repo,
+        delete_user=app.state.delete_user_use_case,
+        accounts=langflow_accounts,
         langflow=langflow_admin,
     )
     app.state.delete_project_use_case = DeleteProjectUseCase(

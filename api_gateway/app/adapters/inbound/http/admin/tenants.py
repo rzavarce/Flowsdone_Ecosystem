@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import TenantCreate, TenantOut, TenantUpdate
-from app.domain.ports.outbound import EmailSendError, UserAlreadyExistsError
+from app.domain.ports.outbound import EmailSendError, LangflowSessionError, UserAlreadyExistsError
 
 router = APIRouter(prefix="/tenants", tags=["admin:tenants"])
 
@@ -147,15 +147,21 @@ async def delete_tenant(
 ) -> None:
     """Delete a tenant.
 
+    Its Langflow user (with its folders and flows) and its client account
+    go with it; if Langflow fails, nothing is deleted.
+
     Args:
         tenant_id (UUID): Id of the tenant to delete.
         request (Request): The incoming FastAPI request; used to reach
-            `request.app.state.tenant_repo`.
+            `request.app.state.delete_tenant_use_case`.
         access (AdminAccess): The authenticated caller (admin only).
 
     Raises:
-        HTTPException: 404 if the tenant does not exist.
+        HTTPException: 404 if the tenant does not exist; 502 if Langflow fails.
     """
-    deleted = await request.app.state.tenant_repo.delete(tenant_id)
+    try:
+        deleted = await request.app.state.delete_tenant_use_case.execute(tenant_id)
+    except LangflowSessionError as exc:
+        raise HTTPException(status_code=502, detail=f"langflow unavailable: {exc}") from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="tenant not found")

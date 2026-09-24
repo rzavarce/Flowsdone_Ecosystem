@@ -123,6 +123,18 @@ class LangflowAdminPort(Protocol):
         """
         ...
 
+    async def delete_user(self, langflow_user_id: str) -> None:
+        """Delete a Langflow user with all its folders and flows (superuser).
+
+        Args:
+            langflow_user_id (str): Id of the user inside Langflow. One that
+                no longer exists is not an error.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
     async def login(self, username: str, password: str) -> LangflowTokens:
         """Log a user in.
 
