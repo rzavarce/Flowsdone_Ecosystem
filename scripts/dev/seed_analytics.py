@@ -149,8 +149,10 @@ def build(channels: List[Channel], days: int) -> tuple[list, list, list]:
                             "message_id": msg_id, "ts": ts(t), "tenant_id": ch.tenant_id, "project_id": ch.project_id,
                             "agent_id": ch.agent_id, "conversation_id": conv_id, "session_id": session,
                             "channel_type": ch.channel_type, "channel_connection_id": ch.connection_id,
-                            "direction": direction, "sender_type": "contact" if direction == "inbound" else "agent",
-                            "app": ch.channel_type, "contact": contact, "text": "(demo)",
+                            # Same values as the real gateway (conversation_tracker / switchboard).
+                            "direction": direction, "sender_type": "contact" if direction == "inbound" else "bot",
+                            "app": "langflow", "contact": contact,
+                            "text": "(mensaje de ejemplo)" if direction == "inbound" else "(respuesta de ejemplo)",
                             "retention_until": (t + timedelta(days=180)).strftime("%Y-%m-%d %H:%M:%S"),
                         })
                         usage.append(_usage(ch, conv_id, msg_id, t, "channel", ch.channel_type, f"message.{direction}", 1, "message"))
