@@ -152,6 +152,17 @@ class Settings(BaseModel):
     CONTACT_MAX_PER_IP: int = 5
     CONTACT_WINDOW_SECONDS: int = 3600
 
+    # Metabase (dashboards of the console). The gateway signs the embed URLs
+    # with METABASE_EMBEDDING_SECRET_KEY (shared with Metabase), locking the
+    # tenant filter; it finds each dashboard's id through Metabase's API with
+    # the admin account. METABASE_PUBLIC_URL is what the browser loads.
+    METABASE_INTERNAL_URL: str = "http://metabase:3000"
+    METABASE_PUBLIC_URL: str = "http://localhost:3030"
+    METABASE_EMBEDDING_SECRET_KEY: Optional[str] = None
+    METABASE_ADMIN_EMAIL: Optional[str] = None
+    METABASE_ADMIN_PASSWORD: Optional[str] = None
+    METABASE_EMBED_TTL_SECONDS: int = 3600
+
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
     # per-bot Telegram secret_token no longer live here - they are
@@ -314,6 +325,13 @@ settings = Settings(
     CONTACT_EMAIL_TO=os.getenv("CONTACT_EMAIL_TO") or None,
     CONTACT_MAX_PER_IP=int(os.getenv("CONTACT_MAX_PER_IP", "5")),
     CONTACT_WINDOW_SECONDS=int(os.getenv("CONTACT_WINDOW_SECONDS", "3600")),
+
+    METABASE_INTERNAL_URL=os.getenv("METABASE_INTERNAL_URL", "http://metabase:3000").rstrip("/"),
+    METABASE_PUBLIC_URL=os.getenv("METABASE_PUBLIC_URL", "http://localhost:3030").rstrip("/"),
+    METABASE_EMBEDDING_SECRET_KEY=os.getenv("METABASE_EMBEDDING_SECRET_KEY") or None,
+    METABASE_ADMIN_EMAIL=os.getenv("METABASE_ADMIN_EMAIL") or None,
+    METABASE_ADMIN_PASSWORD=os.getenv("METABASE_ADMIN_PASSWORD") or None,
+    METABASE_EMBED_TTL_SECONDS=int(os.getenv("METABASE_EMBED_TTL_SECONDS", "3600")),
 
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 

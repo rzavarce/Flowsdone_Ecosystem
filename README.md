@@ -672,6 +672,22 @@ Metabase (`metabase/metabase:v0.63.18.2`) alimenta las secciones **Dashboard** y
 - **DNS:** registro `bi` → IP del VPS (router `metabase` de Traefik).
 - **Local:** `http://localhost:3030` (usuario: `METABASE_ADMIN_EMAIL` de tu `.env`).
 
+**Dashboards como código** (`scripts/metabase/dashboards.py`): `provision.py` los crea o actualiza en la colección «Consola Flowsdone (gestionado)», conservando sus ids. No se editan a mano en Metabase: cada despliegue los deja como en el código.
+
+| Dashboard (clave) | Quién lo ve en *Dashboard* | Contenido |
+|---|---|---|
+| Plataforma (`platform`) | `tenant_manager`, `botmaster` | Actividad, rendimiento (tiempo de respuesta mediana/p95, duración, cierres), tokens de IA por día y modelo, uso de la consola |
+| Plataforma (administración) (`platform_admin`) | `admin` | Lo anterior + negocio: cuotas contratadas, clientes por plan e ingresos/coste/margen de los meses cerrados (`usage_statements`) |
+| Tu asistente (`client`) | `client`, `consultant` | Conversaciones, % del plan usado, canales, horas y días punta, agentes, tiempo de respuesta |
+
+- Las cantidades (mensajes, tokens, tiempos) salen de ClickHouse en tiempo real. El único dinero son los **meses cerrados**, que coinciden con lo facturado. El importe del mes en curso lo calcula la consola con las reglas de facturación, no Metabase.
+- **Filtro de tenant a prueba de manipulación** (*static embedding*): la consola pide `GET /me/dashboard?tenant_id=…`. El gateway (`GetOverviewDashboardUseCase`) elige el dashboard según el perfil y firma una URL con `METABASE_EMBEDDING_SECRET_KEY` en la que el filtro `tenant` va **bloqueado**:
+  - un tenant elegido tiene que ser del usuario;
+  - sin elegir, el admin ve todos y el resto solo los suyos (un usuario sin tenants no ve nada).
+  - Metabase rechaza cualquier intento de cambiar ese filtro desde el navegador.
+- La URL caduca a los `METABASE_EMBED_TTL_SECONDS` (1 h) y la consola la renueva sola. El iframe se ajusta a la altura del dashboard con `iframe-resizer` 4.4.5 (MIT).
+- **Datos de ejemplo (solo local):** `docker compose run --rm --no-deps -v ./scripts/dev:/scripts/dev api python /scripts/dev/seed_analytics.py [--days 60] [--clear]`. Genera conversaciones, mensajes y consumo marcados como `seed:`, que `--clear` borra. Se niega a ejecutarse si `PUBLIC_BASE_URL` es `https`.
+
 ### Landing page — `flowsdone.com`
 
 Página estática en `api_gateway/app/static/flowsdone/` (`index.html`, `styles.css`, `main.js` y `brand/`), sin framework ni build. La sirve el gateway: el router `flowsdone` de Traefik reescribe cada ruta a `/static/flowsdone/…`.

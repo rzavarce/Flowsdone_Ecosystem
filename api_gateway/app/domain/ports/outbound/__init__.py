@@ -89,6 +89,7 @@ from app.domain.ports.outbound.conversations import (  # noqa: F401
     ConversationRepositoryPort,
     MessageArchivePort,
 )
+from app.domain.ports.outbound.analytics import AnalyticsUnavailableError, DashboardEmbedPort  # noqa: F401
 from app.domain.ports.outbound.email import EmailSendError, EmailSenderPort  # noqa: F401
 from app.domain.ports.outbound.langflow_sso import (  # noqa: F401
     LangflowAccountRepositoryPort,

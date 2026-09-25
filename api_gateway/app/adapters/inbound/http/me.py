@@ -11,9 +11,12 @@ that is inherently "about me", not a general-purpose escape hatch around
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel
 
 from app.adapters.inbound.http.admin.billing import statement_out
 from app.adapters.inbound.http.admin.billing_schemas import StatementOut
@@ -22,7 +25,11 @@ from app.adapters.inbound.http.auth_deps import get_current_user, require_consol
 from app.adapters.inbound.http.avatar_io import avatar_response, read_image_body
 from app.application.dto.auth_dto import AuthenticatedUser
 from app.application.use_cases._auth_common import build_authenticated_user
+from app.application.use_cases.analytics_dashboards import NoTenantsError, TenantOutOfScopeError
 from app.application.use_cases.manage_profile import InvalidAvatarError
+from app.domain.ports.outbound import AnalyticsUnavailableError
+
+logger = logging.getLogger("http.me")
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -94,6 +101,60 @@ async def my_usage(
         tenant_id=user.tenants[0].id, period=period or now.strftime("%Y-%m"), now=now
     )
     return statement_out(statement, with_costs=False)
+
+
+class DashboardOut(BaseModel):
+    """Response of GET /me/dashboard.
+
+    Attributes:
+        url (str): Dashboard URL to load in an iframe (short-lived).
+        dashboard (str): Which dashboard ("platform", "platform_admin", "client").
+        expires_in (int): Seconds the URL stays valid; ask again after that.
+    """
+
+    url: str
+    dashboard: str
+    expires_in: int
+
+
+@router.get("/dashboard", response_model=DashboardOut)
+async def my_dashboard(
+    request: Request,
+    response: Response,
+    tenant_id: Optional[UUID] = Query(default=None),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> DashboardOut:
+    """The dashboard of the console's Dashboard section for the caller.
+
+    Every profile has one (staff: the platform; clients and consultants:
+    their assistants). Its data is locked to `tenant_id` - which must be one
+    of the caller's tenants - or, without it, to all of the caller's
+    tenants (every tenant for an admin).
+
+    Args:
+        request (Request): Used to reach `request.app.state.overview_dashboard_use_case`.
+        response (Response): Receives no-store headers (the URL is a credential).
+        tenant_id (Optional[UUID]): Tenant chosen in the console's selector.
+        user (AuthenticatedUser): The signed-in user.
+
+    Returns:
+        DashboardOut: The dashboard's URL.
+
+    Raises:
+        HTTPException: 404 if the tenant is not the caller's; 403 if the
+            caller has no tenants; 503 if the dashboards are unavailable.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        embed = await request.app.state.overview_dashboard_use_case.execute(user, tenant_id)
+    except TenantOutOfScopeError as exc:
+        raise HTTPException(status_code=404, detail="tenant not found") from exc
+    except NoTenantsError as exc:
+        raise HTTPException(status_code=403, detail="no tenant for this account") from exc
+    except AnalyticsUnavailableError as exc:
+        logger.warning("me.dashboard_unavailable", extra={"error": str(exc)})
+        raise HTTPException(status_code=503, detail="dashboards unavailable") from exc
+    return DashboardOut(url=embed.url, dashboard=embed.dashboard, expires_in=embed.expires_in)
 
 
 @router.patch("/profile", response_model=AuthenticatedUser, dependencies=[Depends(require_console_header)])

@@ -1,4 +1,4 @@
-"""Provision Metabase (idempotent): admin account and data sources.
+"""Provision Metabase (idempotent): admin account, data sources and dashboards.
 
 Run inside the `api` container, which already has httpx and reads `.env`:
 
@@ -14,6 +14,9 @@ What it does:
      (role metabase_reader, see scripts/metabase/init-postgres.sh);
    - "Flowsdone · ClickHouse": the `flowsdone` database (user
      metabase_reader, see scripts/clickhouse/users.d/metabase_reader.xml).
+3. Creates or updates the console's dashboards (scripts/metabase/dashboards.py)
+   in their own collection, with static embedding on and the tenant filter
+   locked. Cards and dashboards keep their ids across runs.
 """
 
 from __future__ import annotations
@@ -22,9 +25,12 @@ import os
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import dashboards as specs  # noqa: E402
 
 POSTGRES_SOURCE = "Flowsdone · Postgres"
 CLICKHOUSE_SOURCE = "Flowsdone · ClickHouse"
@@ -219,6 +225,26 @@ def ensure_sources(client: httpx.Client, config: Config) -> Dict[str, int]:
     return ids
 
 
+# Spanish number and date formats (1.593,5 - 26 agosto, 2026) for every chart.
+FORMATTING = {
+    "type/Number": {"number_separators": ",."},
+    "type/Temporal": {"date_style": "D MMMM, YYYY", "date_abbreviate": True},
+    "type/Currency": {"currency": "EUR", "currency_style": "symbol"},
+}
+
+
+def ensure_formatting(client: httpx.Client) -> None:
+    """Set Metabase's global number/date/currency formatting (Spanish, EUR).
+
+    Args:
+        client (httpx.Client): Logged-in client.
+
+    Raises:
+        ProvisionError: If Metabase refuses the setting.
+    """
+    _check(client.put("/api/setting/custom-formatting", json={"value": FORMATTING}), "formato de números")
+
+
 def remove_sample_database(client: httpx.Client) -> bool:
     """Delete Metabase's bundled "Sample Database", so only our data shows.
 
@@ -234,6 +260,228 @@ def remove_sample_database(client: httpx.Client) -> bool:
             client.delete(f"/api/database/{db['id']}")
             return True
     return False
+
+
+def _items(response: httpx.Response) -> list:
+    """Metabase lists come either bare or wrapped in {"data": [...]}.
+
+    Args:
+        response (httpx.Response): A list response.
+
+    Returns:
+        list: The items.
+    """
+    body = response.json()
+    return body.get("data", []) if isinstance(body, dict) else body
+
+
+def _check(response: httpx.Response, what: str) -> dict:
+    """Fail clearly unless Metabase accepted the request.
+
+    Args:
+        response (httpx.Response): The response.
+        what (str): What was being done.
+
+    Returns:
+        dict: The JSON body.
+
+    Raises:
+        ProvisionError: If the status is not 2xx.
+    """
+    if response.status_code >= 300:
+        raise ProvisionError(f"{what} rechazado (HTTP {response.status_code}): {response.text[:300]}")
+    return response.json() if response.content else {}
+
+
+def ensure_collection(client: httpx.Client) -> int:
+    """The collection that holds the managed dashboards.
+
+    Args:
+        client (httpx.Client): Logged-in client.
+
+    Returns:
+        int: Its id.
+    """
+    for collection in _items(client.get("/api/collection")):
+        if collection.get("name") == specs.COLLECTION and not collection.get("archived"):
+            return int(collection["id"])
+    body = {"name": specs.COLLECTION, "description": specs.COLLECTION_DESCRIPTION}
+    return int(_check(client.post("/api/collection", json=body), "colección")["id"])
+
+
+def field_ids(client: httpx.Client, database_ids: Dict[str, int]) -> Dict[str, int]:
+    """Field ids by "schema.table.column" across both sources.
+
+    Args:
+        client (httpx.Client): Logged-in client.
+        database_ids (Dict[str, int]): Source name -> database id.
+
+    Returns:
+        Dict[str, int]: Field ids.
+    """
+    fields: Dict[str, int] = {}
+    for db_id in database_ids.values():
+        metadata = _check(client.get(f"/api/database/{db_id}/metadata"), "metadatos")
+        for table in metadata.get("tables", []):
+            for column in table.get("fields", []):
+                fields[f"{table.get('schema') or ''}.{table['name']}.{column['name']}"] = column["id"]
+    return fields
+
+
+def sync_until_fields(client: httpx.Client, database_ids: Dict[str, int], needed: List[str],
+                      *, attempts: int = 30, delay: float = 5.0) -> Dict[str, int]:
+    """Wait until Metabase has synced the fields the cards filter on.
+
+    A freshly connected source is scanned in the background; the field
+    filters need those field ids.
+
+    Args:
+        client (httpx.Client): Logged-in client.
+        database_ids (Dict[str, int]): Source name -> database id.
+        needed (List[str]): "schema.table.column" references.
+        attempts (int): How many times to check.
+        delay (float): Seconds between checks.
+
+    Returns:
+        Dict[str, int]: Field ids.
+
+    Raises:
+        ProvisionError: If some field never shows up.
+    """
+    for attempt in range(attempts):
+        fields = field_ids(client, database_ids)
+        missing = [ref for ref in needed if ref not in fields]
+        if not missing:
+            return fields
+        if attempt == 0:
+            for db_id in database_ids.values():
+                client.post(f"/api/database/{db_id}/sync_schema")
+        time.sleep(delay)
+    raise ProvisionError(f"Metabase no ve estos campos (¿falta la migración 0013?): {', '.join(missing)}")
+
+
+def card_payload(card: "specs.Card", database_id: int, fields: Dict[str, int], collection_id: int) -> dict:
+    """`POST/PUT /api/card` body for a card spec.
+
+    Args:
+        card (specs.Card): The spec.
+        database_id (int): Its source's database id.
+        fields (Dict[str, int]): Field ids.
+        collection_id (int): The managed collection.
+
+    Returns:
+        dict: The body.
+    """
+    widgets = {"tenant": "string/=", "fecha": "date/all-options"}
+    tags = {
+        tag: {
+            "id": tag, "name": tag, "display-name": tag.capitalize(), "type": "dimension",
+            "dimension": ["field", fields[ref], None], "widget-type": widgets[tag],
+        }
+        for tag, ref in card.tags.items()
+    }
+    return {
+        "name": card.name,
+        "collection_id": collection_id,
+        "display": card.display,
+        "visualization_settings": card.settings,
+        "dataset_query": {"type": "native", "database": database_id,
+                          "native": {"query": card.sql, "template-tags": tags}},
+    }
+
+
+def ensure_cards(client: httpx.Client, collection_id: int, database_ids: Dict[str, int],
+                 fields: Dict[str, int]) -> Dict[str, int]:
+    """Create or update every card, keeping existing ids.
+
+    Args:
+        client (httpx.Client): Logged-in client.
+        collection_id (int): The managed collection.
+        database_ids (Dict[str, int]): Source name -> database id.
+        fields (Dict[str, int]): Field ids.
+
+    Returns:
+        Dict[str, int]: Card id by card key.
+    """
+    source_db = {specs.CH: database_ids[CLICKHOUSE_SOURCE], specs.PG: database_ids[POSTGRES_SOURCE]}
+    existing = {
+        item["name"]: item["id"]
+        for item in _items(client.get(f"/api/collection/{collection_id}/items", params={"models": "card"}))
+    }
+    ids: Dict[str, int] = {}
+    for key, card in specs.CARDS.items():
+        body = card_payload(card, source_db[card.source], fields, collection_id)
+        if card.name in existing:
+            ids[key] = int(_check(client.put(f"/api/card/{existing[card.name]}", json=body), f"pregunta {card.name!r}")["id"])
+        else:
+            ids[key] = int(_check(client.post("/api/card", json=body), f"pregunta {card.name!r}")["id"])
+    return ids
+
+
+def dashcards(dashboard: "specs.Dashboard", card_ids: Dict[str, int]) -> list:
+    """The dashboard's cards and headings, with their filter mappings.
+
+    Args:
+        dashboard (specs.Dashboard): The spec.
+        card_ids (Dict[str, int]): Card id by key.
+
+    Returns:
+        list: `dashcards` for `PUT /api/dashboard/:id` (new ids are negative).
+    """
+    result = []
+    for n, (key, heading, row, col, width, height) in enumerate(specs.layout(dashboard.items), start=1):
+        base = {"id": -n, "row": row, "col": col, "size_x": width, "size_y": height}
+        if key is None:
+            result.append({**base, "card_id": None, "parameter_mappings": [], "visualization_settings": {
+                "virtual_card": {"name": None, "display": "heading", "visualization_settings": {},
+                                 "dataset_query": {}, "archived": False},
+                "text": heading, "dashcard.background": False,
+            }})
+            continue
+        card_id = card_ids[key]
+        mappings = [
+            {"parameter_id": tag, "card_id": card_id, "target": ["dimension", ["template-tag", tag]]}
+            for tag in specs.CARDS[key].tags
+        ]
+        result.append({**base, "card_id": card_id, "parameter_mappings": mappings, "visualization_settings": {}})
+    return result
+
+
+def ensure_dashboards(client: httpx.Client, collection_id: int, card_ids: Dict[str, int]) -> Dict[str, int]:
+    """Create or update every dashboard, keeping existing ids.
+
+    Args:
+        client (httpx.Client): Logged-in client.
+        collection_id (int): The managed collection.
+        card_ids (Dict[str, int]): Card id by key.
+
+    Returns:
+        Dict[str, int]: Dashboard id by dashboard key.
+    """
+    existing = {}
+    for item in _items(client.get(f"/api/collection/{collection_id}/items", params={"models": "dashboard"})):
+        for spec in specs.DASHBOARDS:
+            if spec.marker in (item.get("description") or ""):
+                existing[spec.key] = item["id"]
+    ids: Dict[str, int] = {}
+    for spec in specs.DASHBOARDS:
+        description = f"{spec.description} {spec.marker}"
+        if spec.key in existing:
+            dashboard_id = existing[spec.key]
+        else:
+            created = client.post("/api/dashboard", json={
+                "name": spec.name, "description": description, "collection_id": collection_id,
+                "parameters": specs.PARAMETERS,
+            })
+            dashboard_id = int(_check(created, f"dashboard {spec.name!r}")["id"])
+        _check(client.put(f"/api/dashboard/{dashboard_id}", json={
+            "name": spec.name, "description": description, "collection_id": collection_id,
+            "parameters": specs.PARAMETERS, "enable_embedding": True,
+            "embedding_params": specs.EMBEDDING_PARAMS, "width": "full",
+            "dashcards": dashcards(spec, card_ids),
+        }), f"dashboard {spec.name!r}")
+        ids[spec.key] = dashboard_id
+    return ids
 
 
 def main(env: Optional[Dict[str, str]] = None) -> int:
@@ -254,8 +502,16 @@ def main(env: Optional[Dict[str, str]] = None) -> int:
             login(client, config)
             if remove_sample_database(client):
                 print("metabase: base de ejemplo eliminada")
-            for name, db_id in ensure_sources(client, config).items():
+            ensure_formatting(client)
+            database_ids = ensure_sources(client, config)
+            for name, db_id in database_ids.items():
                 print(f"metabase: fuente {name!r} lista (id {db_id})")
+            needed = sorted({ref for card in specs.CARDS.values() for ref in card.tags.values()})
+            fields = sync_until_fields(client, database_ids, needed)
+            collection_id = ensure_collection(client)
+            card_ids = ensure_cards(client, collection_id, database_ids, fields)
+            for key, dashboard_id in ensure_dashboards(client, collection_id, card_ids).items():
+                print(f"metabase: dashboard {key!r} listo (id {dashboard_id}, {len(card_ids)} preguntas)")
     except ProvisionError as exc:
         print(f"metabase: ERROR {exc}", file=sys.stderr)
         return 1

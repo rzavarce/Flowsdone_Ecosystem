@@ -93,3 +93,52 @@ async def test_never_reveals_another_tenants_billing_profile():
 
     # No hay perfil para "mine" (solo se cargó el de "other"): 404, nunca el ajeno.
     assert resp.status_code == 404
+
+
+class _FakeEmbeds:
+    def __init__(self, error=None):
+        self.calls, self.error = [], error
+
+    async def embed_url(self, dashboard_key, *, tenant_ids, ttl_seconds):
+        if self.error:
+            raise self.error
+        self.calls.append((dashboard_key, list(tenant_ids)))
+        return "https://bi/embed/x"
+
+
+def _dashboard_state(embeds, users, tenants):
+    from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase
+
+    state = _state(users, tenants)
+    state["overview_dashboard_use_case"] = GetOverviewDashboardUseCase(embeds=embeds, ttl_seconds=600)
+    return state
+
+
+async def test_dashboard_is_locked_to_the_callers_tenant():
+    mine, other = make_tenant(), make_tenant(slug="otro")
+    user = make_user(role="client", tenant_ids=[mine.id])
+    embeds = _FakeEmbeds()
+    state = _dashboard_state(embeds, [user], [mine, other])
+    token = await state["sessions"].create(user.id, ttl_seconds=3600)
+
+    async with client_for_router(router, **state) as client:
+        ok = await client.get("/me/dashboard", headers=_cookie(token))
+        foreign = await client.get("/me/dashboard", params={"tenant_id": str(other.id)}, headers=_cookie(token))
+        anonymous = await client.get("/me/dashboard")
+
+    assert ok.status_code == 200 and ok.json() == {"url": "https://bi/embed/x", "dashboard": "client", "expires_in": 600}
+    assert ok.headers["cache-control"] == "no-store"
+    assert embeds.calls == [("client", [str(mine.id)])]
+    assert foreign.status_code == 404 and anonymous.status_code == 401
+
+
+async def test_dashboard_unavailable_is_503():
+    from app.domain.ports.outbound import AnalyticsUnavailableError
+
+    tenant = make_tenant()
+    user = make_user(role="client", tenant_ids=[tenant.id])
+    state = _dashboard_state(_FakeEmbeds(AnalyticsUnavailableError("down")), [user], [tenant])
+    token = await state["sessions"].create(user.id, ttl_seconds=3600)
+    async with client_for_router(router, **state) as client:
+        resp = await client.get("/me/dashboard", headers=_cookie(token))
+    assert resp.status_code == 503
