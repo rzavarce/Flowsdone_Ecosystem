@@ -23,11 +23,11 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Usuarios', 'Planes', 'Ajustes']],
-    ['tenant_manager', ['Dashboard', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
-    ['botmaster', ['Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
-    ['client', ['Dashboard', 'Mi empresa', 'Ajustes']],
-    ['consultant', ['Dashboard', 'Ajustes']],
+    ['admin', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Usuarios', 'Planes', 'Ajustes']],
+    ['tenant_manager', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
+    ['botmaster', ['Dashboard', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
+    ['client', ['Dashboard', 'Reportes', 'Mi empresa', 'Ajustes']],
+    ['consultant', ['Dashboard', 'Reportes', 'Ajustes']],
   ])('%s ve el menú esperado', async (role, expected) => {
     renderApp('/dashboard', fakeAuthApi(makeUser(role)))
     await screen.findAllByRole('navigation', { name: 'Principal' })
@@ -45,20 +45,18 @@ describe('menú y acceso por perfil', () => {
     }
   })
 
-  it('el cliente ve su panel de solo lectura con el nombre de su organización', async () => {
+  it('el cliente ve su panel (dashboard de Metabase) con el nombre de su organización', async () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('client')))
     expect(await h1('Mi panel')).toBeInTheDocument()
     expect(screen.getByText('Resultados de Clínica Vital.')).toBeInTheDocument()
-    // Solo un subconjunto de indicadores.
-    expect(screen.getByText('Conversaciones hoy')).toBeInTheDocument()
-    expect(screen.queryByText('Tiempo de respuesta')).not.toBeInTheDocument()
+    expect(await screen.findByTitle('Mi panel')).toHaveAttribute('src', 'about:blank#tenant=t1')
   })
 
-  it('el botmaster cae directamente en Agentes, con los agentes de su (único) tenant', async () => {
+  it('el botmaster gestiona los agentes de su (único) tenant', async () => {
     // El tenant de este usuario (t1, de renderApp.tsx) tiene que existir de
     // verdad en la API admin para que createLangflowSession no falle con 404 -
     // el mock por defecto usa otros ids (t-vital…), por eso el seed explícito.
-    renderApp('/dashboard', fakeAuthApi(makeUser('botmaster')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
+    renderApp('/agents', fakeAuthApi(makeUser('botmaster')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
     expect(await h1('Agentes')).toBeInTheDocument()
     // Un solo tenant asignado: se auto-selecciona (TenantProvider), sin pedir elegir uno,
     // y abre en el editor de flujos; los agentes registrados están en la otra pestaña.
@@ -69,10 +67,10 @@ describe('menú y acceso por perfil', () => {
     expect(within(sidebar!).getByRole('link', { name: 'Agentes' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('el consultor cae en Reportes (placeholder de los futuros dashboards de Metabase)', async () => {
+  it('el consultor ve el panel del cliente (dashboard de Metabase de su tenant)', async () => {
     renderApp('/dashboard', fakeAuthApi(makeUser('consultant')))
-    expect(await h1('Reportes')).toBeInTheDocument()
-    expect(screen.getByText(/dashboards de Metabase/)).toBeInTheDocument()
+    expect(await h1('Mi panel')).toBeInTheDocument()
+    expect(await screen.findByTitle('Mi panel')).toBeInTheDocument()
   })
 
   it.each<[Role, string]>([
@@ -239,8 +237,8 @@ describe('ruta raíz', () => {
     ['admin', 'Dashboard'],
     ['tenant_manager', 'Dashboard'],
     ['client', 'Mi panel'],
-    ['botmaster', 'Agentes'],
-    ['consultant', 'Reportes'],
+    ['botmaster', 'Dashboard'],
+    ['consultant', 'Mi panel'],
   ])('con sesión %s lleva a su inicio (%s)', async (role, title) => {
     renderApp('/', fakeAuthApi(makeUser(role)))
     expect(await h1(title)).toBeInTheDocument()
@@ -250,7 +248,7 @@ describe('ruta raíz', () => {
 describe('con sesión activa /login no se muestra', () => {
   it('redirige a la página de inicio del perfil', async () => {
     renderApp('/login', fakeAuthApi(makeUser('botmaster')))
-    expect(await h1('Agentes')).toBeInTheDocument()
+    expect(await h1('Dashboard')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByText('Inicia sesión')).not.toBeInTheDocument())
   })
 })

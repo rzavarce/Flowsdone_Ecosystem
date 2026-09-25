@@ -1,4 +1,4 @@
-import { Bot, Building2, LayoutDashboard, MessageSquare, Plug, Receipt, Settings, Store, Users, type LucideIcon } from 'lucide-react'
+import { Bot, Building2, FileBarChart, LayoutDashboard, MessageSquare, Plug, Receipt, Settings, Store, Users, type LucideIcon } from 'lucide-react'
 import type { Permission } from '@/core/auth/types'
 import { i18n } from '@/core/i18n/i18n'
 
@@ -24,6 +24,7 @@ const item = (to: string, key: string, icon: LucideIcon, anyOf: Permission[]): N
 /** Main navigation menu, in display order, filtered per profile by {@link useNavItems}. */
 export const NAV_ITEMS: readonly NavItem[] = [
   item('/dashboard', 'dashboard', LayoutDashboard, ['dashboard:view', 'reports:view']),
+  item('/reports', 'reports', FileBarChart, ['reports:view']),
   item('/tenants', 'tenants', Building2, ['projects:manage']),
   item('/conversations', 'conversations', MessageSquare, ['conversations:manage']),
   item('/agents', 'agents', Bot, ['agents:edit']),

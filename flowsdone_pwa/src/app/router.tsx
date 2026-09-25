@@ -21,6 +21,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SupportPage } from '@/features/support/SupportPage'
 import { TenantsPage } from '@/features/tenants/TenantsPage'
 import { UsersPage } from '@/features/users/UsersPage'
+import { ReportsPage } from '@/features/reports/ReportsPage'
 import { DashboardRoute } from './DashboardRoute'
 import { RootRedirect } from './RootRedirect'
 
@@ -70,6 +71,7 @@ export const routes = [
     ),
     children: [
       { path: '/dashboard', element: <DashboardRoute /> },
+      { path: '/reports', element: guarded('reports:view', <ReportsPage />) },
       { path: '/profile', element: <ProfilePage /> },
       { path: '/support', element: <SupportPage /> },
       { path: '/conversations', element: guarded('conversations:manage', <ConversationsPage />) },

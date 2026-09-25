@@ -45,7 +45,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Staff de Flowsdone asignado a tenants concretos por un admin: agentes,
   // canales y conversaciones de esos tenants (POLICY.channel_connections en
   // el backend, ampliado junto con esto - ver access_control.py).
-  botmaster: ['agents:edit', 'settings:view', 'channels:manage', 'conversations:manage'],
+  botmaster: ['dashboard:view', 'agents:edit', 'settings:view', 'channels:manage', 'conversations:manage'],
   client: ['reports:view', 'settings:view', 'company:view'],
   // Consultor de un cliente: solo reportes (ni dashboard, ni los datos de
   // facturación de la empresa - eso es exclusivo de client).

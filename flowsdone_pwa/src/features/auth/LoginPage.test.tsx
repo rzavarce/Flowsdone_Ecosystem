@@ -63,7 +63,7 @@ describe('LoginPage', () => {
     await userEvent.type(screen.getByLabelText('Correo electrónico'), user.email)
     await userEvent.type(screen.getByLabelText('Contraseña'), 'x')
     await userEvent.click(screen.getByRole('button', { name: 'Ingresar' }))
-    expect(await h1('Agentes')).toBeInTheDocument()
+    expect(await h1('Dashboard')).toBeInTheDocument()
   })
 
   it('tras el login vuelve a la ruta que se intentó abrir', async () => {
