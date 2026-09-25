@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 
 import httpx
 import pytest
@@ -87,7 +88,7 @@ async def test_dashboard_ids_are_cached_and_a_stale_session_is_renewed():
     await adapter.embed_url("client", tenant_ids=[], ttl_seconds=60)
     assert fake.calls == []  # both ids came with the first listing
 
-    adapter._ids_loaded_at = 0  # cache expired
+    adapter._ids_loaded_at = time.monotonic() - 3600  # cache expired (an hour ago)
     fake.expire_session = True
     await adapter.embed_url("platform", tenant_ids=[], ttl_seconds=60)
     assert ("POST", "/api/session") in fake.calls
