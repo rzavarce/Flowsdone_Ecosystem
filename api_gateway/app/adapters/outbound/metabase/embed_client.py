@@ -72,7 +72,9 @@ class MetabaseEmbedAdapter(DashboardEmbedPort):
         self._client = client or httpx.AsyncClient(base_url=settings.METABASE_INTERNAL_URL, timeout=15.0)
         self._session: Optional[str] = None
         self._ids: Dict[str, int] = {}
-        self._ids_loaded_at = 0.0
+        # time.monotonic() of the last load; None = never loaded. (Not 0.0: the
+        # monotonic clock can start near 0 on a freshly booted machine.)
+        self._ids_loaded_at: Optional[float] = None
 
     async def aclose(self) -> None:
         """Close the underlying HTTP client."""
@@ -119,7 +121,7 @@ class MetabaseEmbedAdapter(DashboardEmbedPort):
         Raises:
             AnalyticsUnavailableError: If it cannot be found.
         """
-        fresh = time.monotonic() - self._ids_loaded_at < _ID_CACHE_SECONDS
+        fresh = self._ids_loaded_at is not None and time.monotonic() - self._ids_loaded_at < _ID_CACHE_SECONDS
         if key not in self._ids or not fresh:
             self._ids = await self._load_ids()
             self._ids_loaded_at = time.monotonic()
