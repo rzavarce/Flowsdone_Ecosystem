@@ -657,6 +657,21 @@ En **Agentes**, el admin elige un tenant en el selector y ve el editor de Langfl
 - **Borrar un tenant** borra primero su usuario de Langflow (con todas sus carpetas y flujos) y después sus cuentas `client` (las que no pertenecen a otro tenant), para que su email y su slug se puedan volver a usar. Si Langflow falla, no se borra nada (502).
 - **Borrar un proyecto** borra primero su carpeta en Langflow, con todos sus flujos. Si Langflow falla, el proyecto no se borra (la consola responde 502). Si la carpeta ya no existía, se sigue sin error.
 
+### Metabase — dashboards y reportes (`bi.flowsdone.com`)
+
+Metabase (`metabase/metabase:v0.63.18.2`) alimenta las secciones **Dashboard** y **Reportes** de la consola.
+
+- **Datos, siempre con usuarios de solo lectura:**
+  - Postgres `gatewaydb`: solo el esquema **`analytics`** (migración `0013_analytics_views`). Son vistas sin datos sensibles: nada de contraseñas, emails, credenciales o identificadores de canales, config de agentes ni contactos. Todas llevan `tenant_id`. Rol `metabase_reader`, que no puede leer `public`.
+  - ClickHouse `flowsdone` (`messages`, `usage_events`): usuario `metabase_reader` con perfil `readonly` (`scripts/clickhouse/users.d/metabase_reader.xml`). No ve las tablas de Langfuse.
+- **Configuración propia** en la base `metabasedb` de Postgres.
+- **Preparación (idempotente, la hace el deploy):**
+  1. `scripts/metabase/init-postgres.sh`: crea `metabasedb` y el rol `metabase_reader`, con permisos solo sobre `analytics`.
+  2. `scripts/metabase/provision.py`: crea el administrador (`METABASE_ADMIN_EMAIL`/`METABASE_ADMIN_PASSWORD`), quita la base de ejemplo y conecta las dos fuentes. Si cambias una contraseña en `.env`, basta con volver a ejecutarlo.
+- **Variables (`.env`):** `CLICKHOUSE_METABASE_PASSWORD`, `METABASE_READER_PASSWORD`, `METABASE_ENCRYPTION_KEY`, `METABASE_EMBEDDING_SECRET_KEY`, `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD` y `METABASE_PUBLIC_URL` (ver `env.example.txt`). Sin las obligatorias, `docker compose` no arranca.
+- **DNS:** registro `bi` → IP del VPS (router `metabase` de Traefik).
+- **Local:** `http://localhost:3030` (usuario: `METABASE_ADMIN_EMAIL` de tu `.env`).
+
 ### Landing page — `flowsdone.com`
 
 Página estática en `api_gateway/app/static/flowsdone/` (`index.html`, `styles.css`, `main.js` y `brand/`), sin framework ni build. La sirve el gateway: el router `flowsdone` de Traefik reescribe cada ruta a `/static/flowsdone/…`.

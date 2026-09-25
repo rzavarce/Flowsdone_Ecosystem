@@ -1,0 +1,30 @@
+<!--
+  Usuario de SOLO LECTURA con el que Metabase consulta el archivo de
+  conversaciones y el consumo (base "flowsdone"). Nada de las tablas de
+  Langfuse. Perfil "readonly": no puede escribir ni cambiar ajustes que
+  alteren datos. La contraseña sale de CLICKHOUSE_METABASE_PASSWORD, que
+  docker-compose exige (no arranca si falta).
+-->
+<clickhouse>
+  <profiles>
+    <metabase_readonly>
+      <readonly>2</readonly>
+      <max_execution_time>60</max_execution_time>
+      <max_result_rows>1000000</max_result_rows>
+      <result_overflow_mode>break</result_overflow_mode>
+    </metabase_readonly>
+  </profiles>
+  <users>
+    <metabase_reader>
+      <password from_env="CLICKHOUSE_METABASE_PASSWORD"/>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>metabase_readonly</profile>
+      <quota>default</quota>
+      <grants>
+        <query>GRANT SELECT ON flowsdone.*</query>
+      </grants>
+    </metabase_reader>
+  </users>
+</clickhouse>

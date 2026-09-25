@@ -76,10 +76,21 @@ jobs:
             # Buildear las imágenes actualizadas antes de tocar nada más
             docker compose --profile prod build
 
+            # Postgres primero: si su configuración cambió (p. ej. la contraseña
+            # del rol de Metabase), se recrea antes de migrar. Los datos están
+            # en el volumen.
+            docker compose --profile prod up -d --no-deps postgres
+            PG_CONTAINER=$(docker compose --profile prod ps -q postgres)
+            timeout 120 sh -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' $PG_CONTAINER 2>/dev/null)\" = healthy ]; do sleep 3; done"
+
             # Migrar el esquema de gatewaydb (tenants/projects/agents/workflows/
             # channel_connections/workflow_executions) ANTES de levantar api y
             # los workers, para que arranquen ya contra el esquema nuevo.
             docker compose --profile prod run --rm api alembic -c api_gateway/alembic.ini upgrade head
+
+            # Metabase: su base interna y el rol de solo lectura sobre el esquema
+            # analytics (idempotente), después de las migraciones que lo crean.
+            docker exec -i "$PG_CONTAINER" sh -s < scripts/metabase/init-postgres.sh
 
             # OpenSearch primero, y solo, todavía SIN otel-collector: el index
             # template de logs-* (scripts/opensearch/init-opensearch.sh) tiene
@@ -114,6 +125,10 @@ jobs:
             # encuentra el index template listo) incluyendo el perfil 'prod'
             # (Traefik, etc.)
             docker compose --profile prod up -d --remove-orphans
+
+            # Metabase: cuenta de administrador y fuentes de datos (idempotente;
+            # espera a que Metabase esté sano).
+            docker compose --profile prod run --rm --no-deps -v ./scripts/metabase:/scripts/metabase api python /scripts/metabase/provision.py
 
             # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco
             docker image prune -f

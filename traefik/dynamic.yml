@@ -137,6 +137,17 @@ http:
         - flowsdone-www-redirect
         - flowsdone-static
 
+    # Metabase (dashboards y reportes). El navegador carga de aquí los
+    # dashboards embebidos en la consola (/embed/..., URLs firmadas por el
+    # gateway); el resto es la interfaz de Metabase, con su propio login.
+    # Requiere un registro DNS `bi` -> IP del VPS.
+    metabase:
+      rule: "Host(`bi.flowsdone.com`)"
+      entrypoints: [websecure]
+      tls:
+        certresolver: myresolver
+      service: metabase-svc
+
     # Consola web (PWA React servida por nginx dentro del contenedor `pwa`).
     # Mismo origen para la SPA y su API: nginx reenvía /api/auth/* al gateway,
     # por eso NO hace falta CORS y la cookie de sesión (httpOnly, host-only)
@@ -213,6 +224,11 @@ http:
       loadBalancer:
         servers:
           - url: "http://api:8000"
+
+    metabase-svc:
+      loadBalancer:
+        servers:
+          - url: "http://metabase:3000"
 
     pwa-svc:
       loadBalancer:
