@@ -123,6 +123,7 @@ def build(channels: List[Channel], days: int) -> tuple[list, list, list]:
     """
     now = datetime.now(timezone.utc)
     conversations, messages, usage = [], [], []
+    returning: Dict[str, List[str]] = {}  # contacts already seen per channel
     weights = {"whatsapp_evolution": 6, "instagram": 3, "telegram": 2, "facebook": 2, "voice": 2}
     for day in range(days, -1, -1):
         date = (now - timedelta(days=day)).replace(minute=0, second=0, microsecond=0)
@@ -136,7 +137,12 @@ def build(channels: List[Channel], days: int) -> tuple[list, list, list]:
                 if start > now:
                     continue
                 conv_id, session = str(uuid.uuid4()), f"{SEED_TAG}{uuid.uuid4()}"
-                contact = f"+34 6{random.randint(10000000, 99999999)}"
+                seen = returning.setdefault(ch.connection_id, [])
+                if seen and random.random() < 0.3:  # ~30 % of conversations come from a returning contact
+                    contact = random.choice(seen)
+                else:
+                    contact = f"+34 6{random.randint(10000000, 99999999)}"
+                    seen.append(contact)
                 t = start
                 turns = random.choices([1, 2, 3, 4, 5, 6, 8], weights=[18, 25, 20, 14, 10, 8, 5])[0]
                 inbound = outbound = 0

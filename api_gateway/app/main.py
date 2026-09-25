@@ -74,7 +74,7 @@ from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProvide
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
-from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase
+from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
 from app.application.use_cases.billing import (
     CloseBillingPeriodUseCase,
     ComputeStatementUseCase,
@@ -397,6 +397,7 @@ async def lifespan(app: FastAPI):
     app.state.overview_dashboard_use_case = GetOverviewDashboardUseCase(
         embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS
     )
+    app.state.reports_use_case = ReportsUseCase(embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS)
     app.state.send_contact_request_use_case = SendContactRequestUseCase(
         email_sender=email_sender,
         # Own instance of the Redis counters; keys are prefixed "contact:".

@@ -680,6 +680,16 @@ Metabase (`metabase/metabase:v0.63.18.2`) alimenta las secciones **Dashboard** y
 | Plataforma (administración) (`platform_admin`) | `admin` | Lo anterior + negocio: cuotas contratadas, clientes por plan e ingresos/coste/margen de los meses cerrados (`usage_statements`) |
 | Tu asistente (`client`) | `client`, `consultant` | Conversaciones, % del plan usado, canales, horas y días punta, agentes, tiempo de respuesta |
 
+**Reportes** (sección *Reportes* de la consola: admin, gestor, cliente y consultor; el botmaster no la tiene). Cada pestaña es un dashboard con el mismo filtro de tenant bloqueado (`GET /me/reports` y `GET /me/reports/{clave}`):
+
+| Reporte (clave) | Contenido |
+|---|---|
+| Canales (`report_channels`) | Reparto por canal, mensajes por canal y día, y tabla por canal con mensajes por conversación y tiempos de respuesta |
+| Agentes (`report_agents`) | Conversaciones por agente y día; detalle por agente (duración, cierres manuales, abiertas); cómo terminan |
+| Contactos (`report_contacts`) | Contactos únicos, % que repiten, contactos por semana y conversaciones por contacto. Solo recuentos, nunca teléfonos |
+| Horarios (`report_hours`) | % fuera de horario (L-V 9 a 20 h), mensajes por hora, mapa de calor hora × día y por día de la semana |
+| Consumo (`report_usage`) | Plan del mes, mensajes atendidos por la IA por mes, importe facturado de meses cerrados (sin costes ni márgenes) y tokens |
+
 - Las cantidades (mensajes, tokens, tiempos) salen de ClickHouse en tiempo real. El único dinero son los **meses cerrados**, que coinciden con lo facturado. El importe del mes en curso lo calcula la consola con las reglas de facturación, no Metabase.
 - **Filtro de tenant a prueba de manipulación** (*static embedding*): la consola pide `GET /me/dashboard?tenant_id=…`. El gateway (`GetOverviewDashboardUseCase`) elige el dashboard según el perfil y firma una URL con `METABASE_EMBEDDING_SECRET_KEY` en la que el filtro `tenant` va **bloqueado**:
   - un tenant elegido tiene que ser del usuario;

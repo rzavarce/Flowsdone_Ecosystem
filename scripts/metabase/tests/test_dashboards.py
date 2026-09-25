@@ -70,6 +70,10 @@ def test_dashcards_map_both_filters_and_the_tenant_is_locked_for_embedding():
     assert {p["slug"] for p in specs.PARAMETERS} == {"tenant", "fecha"}
 
 
-@pytest.mark.parametrize("key", ["platform", "platform_admin", "client"])
+@pytest.mark.parametrize("key", [
+    "platform", "platform_admin", "client",
+    # Must match REPORT_KEYS in the gateway (analytics_dashboards.py) and the console.
+    "report_channels", "report_agents", "report_contacts", "report_hours", "report_usage",
+])
 def test_dashboards_the_gateway_asks_for_exist(key):
     assert key in {d.key for d in specs.DASHBOARDS}

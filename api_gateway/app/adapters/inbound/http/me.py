@@ -25,7 +25,7 @@ from app.adapters.inbound.http.auth_deps import get_current_user, require_consol
 from app.adapters.inbound.http.avatar_io import avatar_response, read_image_body
 from app.application.dto.auth_dto import AuthenticatedUser
 from app.application.use_cases._auth_common import build_authenticated_user
-from app.application.use_cases.analytics_dashboards import NoTenantsError, TenantOutOfScopeError
+from app.application.use_cases.analytics_dashboards import NoTenantsError, ReportNotFoundError, TenantOutOfScopeError
 from app.application.use_cases.manage_profile import InvalidAvatarError
 from app.domain.ports.outbound import AnalyticsUnavailableError
 
@@ -108,7 +108,8 @@ class DashboardOut(BaseModel):
 
     Attributes:
         url (str): Dashboard URL to load in an iframe (short-lived).
-        dashboard (str): Which dashboard ("platform", "platform_admin", "client").
+        dashboard (str): Which dashboard ("platform", "platform_admin", "client",
+            or a report key such as "report_channels").
         expires_in (int): Seconds the URL stays valid; ask again after that.
     """
 
@@ -153,6 +154,69 @@ async def my_dashboard(
         raise HTTPException(status_code=403, detail="no tenant for this account") from exc
     except AnalyticsUnavailableError as exc:
         logger.warning("me.dashboard_unavailable", extra={"error": str(exc)})
+        raise HTTPException(status_code=503, detail="dashboards unavailable") from exc
+    return DashboardOut(url=embed.url, dashboard=embed.dashboard, expires_in=embed.expires_in)
+
+
+class ReportsOut(BaseModel):
+    """Response of GET /me/reports.
+
+    Attributes:
+        reports (list[str]): Report keys the caller can open, in display order.
+    """
+
+    reports: list[str]
+
+
+@router.get("/reports", response_model=ReportsOut)
+async def my_reports(request: Request, user: AuthenticatedUser = Depends(get_current_user)) -> ReportsOut:
+    """The reports of the console's Reports section available to the caller.
+
+    Args:
+        request (Request): Used to reach `request.app.state.reports_use_case`.
+        user (AuthenticatedUser): The signed-in user.
+
+    Returns:
+        ReportsOut: Report keys (empty for profiles without Reports).
+    """
+    return ReportsOut(reports=request.app.state.reports_use_case.available(user))
+
+
+@router.get("/reports/{report}", response_model=DashboardOut)
+async def my_report(
+    report: str,
+    request: Request,
+    response: Response,
+    tenant_id: Optional[UUID] = Query(default=None),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> DashboardOut:
+    """One report of the Reports section, locked to the caller's tenants
+    (same rules as `GET /me/dashboard`).
+
+    Args:
+        report (str): Report key (see `GET /me/reports`).
+        request (Request): Used to reach `request.app.state.reports_use_case`.
+        response (Response): Receives no-store headers (the URL is a credential).
+        tenant_id (Optional[UUID]): Tenant chosen in the console's selector.
+        user (AuthenticatedUser): The signed-in user.
+
+    Returns:
+        DashboardOut: The report's URL.
+
+    Raises:
+        HTTPException: 404 if the report or the tenant is not available to the
+            caller; 403 if the caller has no tenants; 503 if the dashboards
+            are unavailable.
+    """
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        embed = await request.app.state.reports_use_case.open(user, report, tenant_id)
+    except (ReportNotFoundError, TenantOutOfScopeError) as exc:
+        raise HTTPException(status_code=404, detail="not found") from exc
+    except NoTenantsError as exc:
+        raise HTTPException(status_code=403, detail="no tenant for this account") from exc
+    except AnalyticsUnavailableError as exc:
+        logger.warning("me.report_unavailable", extra={"report": report, "error": str(exc)})
         raise HTTPException(status_code=503, detail="dashboards unavailable") from exc
     return DashboardOut(url=embed.url, dashboard=embed.dashboard, expires_in=embed.expires_in)
 

@@ -278,6 +278,118 @@ CARDS: Dict[str, Card] = {
     ),
 }
 
+# ---------------------------------------------------------------- reports
+# Cards of the Reports section (one dashboard per report, same filters).
+REPLY_DELAYS = """
+    SELECT channel_type, conversation_id,
+           direction = 'outbound' AND lagInFrame(direction) OVER w = 'inbound' AS is_reply,
+           dateDiff('millisecond', lagInFrame(ts) OVER w, ts) / 1000 AS delay
+    FROM flowsdone.messages
+    WHERE {{tenant}} AND {{fecha}}
+    WINDOW w AS (PARTITION BY conversation_id ORDER BY ts ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)
+"""
+CONVERSATIONS_PER_CONTACT = """
+    SELECT contact, uniqExact(conversation_id) AS c
+    FROM flowsdone.messages WHERE {{tenant}} AND {{fecha}} GROUP BY contact
+"""
+HEAT = {"table.column_formatting": [{
+    "id": 0, "type": "range", "columns": ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'], "colors": ["#ffffff", "#19B4E6"],
+    "min_type": None, "max_type": None, "min_value": 0, "max_value": 100, "operator": "=", "highlight_row": False,
+}]}
+
+CARDS.update({
+    "channel_daily": Card(
+        "Mensajes por canal y día", CH,
+        f"""SELECT toDate(ts, 'Europe/Madrid') AS "Día", {CHANNEL_LABEL} AS "Canal", count() AS "Mensajes"
+            FROM flowsdone.messages WHERE {{{{tenant}}}} AND {{{{fecha}}}} GROUP BY 1, 2 ORDER BY 1""",
+        "bar", MSG, {"graph.dimensions": ["Día", "Canal"], "graph.metrics": ["Mensajes"], "stackable.stack_type": "stacked"},
+    ),
+    "channel_table": Card(
+        "Detalle por canal", CH,
+        f"""SELECT {CHANNEL_LABEL} AS "Canal", uniqExact(conversation_id) AS "Conversaciones", count() AS "Mensajes",
+                   round(count() / uniqExact(conversation_id), 1) AS "Mensajes por conversación",
+                   round(quantileExactIf(0.5)(delay, is_reply), 1) AS "Respuesta mediana (s)",
+                   round(quantileExactIf(0.95)(delay, is_reply), 1) AS "Respuesta p95 (s)"
+            FROM ({REPLY_DELAYS}) GROUP BY channel_type ORDER BY 3 DESC""",
+        "table", MSG,
+    ),
+    "agent_daily": Card(
+        "Conversaciones por agente y día", PG,
+        """SELECT (conversations.started_at AT TIME ZONE 'Europe/Madrid')::date AS "Día", agents.name AS "Agente",
+                  count(*) AS "Conversaciones"
+           FROM analytics.conversations JOIN analytics.agents ON agents.agent_id = conversations.agent_id
+           WHERE {{tenant}} AND {{fecha}} GROUP BY 1, 2 ORDER BY 1""",
+        "line", CONV, {"graph.dimensions": ["Día", "Agente"], "graph.metrics": ["Conversaciones"]},
+    ),
+    "agent_detail": Card(
+        "Detalle por agente", PG,
+        """SELECT agents.name AS "Agente", count(*) AS "Conversaciones",
+                  round(avg(conversations.inbound_count + conversations.outbound_count), 1) AS "Mensajes por conversación",
+                  round(avg(extract(epoch FROM conversations.last_message_at - conversations.started_at)) / 60, 1) AS "Duración media (min)",
+                  round(100.0 * count(*) FILTER (WHERE conversations.close_reason = 'manual') / count(*), 1) AS "% cierre manual",
+                  count(*) FILTER (WHERE conversations.status = 'open') AS "Abiertas ahora"
+           FROM analytics.conversations JOIN analytics.agents ON agents.agent_id = conversations.agent_id
+           WHERE {{tenant}} AND {{fecha}} GROUP BY 1 ORDER BY 2 DESC""",
+        "table", CONV,
+    ),
+    "contacts_unique": Card(
+        "Contactos únicos", CH,
+        "SELECT uniqExact(contact) AS contactos FROM flowsdone.messages WHERE {{tenant}} AND {{fecha}}",
+        "scalar", MSG,
+    ),
+    "contacts_recurring": Card(
+        "Contactos que repiten", CH,
+        f"SELECT round(100 * countIf(c > 1) / count(), 1) AS porcentaje FROM ({CONVERSATIONS_PER_CONTACT})",
+        "scalar", MSG, {"column_settings": {'["name","porcentaje"]': {"suffix": " %"}}},
+    ),
+    "contacts_weekly": Card(
+        "Contactos únicos por semana", CH,
+        """SELECT toMonday(ts, 'Europe/Madrid') AS "Semana", uniqExact(contact) AS "Contactos"
+           FROM flowsdone.messages WHERE {{tenant}} AND {{fecha}} GROUP BY 1 ORDER BY 1""",
+        "bar", MSG, _line("Semana", "Contactos"),
+    ),
+    "contacts_distribution": Card(
+        "Conversaciones por contacto", CH,
+        f"""SELECT multiIf(c = 1, '1', c = 2, '2', c <= 5, '3 a 5', '6 o más') AS "Conversaciones", count() AS "Contactos"
+            FROM ({CONVERSATIONS_PER_CONTACT}) GROUP BY 1 ORDER BY min(c)""",
+        "bar", MSG, _line("Conversaciones", "Contactos"),
+    ),
+    "hours_grid": Card(
+        "Mensajes recibidos por hora y día", CH,
+        f"""SELECT toHour(ts, 'Europe/Madrid') AS "Hora",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 1) AS "Lunes",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 2) AS "Martes",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 3) AS "Miércoles",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 4) AS "Jueves",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 5) AS "Viernes",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 6) AS "Sábado",
+                  countIf(direction = 'inbound' AND toDayOfWeek(ts, 0, 'Europe/Madrid') = 7) AS "Domingo"
+            FROM flowsdone.messages WHERE {{{{tenant}}}} AND {{{{fecha}}}} GROUP BY 1 ORDER BY 1""",
+        "table", MSG, HEAT,
+    ),
+    "after_hours": Card(
+        "Fuera de horario (L-V 9 a 20 h)", CH,
+        """SELECT round(100 * countIf(direction = 'inbound' AND (toHour(ts, 'Europe/Madrid') < 9
+                        OR toHour(ts, 'Europe/Madrid') >= 20 OR toDayOfWeek(ts, 0, 'Europe/Madrid') >= 6))
+                    / nullIf(countIf(direction = 'inbound'), 0), 1) AS porcentaje
+           FROM flowsdone.messages WHERE {{tenant}} AND {{fecha}}""",
+        "scalar", MSG, {"column_settings": {'["name","porcentaje"]': {"suffix": " %"}}},
+    ),
+    "ai_messages_monthly": Card(
+        "Mensajes atendidos por la IA por mes", CH,
+        """SELECT toStartOfMonth(ts, 'Europe/Madrid') AS "Mes", countIf(kind = 'platform' AND sku = 'ai_message') AS "Mensajes"
+           FROM flowsdone.usage_events WHERE {{tenant}} GROUP BY 1 ORDER BY 1""",
+        "bar", {"tenant": USAGE["tenant"]}, _line("Mes", "Mensajes"),
+    ),
+    "billed_monthly": Card(
+        "Importe facturado por mes (meses cerrados)", PG,
+        """SELECT usage_statements.period AS "Mes", sum(usage_statements.revenue_micros) / 1000000.0 AS "Importe"
+           FROM analytics.usage_statements WHERE {{tenant}} GROUP BY 1 ORDER BY 1""",
+        "bar", {"tenant": "analytics.usage_statements.tenant_id"},
+        {**_line("Mes", "Importe"), "column_settings": {'["name","Importe"]': {"number_style": "currency", "currency": "EUR"}}},
+    ),
+})
+
 # A dashboard item: a card key with its width and height (grid of 24
 # columns), or a heading string.
 Item = Union[str, Tuple[str, int, int]]
@@ -347,6 +459,36 @@ DASHBOARDS: List[Dashboard] = [
         ],
     ),
 ]
+
+# Reports section: one dashboard per report, in display order (the gateway
+# and the console list them in this order).
+REPORT_DASHBOARDS: List[Dashboard] = [
+    Dashboard("report_channels", "Reporte · Canales", "Volumen, reparto y tiempos de respuesta por canal.", [
+        ("by_channel", 10, 6), ("channel_daily", 14, 6),
+        ("channel_table", 24, 5),
+    ]),
+    Dashboard("report_agents", "Reporte · Agentes", "Conversaciones, duración y cierres por agente.", [
+        ("agent_daily", 24, 6),
+        ("agent_detail", 24, 5),
+        ("close_reasons", 12, 6), ("conversation_minutes", 6, 6), ("messages_per_conversation", 6, 6),
+    ]),
+    Dashboard("report_contacts", "Reporte · Contactos", "Cuántas personas escriben y cuántas repiten (sin datos personales).", [
+        ("contacts_unique", 8, 3), ("contacts_recurring", 8, 3), ("conversations", 8, 3),
+        ("contacts_weekly", 14, 6), ("contacts_distribution", 10, 6),
+    ]),
+    Dashboard("report_hours", "Reporte · Horarios", "Cuándo escriben los clientes: horas, días y fuera de horario.", [
+        ("after_hours", 6, 6), ("by_hour", 18, 6),
+        ("hours_grid", 24, 20),
+        ("by_weekday", 24, 5),
+    ]),
+    Dashboard("report_usage", "Reporte · Consumo", "Plan, mensajes atendidos por la IA, tokens e importes facturados.", [
+        ("plan_usage", 24, 3),
+        ("ai_messages_monthly", 12, 6), ("billed_monthly", 12, 6),
+        ("tokens_daily", 24, 6),
+        ("tokens_by_model", 24, 4),
+    ]),
+]
+DASHBOARDS += REPORT_DASHBOARDS
 
 PARAMETERS = [
     {"id": "tenant", "name": "Tenant", "slug": "tenant", "type": "string/=", "sectionId": "string"},

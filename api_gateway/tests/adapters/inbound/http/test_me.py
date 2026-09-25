@@ -109,8 +109,11 @@ class _FakeEmbeds:
 def _dashboard_state(embeds, users, tenants):
     from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase
 
+    from app.application.use_cases.analytics_dashboards import ReportsUseCase
+
     state = _state(users, tenants)
     state["overview_dashboard_use_case"] = GetOverviewDashboardUseCase(embeds=embeds, ttl_seconds=600)
+    state["reports_use_case"] = ReportsUseCase(embeds=embeds, ttl_seconds=600)
     return state
 
 
@@ -142,3 +145,23 @@ async def test_dashboard_unavailable_is_503():
     async with client_for_router(router, **state) as client:
         resp = await client.get("/me/dashboard", headers=_cookie(token))
     assert resp.status_code == 503
+
+
+async def test_reports_list_and_open_locked_to_the_callers_tenant():
+    mine, other = make_tenant(), make_tenant(slug="otro")
+    user = make_user(role="client", tenant_ids=[mine.id])
+    embeds = _FakeEmbeds()
+    state = _dashboard_state(embeds, [user], [mine, other])
+    token = await state["sessions"].create(user.id, ttl_seconds=3600)
+
+    async with client_for_router(router, **state) as client:
+        listed = await client.get("/me/reports", headers=_cookie(token))
+        opened = await client.get("/me/reports/report_channels", headers=_cookie(token))
+        unknown = await client.get("/me/reports/platform_admin", headers=_cookie(token))
+        foreign = await client.get("/me/reports/report_channels", params={"tenant_id": str(other.id)}, headers=_cookie(token))
+
+    assert listed.json()["reports"][0] == "report_channels" and len(listed.json()["reports"]) == 5
+    assert opened.status_code == 200 and opened.json()["dashboard"] == "report_channels"
+    assert opened.headers["cache-control"] == "no-store"
+    assert embeds.calls == [("report_channels", [str(mine.id)])]
+    assert unknown.status_code == 404 and foreign.status_code == 404

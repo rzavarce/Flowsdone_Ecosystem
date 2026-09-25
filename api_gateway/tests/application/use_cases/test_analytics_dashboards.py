@@ -73,3 +73,38 @@ async def test_staff_without_tenants_see_nothing_instead_of_everything():
         with pytest.raises(NoTenantsError):
             await use_case.execute(_user(role))
     assert embeds.calls == []
+
+
+def _reports():
+    from app.application.use_cases.analytics_dashboards import ReportsUseCase
+
+    embeds = FakeEmbeds()
+    return ReportsUseCase(embeds=embeds, ttl_seconds=600), embeds
+
+
+def test_reports_are_for_admins_managers_and_the_client_side_only():
+    from app.application.use_cases.analytics_dashboards import REPORT_KEYS
+
+    use_case, _ = _reports()
+    for role in ("admin", "tenant_manager", "client", "consultant"):
+        assert use_case.available(_user(role, T1)) == list(REPORT_KEYS)
+    assert use_case.available(_user("botmaster", T1)) == []
+
+
+async def test_a_report_follows_the_same_tenant_rules_as_the_dashboard():
+    from app.application.use_cases.analytics_dashboards import ReportNotFoundError
+
+    use_case, embeds = _reports()
+    result = await use_case.open(_user("client", T1), "report_hours")
+    await use_case.open(_user("admin", T1, T2), "report_usage")
+    await use_case.open(_user("tenant_manager", T1, T2), "report_agents", T2)
+    assert result.dashboard == "report_hours" and result.expires_in == 600
+    assert [c[:2] for c in embeds.calls] == [("report_hours", [str(T1)]), ("report_usage", []), ("report_agents", [str(T2)])]
+
+    with pytest.raises(TenantOutOfScopeError):
+        await use_case.open(_user("client", T1), "report_hours", T3)
+    with pytest.raises(ReportNotFoundError):
+        await use_case.open(_user("botmaster", T1), "report_hours")
+    with pytest.raises(ReportNotFoundError):
+        await use_case.open(_user("admin", T1), "platform_admin")  # dashboards are not reports
+    assert len(embeds.calls) == 3
