@@ -496,6 +496,10 @@ services:
       LANGFLOW_SUPERUSER_PASSWORD: ${LANGFLOW_SUPERUSER_PASSWORD:?Falta LANGFLOW_SUPERUSER_PASSWORD en .env (contraseña fuerte; ver README, sección Langflow)}
       # Un registro nuevo queda inactivo hasta que el superusuario lo active.
       LANGFLOW_NEW_USER_IS_ACTIVE: "false"
+      # Sin la "Langflow Store": es un servicio externo (api.langflow.store)
+      # abandonado, que pide su propia API key y hoy falla por certificado.
+      # Con esto el editor ni la muestra ni la consulta.
+      LANGFLOW_STORE: "false"
       # Default de la URL de Weaviate para components/weaviate_multitenant.py
       # (os.environ, nunca hardcodeado en el componente) - mismo patron que
       # GATEWAY_INTERNAL_URL mas abajo.

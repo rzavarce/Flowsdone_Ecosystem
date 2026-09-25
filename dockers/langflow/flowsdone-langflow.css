@@ -15,3 +15,9 @@ div:has(> div > [data-testid="get_started_progress_title"]) + div:has(> hr) {
 [data-testid="header_right_section_wrapper"] > .whitespace-nowrap.lg\:inline {
   display: none !important;
 }
+
+/* Sidebar "Store" button: the Langflow Store is an abandoned external service
+   (disabled with LANGFLOW_STORE=false, but this button ignores that setting). */
+[data-testid="button-store"] {
+  display: none !important;
+}
