@@ -37,3 +37,4 @@ def test_the_stylesheet_targets_the_promos():
     css = CSS.read_text(encoding="utf-8")
     assert "get_started_progress_title" in css
     assert "header_right_section_wrapper" in css
+    assert "button-store" in css
