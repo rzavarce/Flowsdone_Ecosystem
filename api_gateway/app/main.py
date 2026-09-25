@@ -38,6 +38,7 @@ from app.adapters.outbound.db.tenant_billing_profile_repository import (
 from app.adapters.outbound.db.tenant_repository import SqlAlchemyTenantRepository
 from app.adapters.outbound.db.user_repository import SqlAlchemyUserAvatarRepository, SqlAlchemyUserRepository
 from app.adapters.outbound.email.resend_client import ResendEmailAdapter
+from app.adapters.outbound.metabase.embed_client import MetabaseEmbedAdapter
 from app.adapters.outbound.session.redis_account_token_store import RedisAccountTokenStore
 from app.adapters.outbound.session.redis_auth_session_repository import RedisAuthSessionRepository
 from app.adapters.outbound.session.redis_login_throttle import RedisLoginThrottle
@@ -73,6 +74,7 @@ from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProvide
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
 from app.application.use_cases.billing import (
     CloseBillingPeriodUseCase,
     ComputeStatementUseCase,
@@ -390,6 +392,12 @@ async def lifespan(app: FastAPI):
     # never be redeemed as one another (different key prefixes).
     email_sender = ResendEmailAdapter()
     app.state.email_sender = email_sender
+    dashboard_embeds = MetabaseEmbedAdapter()
+    app.state.dashboard_embeds = dashboard_embeds
+    app.state.overview_dashboard_use_case = GetOverviewDashboardUseCase(
+        embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS
+    )
+    app.state.reports_use_case = ReportsUseCase(embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS)
     app.state.send_contact_request_use_case = SendContactRequestUseCase(
         email_sender=email_sender,
         # Own instance of the Redis counters; keys are prefixed "contact:".
@@ -671,6 +679,9 @@ async def lifespan(app: FastAPI):
     email_sender = getattr(app.state, "email_sender", None)
     if email_sender:
         await email_sender.aclose()
+    dashboard_embeds = getattr(app.state, "dashboard_embeds", None)
+    if dashboard_embeds:
+        await dashboard_embeds.aclose()
 
     clickhouse = getattr(app.state, "clickhouse", None)
     if clickhouse:

@@ -21,7 +21,6 @@ export const es = {
     processing: 'Procesando…',
     retry: 'Reintentar',
     optional: 'Opcional',
-    comingSoon: 'Próximamente',
     name: 'Nombre',
     status: 'Estado',
     tenant: 'Tenant',
@@ -58,6 +57,7 @@ export const es = {
   },
   nav: {
     dashboard: 'Dashboard',
+    reports: 'Reportes',
     conversations: 'Conversaciones',
     channels: 'Canales',
     tenants: 'Tenants',
@@ -182,6 +182,15 @@ export const es = {
   },
   dashboard: {
     description: 'Resumen de la actividad de tu plataforma.',
+    descriptionTenant: 'Actividad y rendimiento de {{name}}.',
+    descriptionAll: 'Actividad y rendimiento de la plataforma, de todos los tenants.',
+    analytics: {
+      loading: 'Cargando el dashboard',
+      unavailable: 'Los dashboards no están disponibles ahora mismo. Inténtalo de nuevo en unos minutos.',
+      error: 'No se pudo cargar el dashboard.',
+      noTenantTitle: 'Sin tenants asignados',
+      noTenant: 'Tu cuenta aún no tiene tenants asignados, así que no hay datos que mostrar. Pide a un administrador que te asigne uno.',
+    },
     indicators: 'Indicadores',
     vsLastWeek: 'frente a la semana anterior',
     stats: {
@@ -208,8 +217,16 @@ export const es = {
   },
   reports: {
     title: 'Reportes',
-    description: 'Indicadores y dashboards de tus clientes.',
-    comingSoon: 'Aquí se embeberán los dashboards de Metabase con los reportes de tus clientes.',
+    description: 'Informes detallados de tus conversaciones, canales y consumo.',
+    descriptionTenant: 'Informes de {{name}}.',
+    none: 'Tu perfil no tiene reportes.',
+    tabs: {
+      report_channels: 'Canales',
+      report_agents: 'Agentes',
+      report_contacts: 'Contactos',
+      report_hours: 'Horarios',
+      report_usage: 'Consumo',
+    },
     clientTitle: 'Mi panel',
     resultsOf: 'Resultados de {{name}}.',
     resultsOwn: 'Resultados de tu organización.',

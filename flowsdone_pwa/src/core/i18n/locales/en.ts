@@ -20,7 +20,6 @@ export const en: Messages<typeof es> = {
     processing: 'Processing…',
     retry: 'Retry',
     optional: 'Optional',
-    comingSoon: 'Coming soon',
     name: 'Name',
     status: 'Status',
     tenant: 'Tenant',
@@ -57,6 +56,7 @@ export const en: Messages<typeof es> = {
   },
   nav: {
     dashboard: 'Dashboard',
+    reports: 'Reports',
     conversations: 'Conversations',
     channels: 'Channels',
     tenants: 'Tenants',
@@ -181,6 +181,15 @@ export const en: Messages<typeof es> = {
   },
   dashboard: {
     description: "Your platform's activity at a glance.",
+    descriptionTenant: 'Activity and performance of {{name}}.',
+    descriptionAll: 'Activity and performance of the platform, across all tenants.',
+    analytics: {
+      loading: 'Loading the dashboard',
+      unavailable: "Dashboards aren't available right now. Try again in a few minutes.",
+      error: "The dashboard couldn't be loaded.",
+      noTenantTitle: 'No tenants assigned',
+      noTenant: "Your account has no tenants yet, so there's no data to show. Ask an administrator to assign you one.",
+    },
     indicators: 'Indicators',
     vsLastWeek: 'compared with last week',
     stats: {
@@ -207,8 +216,16 @@ export const en: Messages<typeof es> = {
   },
   reports: {
     title: 'Reports',
-    description: "Your clients' metrics and dashboards.",
-    comingSoon: "Your clients' Metabase report dashboards will be embedded here.",
+    description: 'Detailed reports on your conversations, channels and usage.',
+    descriptionTenant: 'Reports for {{name}}.',
+    none: 'Your profile has no reports.',
+    tabs: {
+      report_channels: 'Channels',
+      report_agents: 'Agents',
+      report_contacts: 'Contacts',
+      report_hours: 'Hours',
+      report_usage: 'Usage',
+    },
     clientTitle: 'My panel',
     resultsOf: 'Results for {{name}}.',
     resultsOwn: "Your organization's results.",

@@ -21,12 +21,13 @@ describe('can', () => {
     }
   })
 
-  it('el botmaster edita agentes, canales y conversaciones de sus tenants, pero no ve dashboards', () => {
+  it('el botmaster edita agentes, canales y conversaciones de sus tenants y ve el dashboard de la plataforma', () => {
     const u = makeUser('botmaster')
     expect(can(u, 'agents:edit')).toBe(true)
     expect(can(u, 'channels:manage')).toBe(true)
     expect(can(u, 'conversations:manage')).toBe(true)
-    expect(can(u, 'dashboard:view', 'reports:view')).toBe(false)
+    expect(can(u, 'dashboard:view')).toBe(true)
+    expect(can(u, 'reports:view', 'users:manage')).toBe(false)
   })
 
   it('el cliente solo ve reportes', () => {
@@ -45,7 +46,7 @@ describe('homePathFor', () => {
     ['admin', '/dashboard'],
     ['tenant_manager', '/dashboard'],
     ['client', '/dashboard'],
-    ['botmaster', '/agents'],
+    ['botmaster', '/dashboard'],
   ] as const)('%s -> %s', (role, path) => {
     expect(homePathFor(makeUser(role))).toBe(path)
   })

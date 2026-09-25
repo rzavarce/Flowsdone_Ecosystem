@@ -35,7 +35,7 @@ describe('ActivateAccountPage', () => {
     await userEvent.type(screen.getByLabelText('Confirma la contraseña'), 'x'.repeat(10))
     await userEvent.click(screen.getByRole('button', { name: 'Activar mi cuenta' }))
 
-    expect(await h1('Agentes')).toBeInTheDocument()
+    expect(await h1('Dashboard')).toBeInTheDocument()
     expect(api.activateAccount).toHaveBeenCalledWith('tok-1', 'x'.repeat(10))
   })
 
@@ -56,7 +56,7 @@ describe('ActivateAccountPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Activar mi cuenta' }))
 
     // Termina en el inicio del usuario recién activado (botmaster), no en el del admin.
-    expect(await h1('Agentes')).toBeInTheDocument()
+    expect(await h1('Dashboard')).toBeInTheDocument()
     expect(api.activateAccount).toHaveBeenCalledWith('tok-1', 'x'.repeat(10))
   })
 

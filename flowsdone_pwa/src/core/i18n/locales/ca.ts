@@ -20,7 +20,6 @@ export const ca: Messages<typeof es> = {
     processing: 'Processant…',
     retry: 'Tornar-ho a provar',
     optional: 'Opcional',
-    comingSoon: 'Properament',
     name: 'Nom',
     status: 'Estat',
     tenant: 'Tenant',
@@ -57,6 +56,7 @@ export const ca: Messages<typeof es> = {
   },
   nav: {
     dashboard: 'Tauler',
+    reports: 'Informes',
     conversations: 'Converses',
     channels: 'Canals',
     tenants: 'Tenants',
@@ -181,6 +181,15 @@ export const ca: Messages<typeof es> = {
   },
   dashboard: {
     description: "Resum de l'activitat de la teva plataforma.",
+    descriptionTenant: 'Activitat i rendiment de {{name}}.',
+    descriptionAll: 'Activitat i rendiment de la plataforma, de tots els tenants.',
+    analytics: {
+      loading: 'Carregant el dashboard',
+      unavailable: 'Els dashboards no estan disponibles ara mateix. Torna-ho a provar d\'aquí a uns minuts.',
+      error: "No s'ha pogut carregar el dashboard.",
+      noTenantTitle: 'Sense tenants assignats',
+      noTenant: "El teu compte encara no té tenants assignats, així que no hi ha dades per mostrar. Demana a un administrador que te n'assigni un.",
+    },
     indicators: 'Indicadors',
     vsLastWeek: 'respecte a la setmana anterior',
     stats: {
@@ -207,8 +216,16 @@ export const ca: Messages<typeof es> = {
   },
   reports: {
     title: 'Informes',
-    description: 'Indicadors i taulers dels teus clients.',
-    comingSoon: "Aquí s'incrustaran els taulers de Metabase amb els informes dels teus clients.",
+    description: 'Informes detallats de les teves converses, canals i consum.',
+    descriptionTenant: 'Informes de {{name}}.',
+    none: 'El teu perfil no té informes.',
+    tabs: {
+      report_channels: 'Canals',
+      report_agents: 'Agents',
+      report_contacts: 'Contactes',
+      report_hours: 'Horaris',
+      report_usage: 'Consum',
+    },
     clientTitle: 'El meu panell',
     resultsOf: 'Resultats de {{name}}.',
     resultsOwn: 'Resultats de la teva organització.',

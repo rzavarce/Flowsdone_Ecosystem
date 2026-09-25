@@ -42,6 +42,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_MULTIPLE_DATABASES: ${POSTGRES_MULTIPLE_DATABASES}
+      # Solo lo usa scripts/metabase/init-postgres.sh (docker exec) para el
+      # rol de solo lectura de Metabase.
+      METABASE_READER_PASSWORD: ${METABASE_READER_PASSWORD:-}
     volumes:
       - ./volumes/postgres_data:/var/lib/postgresql/data
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
@@ -267,10 +270,13 @@ services:
       # lee de aquí). Obligatoria: sin ella el usuario quedaría sin contraseña,
       # así que docker compose se niega a arrancar.
       CLICKHOUSE_APP_PASSWORD: ${CLICKHOUSE_APP_PASSWORD:?Falta CLICKHOUSE_APP_PASSWORD en .env (openssl rand -hex 24)}
+      # Usuario de solo lectura de Metabase (users.d/metabase_reader.xml).
+      CLICKHOUSE_METABASE_PASSWORD: ${CLICKHOUSE_METABASE_PASSWORD:?Falta CLICKHOUSE_METABASE_PASSWORD en .env (openssl rand -hex 24)}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
       - ./scripts/clickhouse/users.d/flowsdone_app.xml:/etc/clickhouse-server/users.d/flowsdone_app.xml:ro
+      - ./scripts/clickhouse/users.d/metabase_reader.xml:/etc/clickhouse-server/users.d/metabase_reader.xml:ro
     ports:
       - "${CLICKHOUSE_HTTP_PORT}:8123"
       - "${CLICKHOUSE_TCP_PORT}:9000"
@@ -884,6 +890,55 @@ services:
   # TRAEFIK — solo profile prod. Rutea por dominio usando el file
   # provider (traefik/dynamic.yml), no lee labels de Docker.
   # ------------------------------------------------------------------
+
+  # ------------------------------------------------------------------
+  # ANALÍTICA
+  # ------------------------------------------------------------------
+
+  # Dashboards y reportes de la consola. Lee gatewaydb (solo el esquema
+  # analytics, rol metabase_reader) y ClickHouse (base flowsdone, usuario
+  # metabase_reader); su propia configuración vive en la base metabasedb.
+  # La consola muestra los dashboards con "static embedding": el gateway
+  # firma cada URL con MB_EMBEDDING_SECRET_KEY y fija el tenant, así un
+  # cliente no puede ver datos de otro tenant cambiando los filtros.
+  metabase:
+    <<: *common
+    image: ${METABASE_IMAGE:-metabase/metabase:v0.63.18.2}
+    container_name: ${CONTAINER_PREFIX}_metabase
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${METABASE_PORT:-3030}:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: ${METABASE_DB:-metabasedb}
+      MB_DB_USER: ${POSTGRES_USER}
+      MB_DB_PASS: ${POSTGRES_PASSWORD}
+      MB_SITE_URL: ${METABASE_PUBLIC_URL:-http://localhost:3030}
+      MB_SITE_LOCALE: es
+      MB_REPORT_TIMEZONE: Europe/Madrid
+      # Cifra en metabasedb las credenciales de las bases conectadas.
+      MB_ENCRYPTION_SECRET_KEY: ${METABASE_ENCRYPTION_KEY:?Falta METABASE_ENCRYPTION_KEY en .env (openssl rand -base64 32)}
+      MB_ENABLE_EMBEDDING_STATIC: "true"
+      MB_EMBEDDING_SECRET_KEY: ${METABASE_EMBEDDING_SECRET_KEY:?Falta METABASE_EMBEDDING_SECRET_KEY en .env (openssl rand -hex 32)}
+      MB_ANON_TRACKING_ENABLED: "false"
+      MB_CHECK_FOR_UPDATES: "false"
+      JAVA_OPTS: "-Xmx${METABASE_JAVA_XMX:-1g}"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    networks:
+      - flowsdone-net
+    mem_limit: ${METABASE_MEM_LIMIT:-1536m}
+    cpus: ${METABASE_CPUS:-1}
 
   traefik:
     <<: *common

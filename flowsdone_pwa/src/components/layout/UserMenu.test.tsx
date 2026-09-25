@@ -22,7 +22,7 @@ describe('UserMenu: idioma', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Main' })
     expect(within(sidebar!).getByRole('link', { name: 'Settings' })).toBeInTheDocument()
-    expect(screen.getByText('Weekly activity')).toBeInTheDocument()
+    expect(screen.getByText('Activity and performance of the platform, across all tenants.')).toBeInTheDocument()
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en')
     expect(document.documentElement.lang).toBe('en')
   })

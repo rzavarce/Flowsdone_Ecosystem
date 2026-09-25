@@ -3,24 +3,17 @@ import { can, homePathFor } from '@/core/auth/permissions'
 import { useAuth } from '@/core/auth/useAuth'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { ClientPanel } from '@/features/reports/ClientPanel'
-import { ReportsPlaceholder } from '@/features/reports/ReportsPlaceholder'
 
 /**
- * Content for /dashboard based on the profile: operational dashboard, the
- * client's read-only panel, the consultant's reports placeholder, or a
- * redirect to the user's own section (botmaster).
- *
- * `consultant` is resolved by ROLE, not by permission, ahead of the generic
- * `reports:view` check: it shares that permission with `client` (both "view
- * reports"), but each lands on a different screen - `client` stays on
- * `ClientPanel` (its usual panel); `consultant` is exclusive to
- * `ReportsPlaceholder`, the placeholder reserved for the Metabase dashboards.
+ * Content for /dashboard based on the profile: the staff's platform
+ * dashboard, the client side's panel (`client` and `consultant`), or a
+ * redirect to the user's own section. Both screens embed a Metabase
+ * dashboard; the gateway picks which one and locks its tenants.
  */
 export function DashboardRoute() {
   const { user } = useAuth()
   if (!user) return null
   if (can(user, 'dashboard:view')) return <DashboardPage />
-  if (user.role === 'consultant') return <ReportsPlaceholder />
   if (can(user, 'reports:view')) return <ClientPanel />
   return <Navigate to={homePathFor(user)} replace />
 }
