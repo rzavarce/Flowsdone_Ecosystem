@@ -506,6 +506,11 @@ services:
       # abandonado, que pide su propia API key y hoy falla por certificado.
       # Con esto el editor ni la muestra ni la consulta.
       LANGFLOW_STORE: "false"
+      # Langflow copia por defecto claves de proveedores del entorno
+      # (OPENAI_API_KEY…) como variable global de CADA usuario, es decir, de
+      # cada tenant. Cada tenant gestiona sus propias claves: si algún día el
+      # contenedor recibe una, que no se reparta a todos.
+      LANGFLOW_STORE_ENVIRONMENT_VARIABLES: "false"
       # Default de la URL de Weaviate para components/weaviate_multitenant.py
       # (os.environ, nunca hardcodeado en el componente) - mismo patron que
       # GATEWAY_INTERNAL_URL mas abajo.
