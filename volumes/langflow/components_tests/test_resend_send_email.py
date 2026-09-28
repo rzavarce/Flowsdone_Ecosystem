@@ -103,7 +103,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent.parent / "components" / "resend_send_email.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "resend_send_email.py"
 _spec = importlib.util.spec_from_file_location("resend_send_email", _MODULE_PATH)
 resend_send_email = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(resend_send_email)

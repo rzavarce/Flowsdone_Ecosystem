@@ -89,7 +89,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent.parent / "components" / "data_to_toon.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "data_to_toon.py"
 _spec = importlib.util.spec_from_file_location("data_to_toon", _MODULE_PATH)
 data_to_toon = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(data_to_toon)

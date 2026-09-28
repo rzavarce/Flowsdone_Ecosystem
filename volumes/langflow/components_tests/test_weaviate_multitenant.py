@@ -232,7 +232,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent.parent / "components" / "weaviate_multitenant.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "weaviate_multitenant.py"
 _spec = importlib.util.spec_from_file_location("weaviate_multitenant", _MODULE_PATH)
 weaviate_multitenant = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(weaviate_multitenant)

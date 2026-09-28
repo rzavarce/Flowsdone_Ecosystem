@@ -70,7 +70,9 @@ jobs:
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
 
-            # Descargar los cambios más recientes desde main
+            # Descargar los cambios más recientes desde main (guardando el commit
+            # anterior para saber después qué cambió)
+            PREV_HEAD=$(git rev-parse HEAD)
             git pull origin main
 
             # Buildear las imágenes actualizadas antes de tocar nada más
@@ -125,6 +127,13 @@ jobs:
             # encuentra el index template listo) incluyendo el perfil 'prod'
             # (Traefik, etc.)
             docker compose --profile prod up -d --remove-orphans
+
+            # Langflow solo escanea sus componentes propios al arrancar, y están
+            # montados como volumen (no en la imagen): si cambiaron, el `up -d`
+            # no recrea el contenedor y seguiría mostrando los de antes.
+            if ! git diff --quiet "$PREV_HEAD" HEAD -- volumes/langflow/components; then
+              docker compose --profile prod restart langflow
+            fi
 
             # Metabase: cuenta de administrador y fuentes de datos (idempotente;
             # espera a que Metabase esté sano).

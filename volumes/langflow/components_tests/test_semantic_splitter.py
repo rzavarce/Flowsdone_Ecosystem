@@ -54,7 +54,7 @@ def _install_stubs() -> None:
 
 
 _install_stubs()
-_PATH = Path(__file__).parent.parent / "components" / "semantic_splitter.py"
+_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "semantic_splitter.py"
 _spec = importlib.util.spec_from_file_location("semantic_splitter", _PATH)
 splitter = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(splitter)
