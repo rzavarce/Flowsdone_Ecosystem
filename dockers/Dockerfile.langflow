@@ -6,6 +6,15 @@ RUN /app/.venv/bin/uv pip install --python /app/.venv/bin/python3 \
     --reinstall-package weaviate-client \
     python-toon "langfuse<3" "weaviate-client<4"
 
+# MarkItDown, for components/document_to_markdown.py (pdf, docx, pptx, xlsx ->
+# Markdown). 0.1.4 is the version that installs on top of Langflow 1.4 without
+# upgrading what the image already has: the pins keep pillow, pdfminer,
+# pdfplumber and pypdfium2 at the image's versions (newer markitdown would bump
+# pillow and pypdfium2 a major version).
+RUN /app/.venv/bin/uv pip install --python /app/.venv/bin/python3 \
+    "markitdown[pdf,docx,pptx,xlsx]==0.1.4" \
+    "pillow==11.1.0" "pdfminer-six==20231228" "pdfplumber==0.11.5" "pypdfium2==4.30.1"
+
 # Hide Langflow's community promos ("Get started" checklist, GitHub/Discord
 # counters) in the editor embedded in the console: only a <style> block is
 # added to its index.html, no Langflow code is changed.
