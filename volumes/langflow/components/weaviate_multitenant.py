@@ -39,6 +39,17 @@ service block ("la tool lee esto via os.environ, nunca hardcodeado en el
 flow"). It's still a plain default: editable per-flow from the canvas like
 any other input, and falls back to the local dev URL if the env var isn't
 set, so a missing env var can't break Langflow's component scan at import.
+
+Knowledge bases (web pages, documents) reloaded from time to time have two
+extra needs, covered by options that are off by default so existing flows
+behave as before:
+- "Id desde el contenido": chunks have no id of their own, so the id is a
+  uuid5 of their source and text - reloading overwrites instead of
+  duplicating, and repeated chunks are dropped.
+- "Reemplazar por fuente": before adding, delete this tenant's objects from
+  the same sources (`source_field`, "source" by default), so content that
+  was removed or changed (an old price) doesn't stay behind. URL sources are
+  normalized first ("https://site.com/" == "https://site.com").
 """
 
 from __future__ import annotations
@@ -93,6 +104,38 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
                 "Nombre del campo en los metadatos (ej. 'sku') a partir del cual se computa un "
                 "id determinístico (uuid5) para cada objeto, así los reruns de sync actualizan "
                 "en vez de duplicar. Vacío = Weaviate genera un id aleatorio en cada insert."
+            ),
+        ),
+        BoolInput(
+            name="ids_from_content",
+            display_name="Id desde el contenido",
+            value=False,
+            advanced=True,
+            info=(
+                "Sin 'Campo de id determinístico': calcula el id de cada objeto a partir de su fuente "
+                "y su texto, así volver a cargar el mismo contenido lo sobrescribe en vez de duplicarlo. "
+                "Útil para fragmentos de documentos o páginas web, que no traen un id propio."
+            ),
+        ),
+        StrInput(
+            name="source_field",
+            display_name="Campo de fuente",
+            value="source",
+            advanced=True,
+            info=(
+                "Campo de los metadatos que dice de dónde viene cada objeto (una URL, un documento). "
+                "Lo usan 'Id desde el contenido' y 'Reemplazar por fuente'. Las URLs se normalizan "
+                "(sin '#…' ni '/' final) para que la misma página cuente una sola vez."
+            ),
+        ),
+        BoolInput(
+            name="replace_by_source",
+            display_name="Reemplazar por fuente",
+            value=False,
+            advanced=True,
+            info=(
+                "Antes de cargar, borra de este tenant los objetos de las mismas fuentes que llegan, "
+                "para que lo que se quitó o cambió (un precio antiguo) no se quede en la base."
             ),
         ),
         StrInput(
@@ -272,13 +315,114 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
         if documents:
             texts = [doc.page_content for doc in documents]
             metadatas = [doc.metadata for doc in documents]
+            if self._source_options_enabled():
+                self._normalize_sources(metadatas)
             uuids = self._compute_uuids(metadatas)
+            if uuids is None and getattr(self, "ids_from_content", False):
+                texts, metadatas, uuids = self._content_ids(texts, metadatas)
+            deleted = self._delete_previous_from_sources(client, metadatas) if getattr(self, "replace_by_source", False) else None
             add_kwargs: dict[str, Any] = {"tenant": self.tenant}
             if uuids is not None:
                 add_kwargs["uuids"] = uuids
             vector_store.add_texts(texts=texts, metadatas=metadatas, **add_kwargs)
+            self.status = f"{len(texts)} objetos cargados en el tenant '{self.tenant}'" + (
+                f"; {deleted} objetos anteriores de las mismas fuentes borrados" if deleted is not None else ""
+            )
 
         return vector_store
+
+    def _source_options_enabled(self) -> bool:
+        """Whether an option that relies on `source_field` is on.
+
+        getattr: flows saved before these options existed have no such fields
+        until the node is updated.
+
+        Returns:
+            bool: True if 'Id desde el contenido' or 'Reemplazar por fuente' is on.
+        """
+        return bool(getattr(self, "ids_from_content", False) or getattr(self, "replace_by_source", False))
+
+    def _source_key(self) -> str:
+        """Name of the metadata field holding each object's source.
+
+        Returns:
+            str: `source_field`, or "source" if unset.
+        """
+        return (getattr(self, "source_field", "") or "source").strip()
+
+    def _normalize_sources(self, metadatas: list[dict]) -> None:
+        """Normalize URL sources in place, so one page is one source.
+
+        `https://site.com/` and `https://site.com#plans` become
+        `https://site.com`: crawlers often reach the same page through
+        links written differently.
+
+        Args:
+            metadatas (list[dict]): Metadata of the items being ingested.
+        """
+        key = self._source_key()
+        for metadata in metadatas:
+            value = metadata.get(key)
+            if isinstance(value, str) and value.startswith(("http://", "https://")):
+                metadata[key] = value.split("#", 1)[0].rstrip("/")
+
+    def _content_ids(self, texts: list[str], metadatas: list[dict]) -> tuple[list[str], list[dict], list[str]]:
+        """Deterministic ids from source + text, dropping repeated items.
+
+        Args:
+            texts (list[str]): Texts being ingested.
+            metadatas (list[dict]): Their metadata (same order).
+
+        Returns:
+            tuple[list[str], list[dict], list[str]]: Texts, metadata and uuid5
+            ids, without items whose source and text were already seen.
+        """
+        key = self._source_key()
+        kept_texts, kept_metadatas, uuids, seen = [], [], [], set()
+        for text, metadata in zip(texts, metadatas):
+            object_id = str(uuid.uuid5(_ID_NAMESPACE, f"{metadata.get(key, '')}\n{text}"))
+            if object_id in seen:
+                continue
+            seen.add(object_id)
+            kept_texts.append(text)
+            kept_metadatas.append(metadata)
+            uuids.append(object_id)
+        return kept_texts, kept_metadatas, uuids
+
+    def _delete_previous_from_sources(self, client: weaviate.Client, metadatas: list[dict]) -> int:
+        """Delete this tenant's objects from the sources being ingested.
+
+        Args:
+            client (weaviate.Client): Connected Weaviate v3 client.
+            metadatas (list[dict]): Metadata of the items being ingested.
+
+        Returns:
+            int: Objects deleted (0 on a first load: no collection, tenant or
+            source property yet - Weaviate would answer the delete with an error).
+
+        Raises:
+            ValueError: If an item has no `source_field`: without it, what to
+                replace can't be known.
+        """
+        key = self._source_key()
+        missing = [m for m in metadatas if not m.get(key)]
+        if missing:
+            msg = f"'Reemplazar por fuente' necesita el campo '{key}' en los metadatos de cada objeto."
+            raise ValueError(msg)
+        if not client.schema.exists(self.index_name):
+            return 0
+        properties = {p["name"] for p in client.schema.get(self.index_name).get("properties", [])}
+        if key not in properties:
+            return 0
+        if self.tenant not in {t.name for t in client.schema.get_class_tenants(self.index_name)}:
+            return 0
+        sources = sorted({str(m[key]) for m in metadatas})
+        result = client.batch.delete_objects(
+            class_name=self.index_name,
+            where={"path": [key], "operator": "ContainsAny", "valueTextArray": sources},
+            tenant=self.tenant,
+        )
+        return int((result or {}).get("results", {}).get("successful", 0))
 
     def search_documents(self) -> list[Data]:
         """Runs a tenant-scoped similarity search, if `search_query` is set.
