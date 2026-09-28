@@ -112,6 +112,7 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.send_contact_request import SendContactRequestUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
 from app.core.config import settings
 from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
@@ -397,6 +398,11 @@ async def lifespan(app: FastAPI):
     app.state.overview_dashboard_use_case = GetOverviewDashboardUseCase(
         embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS
     )
+    app.state.webchat_test_link_use_case = IssueWebchatTestLinkUseCase(
+        secret=settings.CALLBACK_HMAC_SECRET,
+        ttl_seconds=settings.WEBCHAT_TEST_TOKEN_TTL_SECONDS,
+        demo_url=settings.WEBCHAT_PUBLIC_URL,
+    )
     app.state.reports_use_case = ReportsUseCase(embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS)
     app.state.send_contact_request_use_case = SendContactRequestUseCase(
         email_sender=email_sender,
@@ -530,6 +536,8 @@ async def lifespan(app: FastAPI):
         workspace=app.state.prepare_langflow_session_use_case,
         langflow=langflow_admin,
         manage_agents=app.state.manage_agents_use_case,
+        channel_connection_repo=app.state.channel_connection_repo,
+        create_channel=app.state.create_channel_connection_use_case,
     )
     app.state.redeem_langflow_ticket_use_case = RedeemLangflowTicketUseCase(
         accounts=langflow_accounts, langflow=langflow_admin, tickets=langflow_tickets

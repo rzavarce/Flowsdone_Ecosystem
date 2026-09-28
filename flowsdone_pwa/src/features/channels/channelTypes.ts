@@ -1,4 +1,4 @@
-import { AtSign, MessageCircle, MessagesSquare, Music2, PhoneCall, Send, Share2, type LucideIcon } from 'lucide-react'
+import { AtSign, Globe, MessageCircle, MessagesSquare, Music2, PhoneCall, Send, Share2, type LucideIcon } from 'lucide-react'
 import type { ChannelType } from '@/core/admin/types'
 import { i18n } from '@/core/i18n/i18n'
 
@@ -23,6 +23,8 @@ export interface ChannelTypeConfig {
   credentials: CredentialField[]
   /** Note about what the gateway does automatically on save. */
   note?: string
+  /** The gateway generates the identifier (web chat): no field to fill in. */
+  autoKey?: boolean
 }
 
 /**
@@ -38,12 +40,13 @@ function channelType(
   type: ChannelType,
   icon: LucideIcon,
   externalIdPlaceholder: string,
-  opts: { credentials?: string[]; note?: boolean; label?: string } = {},
+  opts: { credentials?: string[]; note?: boolean; label?: string; autoKey?: boolean } = {},
 ): ChannelTypeConfig {
   return {
     type,
     icon,
     externalIdPlaceholder,
+    autoKey: opts.autoKey,
     get label() {
       return opts.label ?? tr(`${type}.label`)
     },
@@ -71,6 +74,7 @@ function channelType(
 
 export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
   whatsapp_evolution: channelType('whatsapp_evolution', MessageCircle, 'clinica-vital', { label: 'WhatsApp' }),
+  webchat: channelType('webchat', Globe, '', { autoKey: true, note: true }),
   telegram: channelType('telegram', Send, '123456789:AA…', { label: 'Telegram', note: true }),
   facebook: channelType('facebook', MessagesSquare, '102030405060708', {
     label: 'Facebook Messenger',

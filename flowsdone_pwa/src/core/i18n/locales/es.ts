@@ -470,6 +470,9 @@ export const es = {
       makeDefaultItem: 'Hacer predeterminado a {{name}}',
       flow: 'Flujo: {{name}}',
       flowMissing: 'El flujo ya no está en la carpeta del proyecto',
+      tryWebchat: 'Probar en webchat',
+      tryWebchatItem: 'Probar {{name}} en webchat',
+      tryWebchatError: 'No se pudo abrir la prueba: {{error}}',
     },
     dialog: {
       registerTitle: 'Registrar agente',
@@ -524,10 +527,19 @@ export const es = {
       displayName: 'Nombre para mostrar',
       displayNameHint: 'Opcional. Ayuda a distinguirlo en la lista.',
       keepCredential: 'Déjalo vacío para conservar el actual. Si escribes uno, reemplaza al anterior.',
+      allowedOrigins: 'Dominios permitidos',
+      allowedOriginsHint: 'Una web por línea (p. ej. https://miempresa.com). Vacío = cualquier web puede usar el chat.',
       errors: {
         project: 'Elige un proyecto.',
         agent: 'Elige un agente.',
       },
+    },
+    webchat: {
+      showCode: 'Código',
+      snippet: 'Código para tu web',
+      snippetHint: 'Pégalo antes de </body> en las páginas donde quieras el chat.',
+      copy: 'Copiar',
+      copied: 'Copiado',
     },
     newProject: {
       help: 'Un canal siempre pertenece a un proyecto. Crea el primero para continuar.',
@@ -539,6 +551,12 @@ export const es = {
         externalIdLabel: 'Nombre de la instancia',
         externalIdHint: 'La instancia creada en Evolution API.',
         note: '',
+      },
+      webchat: {
+        label: 'Chat web',
+        externalIdLabel: 'Clave pública',
+        externalIdHint: 'La genera Flowsdone.',
+        note: 'Flowsdone genera la clave del chat. Al guardar verás el código para pegar en tu web.',
       },
       telegram: {
         label: 'Telegram',

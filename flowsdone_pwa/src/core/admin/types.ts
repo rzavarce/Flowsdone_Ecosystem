@@ -11,6 +11,7 @@ export type ChannelType =
   | 'telegram'
   | 'tiktok'
   | 'voice'
+  | 'webchat'
 
 /** Providers with one app shared across the whole platform. */
 export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio'
@@ -180,6 +181,20 @@ export interface ChannelConnection {
   status: string
   created_at: string
   updated_at: string
+  /** Web chat only: where a website loads the widget and its WebSocket from. */
+  webchat?: WebchatEmbed | null
+}
+
+/** Where a website loads the web chat from (see the snippet in Channels). */
+export interface WebchatEmbed {
+  script_url: string
+  ws_url: string
+}
+
+/** Demo link to try one agent in the web chat (short-lived). */
+export interface WebchatTestLink {
+  url: string
+  expires_in: number
 }
 
 /** A provider's shared credentials; only whether they're configured is known here. */
@@ -205,9 +220,12 @@ export interface CreateChannelConnectionInput {
   project_id: string
   agent_id: string
   channel_type: ChannelType
-  external_id: string
+  /** Not needed for the web chat: the gateway generates its public key. */
+  external_id?: string
   display_name?: string | null
   credentials?: Record<string, string>
+  /** Web chat: `{ allowed_origins: string[] }`. */
+  config?: Record<string, unknown>
 }
 
 /** Editable fields of a connection; omitted ones stay unchanged. */
@@ -217,6 +235,8 @@ export interface UpdateChannelConnectionInput {
   /** When sent, REPLACES the current credentials. */
   credentials?: Record<string, string>
   status?: string
+  /** Keys to set on the config (shallow merge). */
+  config?: Record<string, unknown>
 }
 
 /** Status of a console account. `pending`: created, waiting for the user to

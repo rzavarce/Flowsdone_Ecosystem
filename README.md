@@ -422,6 +422,23 @@ El flujo de trabajo normal no necesita curl:
 | No se borra un agente con canales conectados | Responde `409`. Hay que mover los canales a otro agente o borrarlos antes. Antes daba un `500` por la clave foránea `RESTRICT` |
 | Suspender un agente (`status: suspended`) | Sus canales dejan de responder, porque el enrutado solo atiende agentes `active` |
 
+### Webchat: canal por tenant y demo genérica
+
+El webchat es un canal más (`channel_type: webchat`), uno por proyecto:
+
+- **Se crea solo** con el agente base del alta de cliente (*Chat web*, sin dominios restringidos). También se puede crear a mano en *Canales*: no pide identificador, el gateway genera la clave pública `wc_…`.
+- **Dominios permitidos** (`config.allowed_origins`): si hay alguno, el WebSocket rechaza páginas de otros orígenes (cabecera `Origin`). Vacío = cualquier web. Se normalizan a `https://host[:puerto]`.
+- **Código para la web:** la tarjeta del canal muestra el fragmento listo para copiar (CSS, `wsUrl: "wss://chat.flowsdone.com/ws"` y `channelKey`). Sale de `WEBCHAT_PUBLIC_URL`, que es también de donde Traefik toma el dominio del chat (plantilla en `traefik/dynamic.yml`): cambiar el dominio es cambiar solo esa variable y el DNS.
+- Los mensajes pasan por el Switchboard como cualquier canal: conversaciones, consumo, límites del plan y dashboards. Límite por visitante/IP: `WEBCHAT_MAX_MESSAGES_PER_MINUTE`; tamaño máximo: `WEBCHAT_MAX_MESSAGE_CHARS`.
+
+**Demo genérica (probar cualquier agente):** en *Agentes*, el botón *Probar en webchat* pide `POST /internal/admin/agents/{id}/webchat-test` y abre `WEBCHAT_PUBLIC_URL?test_token=…`. El token va firmado (HMAC derivado de `CALLBACK_HMAC_SECRET`), nombra el flujo del agente y caduca a los `WEBCHAT_TEST_TOKEN_TTL_SECONDS` (30 min por defecto). Esas conversaciones van directas al flujo: **no se registran ni se facturan**. Ya no se acepta un `workflow_id` arbitrario en el WebSocket.
+
+| Conexión a `/ws` | Uso |
+|---|---|
+| `?key=wc_…` | Web del cliente (canal del tenant) |
+| `?test_token=…` | Demo desde la consola |
+| Ninguno / inválido / origen no permitido | Rechazada antes del handshake (código 1008) |
+
 
 ---
 
@@ -552,7 +569,7 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 | Servicio | URL |
 |---|---|
 | API Gateway | http://localhost:8000 |
-| Webchat (demo) | http://localhost:8000/static/webchat/ (`?caso=langflow` o `?caso=n8n`, ver sección 13) |
+| Webchat (demo) | http://localhost:8000/static/webchat/ — se abre desde la consola (Agentes → *Probar en webchat*), ver sección 8 |
 | Admin API (tenants/proyectos/agentes/canales) | http://localhost:8000/internal/admin/* (sección 8) |
 | Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
 | Webhook de voz (Twilio) | http://localhost:8000/webhooks/voice — sin el nombre del proveedor en la ruta, a propósito (sección 18) |

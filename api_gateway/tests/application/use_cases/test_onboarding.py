@@ -5,11 +5,13 @@ from __future__ import annotations
 import pytest
 
 from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError
+from app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
 from app.application.use_cases.onboarding import CreateBaseAgentUseCase, GetOnboardingStatusUseCase
 from app.domain.ports.outbound import LangflowFlowSummary, LangflowSessionError
 from api_gateway.tests.application.use_cases.test_manage_agents import FlowsLangflow, _setup
 from api_gateway.tests.support.fakes import (
     FakePlanRepo,
+    FakeSecretGenerator,
     FakeSubscriptionRepo,
     FakeTenantBillingProfileRepo,
     FakeUserRepo,
@@ -54,7 +56,9 @@ def _world():
     w.prepare._langflow = w.langflow
     flows._langflow = w.langflow
     create = CreateBaseAgentUseCase(
-        project_repo=w.projects, tenant_repo=w.tenants, workspace=w.prepare, langflow=w.langflow, manage_agents=manage
+        project_repo=w.projects, tenant_repo=w.tenants, workspace=w.prepare, langflow=w.langflow, manage_agents=manage,
+        channel_connection_repo=connections,
+        create_channel=CreateChannelConnectionUseCase(connections, FakeSecretGenerator("ab" * 32), {}),
     )
     billing, users, subs, plans = FakeTenantBillingProfileRepo(), FakeUserRepo(), FakeSubscriptionRepo(), FakePlanRepo()
     status = GetOnboardingStatusUseCase(
@@ -151,3 +155,18 @@ async def test_an_agent_whose_flow_is_gone_is_a_warning_and_langflow_down_is_unk
     x["w"].langflow.fail = True
     status = await x["status"].execute(x["w"].tenant.id)
     assert _check(status, "agent").status == "unknown" and _check(status, "openai_key").status == "unknown"
+
+
+async def test_the_base_agent_brings_the_projects_web_chat_once():
+    x = _world()
+    project = await x["w"].add_project("Atención")
+
+    agent = await x["create"].execute(project_id=project.id, assistant_name="Fibi", tone="cercano", instructions="")
+
+    [webchat] = [c for c in await x["connections"].list_by_project(project.id) if c.channel_type == "webchat"]
+    assert webchat.agent_id == agent.id and webchat.display_name == "Chat web"
+    assert webchat.external_id == "wc_" + "ab" * 16 and webchat.config == {"allowed_origins": []}
+
+    # A second base agent (e.g. after deleting the first) does not add another web chat.
+    await x["create"].execute(project_id=project.id, assistant_name="Otro", tone="cercano", instructions="")
+    assert [c.channel_type for c in await x["connections"].list_by_project(project.id)].count("webchat") == 1

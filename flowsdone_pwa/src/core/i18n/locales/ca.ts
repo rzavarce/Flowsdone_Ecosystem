@@ -469,6 +469,9 @@ export const ca: Messages<typeof es> = {
       makeDefaultItem: 'Fer predeterminat {{name}}',
       flow: 'Flux: {{name}}',
       flowMissing: 'El flux ja no és a la carpeta del projecte',
+      tryWebchat: 'Provar al xat web',
+      tryWebchatItem: 'Provar {{name}} al xat web',
+      tryWebchatError: "No s'ha pogut obrir la prova: {{error}}",
     },
     dialog: {
       registerTitle: 'Registrar agent',
@@ -523,10 +526,19 @@ export const ca: Messages<typeof es> = {
       displayName: 'Nom visible',
       displayNameHint: 'Opcional. Ajuda a distingir-lo a la llista.',
       keepCredential: "Deixa-ho buit per conservar l'actual. Si n'escrius un, substitueix l'anterior.",
+      allowedOrigins: 'Webs permeses',
+      allowedOriginsHint: "Una per línia (p. ex. https://lamevaempresa.com). Buit = qualsevol web pot fer servir el xat.",
       errors: {
         project: 'Tria un projecte.',
         agent: 'Tria un agent.',
       },
+    },
+    webchat: {
+      showCode: 'Codi',
+      snippet: 'Codi per a la teva web',
+      snippetHint: 'Enganxa-ho abans de </body> a les pàgines on vulguis el xat.',
+      copy: 'Copiar',
+      copied: 'Copiat',
     },
     newProject: {
       help: "Un canal sempre pertany a un projecte. Crea'n el primer per continuar.",
@@ -538,6 +550,12 @@ export const ca: Messages<typeof es> = {
         externalIdLabel: 'Nom de la instància',
         externalIdHint: 'La instància creada a Evolution API.',
         note: '',
+      },
+      webchat: {
+        label: 'Xat web',
+        externalIdLabel: 'Clau pública',
+        externalIdHint: 'La genera Flowsdone.',
+        note: 'Flowsdone genera la clau del xat. En desar veuràs el codi per enganxar a la teva web.',
       },
       telegram: {
         label: 'Telegram',

@@ -1,4 +1,4 @@
-import { Bot, Pause, Pencil, Play, Plus, Star, Trash2 } from 'lucide-react'
+import { Bot, MessageSquareText, Pause, Pencil, Play, Plus, Star, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner } from '@/components/ui/Spinner'
-import { useAgents, useDeleteAgent, useProjectFlows, useProjects, useUpdateAgent } from '@/core/admin/hooks'
+import { useAgents, useDeleteAgent, useProjectFlows, useProjects, useUpdateAgent, useWebchatTestLink } from '@/core/admin/hooks'
 import type { Agent, Project } from '@/core/admin/types'
 import { ApiError } from '@/core/http/apiFetch'
 import { describeError } from '@/core/http/describeError'
@@ -25,6 +25,7 @@ function ProjectAgents({
   onAsk,
   onMakeDefault,
   onReactivate,
+  onTryWebchat,
 }: {
   project: Project
   agents: Agent[]
@@ -33,6 +34,7 @@ function ProjectAgents({
   onAsk: (pending: NonNullable<Pending>) => void
   onMakeDefault: (agent: Agent) => void
   onReactivate: (agent: Agent) => void
+  onTryWebchat: (agent: Agent) => void
 }) {
   const { t } = useTranslation()
   const flows = useProjectFlows(agents.length ? project.id : undefined)
@@ -77,6 +79,11 @@ function ProjectAgents({
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1">
+                    {!suspended && (
+                      <Button variant="ghost" size="icon" onClick={() => onTryWebchat(agent)} aria-label={t('agents.list.tryWebchatItem', { name: agent.name })} title={t('agents.list.tryWebchat')}>
+                        <MessageSquareText className="size-4" aria-hidden="true" />
+                      </Button>
+                    )}
                     {!agent.is_default && (
                       <Button variant="ghost" size="icon" onClick={() => onMakeDefault(agent)} aria-label={t('agents.list.makeDefaultItem', { name: agent.name })} title={t('agents.list.makeDefault')}>
                         <Star className="size-4" aria-hidden="true" />
@@ -119,6 +126,7 @@ export function AgentsPanel({ tenantId }: { tenantId: string }) {
   const agents = useAgents()
   const update = useUpdateAgent()
   const remove = useDeleteAgent()
+  const webchatTest = useWebchatTestLink()
   const [dialog, setDialog] = useState<{ agent: Agent | null; projectId?: string } | null>(null)
   const [pending, setPending] = useState<Pending>(null)
 
@@ -137,6 +145,7 @@ export function AgentsPanel({ tenantId }: { tenantId: string }) {
       <p className="text-sm text-muted">{t('agents.list.description')}</p>
       <Alert tone="info">{t('agents.list.howTo')}</Alert>
       {update.error && !pending && <Alert tone="danger">{describeError(update.error)}</Alert>}
+      {webchatTest.error && <Alert tone="danger">{t('agents.list.tryWebchatError', { error: describeError(webchatTest.error) })}</Alert>}
       {projects.data.map((project) => (
         <ProjectAgents
           key={project.id}
@@ -151,6 +160,18 @@ export function AgentsPanel({ tenantId }: { tenantId: string }) {
           }}
           onMakeDefault={(agent) => void update.mutateAsync({ id: agent.id, patch: { is_default: true } }).catch(() => {})}
           onReactivate={(agent) => void update.mutateAsync({ id: agent.id, patch: { status: 'active' } }).catch(() => {})}
+          onTryWebchat={(agent) => {
+            // Opened now, while the click still counts as a user gesture
+            // (popup blockers); pointed at the demo once the link arrives.
+            const tab = window.open('', '_blank')
+            void webchatTest
+              .mutateAsync(agent.id)
+              .then((link) => {
+                if (tab) tab.location.href = link.url
+                else window.open(link.url, '_blank', 'noopener')
+              })
+              .catch(() => tab?.close())
+          }}
         />
       ))}
 

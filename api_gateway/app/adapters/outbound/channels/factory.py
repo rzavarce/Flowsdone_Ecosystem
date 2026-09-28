@@ -12,6 +12,7 @@ from app.adapters.outbound.channels.telegram_sender import TelegramSender
 from app.adapters.outbound.channels.tiktok_sender import TikTokSender
 from app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
 from app.adapters.outbound.channels.twitter_sender import TwitterSender
+from app.adapters.outbound.channels.webchat_sender import WebchatSender
 from app.adapters.outbound.channels.whatsapp_evolution_sender import WhatsAppEvolutionSender
 
 
@@ -51,6 +52,7 @@ class ChannelSenderFactory:
             "facebook": FacebookSender(),
             "instagram": InstagramSender(),
             "telegram": TelegramSender(),
+            "webchat": WebchatSender(),
             "twitter": TwitterSender(),
             "tiktok": TikTokSender(),
             "voice": TwilioVoiceSender(

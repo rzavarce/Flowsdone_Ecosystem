@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ChannelType } from '@/core/admin/types'
 import { CHANNEL_TYPES, CHANNEL_TYPE_LIST, maskExternalId } from './channelTypes'
 
-const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'telegram', 'tiktok', 'voice']
+const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'telegram', 'tiktok', 'voice', 'webchat']
 
 describe('catálogo de canales', () => {
-  it('cubre exactamente los siete canales que soporta el gateway', () => {
+  it('cubre exactamente los ocho canales que soporta el gateway', () => {
     expect(Object.keys(CHANNEL_TYPES).sort()).toEqual([...ALL].sort())
     expect(CHANNEL_TYPE_LIST).toHaveLength(ALL.length)
   })
@@ -45,5 +45,16 @@ describe('maskExternalId', () => {
   it('deja intactos los identificadores no sensibles', () => {
     expect(maskExternalId('whatsapp_evolution', 'vital-wa')).toBe('vital-wa')
     expect(maskExternalId('instagram', '17841400000000')).toBe('17841400000000')
+  })
+})
+
+describe('chat web', () => {
+  it('su clave la genera el gateway: no se pide identificador', () => {
+    expect(CHANNEL_TYPES.webchat.autoKey).toBe(true)
+    expect(CHANNEL_TYPE_LIST.filter((c) => c.autoKey).map((c) => c.type)).toEqual(['webchat'])
+  })
+
+  it('la clave pública se muestra entera (no es un secreto)', () => {
+    expect(maskExternalId('webchat', 'wc_abc123')).toBe('wc_abc123')
   })
 })

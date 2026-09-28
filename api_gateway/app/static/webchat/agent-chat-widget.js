@@ -7,7 +7,13 @@
         wsUrl: options.wsUrl || null,
         sessionId: options.sessionId || null,
         conversationId: options.conversationId || null,
-        workflowId: options.workflowId || null,
+        // Where messages go - one of the two is required:
+        //  - channelKey: the tenant's web chat channel key ("wc_..."), shown
+        //    in the console (Channels) together with the snippet;
+        //  - testToken: a short-lived token to try one agent (the demo page
+        //    opened from the console, Agents -> Try in web chat).
+        channelKey: options.channelKey || null,
+        testToken: options.testToken || null,
         transport: options.transport || 'rabbitmq',
         userId: options.userId || null,
         modelName: options.modelName || 'chatgpt',
@@ -55,6 +61,10 @@
           socketDisconnected: 'Disconnected',
           genericError: 'Something went wrong. Please try again.',
           queuedError: 'The message could not be queued.',
+          rateLimited: 'Too many messages. Please wait a moment and try again.',
+          messageTooLong: 'The message is too long.',
+          channelUnavailable: 'This chat is not available right now.',
+          testExpired: 'This test link has expired. Open it again from the console.',
           ...(options.messages || {})
         }
       };
@@ -160,8 +170,11 @@
         return this.socketReadyPromise;
       }
       this.setConnectionState(false, this.config.messages.socketConnecting);
-      const url = `${this.config.wsUrl.replace(/\/$/, '')}`;
-      this.socket = new WebSocket(url);
+      const base = this.config.wsUrl.replace(/\/$/, '');
+      const query = this.config.testToken
+        ? `test_token=${encodeURIComponent(this.config.testToken)}`
+        : `key=${encodeURIComponent(this.config.channelKey || '')}`;
+      this.socket = new WebSocket(`${base}${base.includes('?') ? '&' : '?'}${query}`);
 
       this.socketReadyPromise = new Promise((resolve, reject) => {
         const cleanup = () => {
@@ -240,7 +253,13 @@
       }
 
       if (data.type === 'chat.error') {
-        this.showToast(data.error || this.config.messages.genericError, 'error');
+        const known = {
+          rate_limited: this.config.messages.rateLimited,
+          message_too_long: this.config.messages.messageTooLong,
+          channel_unavailable: this.config.messages.channelUnavailable,
+          test_token_expired: this.config.messages.testExpired,
+        };
+        this.showToast(known[data.error] || this.config.messages.genericError, 'error');
         this.setLoading(false);
       }
     }
@@ -354,8 +373,8 @@
       const text = this.input.value.trim();
       if (!text || this.isLoading) return;
 
-      if (!this.config.workflowId || !this.config.conversationId) {
-        this.showToast('Missing workflowId/conversationId in AgentChatConfig', 'error');
+      if (!(this.config.channelKey || this.config.testToken) || !this.config.conversationId) {
+        this.showToast('Missing channelKey (or testToken) in AgentChatConfig', 'error');
         return;
       }
 
@@ -368,10 +387,7 @@
 
         socket.send(JSON.stringify({
           type: "chat.message",
-          workflow_id: this.config.workflowId,
           conversation_id: this.config.conversationId,
-          sender_id: this.config.userId || "anonymous",
-          channel: "web",
           payload: { message: text },
           transport: this.config.transport || "rabbitmq",
         }));

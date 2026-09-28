@@ -18,6 +18,7 @@ import type {
   TenantRecord,
   UnratedMeter,
   UserRecord,
+  WebchatTestLink,
 } from './types'
 
 /**
@@ -51,6 +52,7 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     createAgent: (input) => call<Agent>('/agents', 'POST', input),
     updateAgent: (id, patch) => call<Agent>(`/agents/${id}`, 'PATCH', patch),
     deleteAgent: (id) => call<void>(`/agents/${id}`, 'DELETE'),
+    webchatTestLink: (agentId) => call<WebchatTestLink>(`/agents/${agentId}/webchat-test`, 'POST'),
     createBaseAgent: (input) => call<Agent>('/agents/base', 'POST', input),
     getOnboarding: (tenantId) => call<OnboardingStatus>(`/tenants/${tenantId}/onboarding`),
     listLangflowFlows: (projectId) => call<LangflowFlow[]>(`/langflow/flows${query({ project_id: projectId })}`),

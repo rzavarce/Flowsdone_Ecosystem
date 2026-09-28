@@ -15,6 +15,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate, BaseAgentCreate
@@ -234,6 +235,46 @@ async def update_agent(
     if not item:
         raise HTTPException(status_code=404, detail="agent not found")
     return AgentOut(**item.model_dump())
+
+
+class WebchatTestOut(BaseModel):
+    """Response of POST /agents/{agent_id}/webchat-test.
+
+    Attributes:
+        url (str): The demo page with a short-lived token for this agent.
+        expires_in (int): Seconds the token stays valid.
+    """
+
+    url: str
+    expires_in: int
+
+
+@router.post("/{agent_id}/webchat-test", response_model=WebchatTestOut)
+async def webchat_test_link(
+    agent_id: UUID,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("agents", "read")),
+) -> WebchatTestOut:
+    """A link to try an agent in the generic web chat demo.
+
+    Any staff member who can see the agent may ask for it. The token in the
+    link only allows chatting with this agent for a while, and those
+    conversations are not tracked nor billed.
+
+    Args:
+        agent_id (UUID): The agent.
+        request (Request): Used to reach `request.app.state.webchat_test_link_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Returns:
+        WebchatTestOut: The demo link.
+
+    Raises:
+        HTTPException: 404 if the agent does not exist or is outside the caller's tenants.
+    """
+    agent = await _load_scoped(request, access, agent_id)
+    link = request.app.state.webchat_test_link_use_case.execute(agent)
+    return WebchatTestOut(url=link.url, expires_in=link.expires_in)
 
 
 @router.delete("/{agent_id}", status_code=204)

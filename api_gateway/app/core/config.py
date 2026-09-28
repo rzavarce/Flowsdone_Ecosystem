@@ -163,6 +163,17 @@ class Settings(BaseModel):
     METABASE_ADMIN_PASSWORD: Optional[str] = None
     METABASE_EMBED_TTL_SECONDS: int = 3600
 
+    # Web chat (WebSocket /ws). Per visitor IP and channel (or test agent):
+    # at most WEBCHAT_MAX_MESSAGES_PER_MINUTE messages, each up to
+    # WEBCHAT_MAX_MESSAGE_CHARS characters. Demo test tokens (staff trying
+    # an agent from the console) last WEBCHAT_TEST_TOKEN_TTL_SECONDS.
+    WEBCHAT_MAX_MESSAGES_PER_MINUTE: int = 20
+    WEBCHAT_MAX_MESSAGE_CHARS: int = 2000
+    WEBCHAT_TEST_TOKEN_TTL_SECONDS: int = 1800
+    # Where the widget and the demo page are served (chat.flowsdone.com in
+    # production); the WebSocket is "/ws" on the same host.
+    WEBCHAT_PUBLIC_URL: str = "http://localhost:8000/static/webchat/"
+
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
     # per-bot Telegram secret_token no longer live here - they are
@@ -332,6 +343,11 @@ settings = Settings(
     METABASE_ADMIN_EMAIL=os.getenv("METABASE_ADMIN_EMAIL") or None,
     METABASE_ADMIN_PASSWORD=os.getenv("METABASE_ADMIN_PASSWORD") or None,
     METABASE_EMBED_TTL_SECONDS=int(os.getenv("METABASE_EMBED_TTL_SECONDS", "3600")),
+
+    WEBCHAT_MAX_MESSAGES_PER_MINUTE=int(os.getenv("WEBCHAT_MAX_MESSAGES_PER_MINUTE", "20")),
+    WEBCHAT_MAX_MESSAGE_CHARS=int(os.getenv("WEBCHAT_MAX_MESSAGE_CHARS", "2000")),
+    WEBCHAT_TEST_TOKEN_TTL_SECONDS=int(os.getenv("WEBCHAT_TEST_TOKEN_TTL_SECONDS", "1800")),
+    WEBCHAT_PUBLIC_URL=os.getenv("WEBCHAT_PUBLIC_URL", "http://localhost:8000/static/webchat/"),
 
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 

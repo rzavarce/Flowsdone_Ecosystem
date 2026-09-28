@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from app.domain.models.channel_connection import ChannelConnection
+from app.application.services.webchat import normalize_origins
+from app.domain.models.channel_connection import WEBCHAT, ChannelConnection
 from app.domain.ports.outbound import (
     ChannelConnectionRepositoryPort,
     SecretGeneratorPort,
@@ -109,6 +110,8 @@ class UpdateChannelConnectionUseCase:
 
         if config is not None:
             config = {**existing.config, **config}
+            if existing.channel_type == WEBCHAT:
+                config["allowed_origins"] = normalize_origins(config.get("allowed_origins"))
 
         if credentials is not None and registrar is not None:
             credentials = dict(credentials)

@@ -11,6 +11,7 @@ import { useTenant } from '@/core/tenant/useTenant'
 import { CHANNEL_TYPE_LIST, CHANNEL_TYPES, maskExternalId } from './channelTypes'
 import { describeError } from '@/core/http/describeError'
 import { NewProjectForm } from './NewProjectForm'
+import { originsOf, parseOrigins } from './webchat'
 import type { ChannelsView } from './useChannelsView'
 import { Trans, useTranslation } from 'react-i18next'
 
@@ -48,6 +49,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
   const [displayName, setDisplayName] = useState(connection?.display_name ?? '')
   const [status, setStatus] = useState(connection?.status ?? 'active')
   const [credentials, setCredentials] = useState<Record<string, string>>({})
+  const [origins, setOrigins] = useState(() => originsOf(connection).join('\n'))
   const [submitted, setSubmitted] = useState(false)
 
   // Valores efectivos derivados (sin efectos): si la elección ya no es válida
@@ -70,7 +72,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
   const errors = {
     project: !editing && !effectiveProjectId ? t('channels.form.errors.project') : '',
     agent: !effectiveAgentId ? t('channels.form.errors.agent') : '',
-    externalId: !editing && !externalId.trim() ? t('common.fieldRequired', { field: config.externalIdLabel }) : '',
+    externalId: !editing && !config.autoKey && !externalId.trim() ? t('common.fieldRequired', { field: config.externalIdLabel }) : '',
     credentials: Object.fromEntries(
       config.credentials.filter((f) => f.required && !editing && !credentials[f.key]?.trim()).map((f) => [f.key, t('common.fieldRequired', { field: f.label })]),
     ) as Record<string, string>,
@@ -82,6 +84,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
     setSubmitted(true)
     if (hasErrors) return
     const filled = Object.fromEntries(Object.entries(credentials).filter(([, v]) => v.trim()))
+    const webchatConfig = type === 'webchat' ? { config: { allowed_origins: parseOrigins(origins) } } : {}
     try {
       if (editing) {
         await update.mutateAsync({
@@ -91,6 +94,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             display_name: displayName.trim(),
             status,
             ...(Object.keys(filled).length ? { credentials: filled } : {}),
+            ...webchatConfig,
           },
         })
       } else {
@@ -98,9 +102,10 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
           project_id: effectiveProjectId,
           agent_id: effectiveAgentId,
           channel_type: channelType,
-          external_id: externalId.trim(),
+          ...(config.autoKey ? {} : { external_id: externalId.trim() }),
           display_name: displayName.trim() || null,
           ...(Object.keys(filled).length ? { credentials: filled } : {}),
+          ...webchatConfig,
         })
       }
       onClose()
@@ -181,7 +186,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             </Alert>
           )}
 
-          {!editing && (
+          {!editing && !config.autoKey && (
             <Field label={config.externalIdLabel} hint={config.externalIdHint} error={submitted ? errors.externalId : undefined}>
               <Input
                 value={externalId}
@@ -196,6 +201,19 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
           <Field label={t('channels.form.displayName')} hint={t('channels.form.displayNameHint')}>
             <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={config.label} />
           </Field>
+
+          {type === 'webchat' && (
+            <Field label={t('channels.form.allowedOrigins')} hint={t('channels.form.allowedOriginsHint')}>
+              <textarea
+                value={origins}
+                rows={3}
+                onChange={(e) => setOrigins(e.target.value)}
+                placeholder="https://miempresa.com"
+                spellCheck={false}
+                className="w-full rounded-lg border border-input bg-transparent px-4 py-3 font-mono text-sm shadow-theme-xs placeholder:text-muted/70 focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/15 focus-visible:outline-none"
+              />
+            </Field>
+          )}
 
           {editing && (
             <Field label={t('common.status')}>

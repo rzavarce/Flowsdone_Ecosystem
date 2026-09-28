@@ -964,6 +964,10 @@ services:
       - "--certificatesresolvers.myresolver.acme.preferredchain=ISRG Root X1"
       - "--accesslog=true"
       - "--log.level=${TRAEFIK_LOG_LEVEL}"
+    environment:
+      # traefik/dynamic.yml saca de aquí el dominio del webchat (una sola
+      # variable para el gateway y para el ruteo).
+      WEBCHAT_PUBLIC_URL: ${WEBCHAT_PUBLIC_URL:-https://chat.flowsdone.com/}
     ports:
       - "${TRAEFIK_HTTP_PORT}:80"
       - "${TRAEFIK_HTTPS_PORT}:443"
