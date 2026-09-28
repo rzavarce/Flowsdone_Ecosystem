@@ -42,6 +42,7 @@ class _FakeWeaviateVectorStore:
 
     def add_texts(self, texts, metadatas=None, **kwargs):
         self.add_texts_calls.append({"texts": texts, "metadatas": metadatas, **kwargs})
+        _FakeBatch.events.append("add")
         return [f"id-{i}" for i in range(len(texts))]
 
     def similarity_search(self, query, k, **kwargs):
@@ -98,11 +99,31 @@ def _reset_weaviate_schema_state():
     _FakeSchema.properties = {}
 
 
+class _FakeBatch:
+    """Records batch deletes; `events` is shared with add_texts to check ordering."""
+
+    delete_calls: list = []
+    events: list = []
+    deleted_count = 0
+
+    def delete_objects(self, class_name, where, output="minimal", dry_run=False, tenant=None):
+        type(self).delete_calls.append({"class_name": class_name, "where": where, "tenant": tenant})
+        type(self).events.append("delete")
+        return {"results": {"successful": type(self).deleted_count, "failed": 0}}
+
+
+def _reset_batch_state():
+    _FakeBatch.delete_calls = []
+    _FakeBatch.events = []
+    _FakeBatch.deleted_count = 0
+
+
 class _FakeWeaviateClient:
     def __init__(self, url=None, auth_client_secret=None):
         self.url = url
         self.auth_client_secret = auth_client_secret
         self.schema = _FakeSchema()
+        self.batch = _FakeBatch()
 
 
 def _install_stubs() -> None:
@@ -237,6 +258,9 @@ def _make_component(**overrides):
     component.ingest_data = []
     component.search_query = ""
     component.should_cache_vector_store = True
+    component.ids_from_content = False
+    component.source_field = "source"
+    component.replace_by_source = False
     for key, value in overrides.items():
         setattr(component, key, value)
     return component
@@ -432,4 +456,149 @@ def test_component_without_metadata_fields_still_works_for_flows_saved_before_it
     component.build_vector_store()
 
     assert _FakeWeaviateVectorStore.last_instance.attributes == ["documentId"]
+
+
+# --- Knowledge-base loads: ids from content, URL sources, replace by source ---
+
+def _chunks(*pairs):
+    return [Data(data={"text": text, "source": source}) for source, text in pairs]
+
+
+def _existing_knowledge_collection(properties=("text", "source")):
+    """Collection and tenant from a previous load, with a `source` property."""
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    _FakeSchema.classes.add("Conocimiento")
+    _FakeSchema.tenants["Conocimiento"] = {"flowsdone"}
+    _FakeSchema.properties["Conocimiento"] = list(properties)
+
+
+def _knowledge_component(**overrides):
+    return _make_component(index_name="Conocimiento", tenant="flowsdone", **overrides)
+
+
+def test_ids_from_content_are_stable_across_loads_and_depend_on_the_source():
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    chunks = _chunks(("https://flowsdone.com", "Pro: 99 €/mes"), ("manual-comercial.pdf", "Pro: 99 €/mes"))
+
+    _knowledge_component(ingest_data=chunks, ids_from_content=True).build_vector_store()
+    first = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]["uuids"]
+    _knowledge_component(ingest_data=chunks, ids_from_content=True).build_vector_store()
+    second = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]["uuids"]
+
+    assert first == second
+    assert len(set(first)) == 2  # same text, different source -> different objects
+
+
+def test_ids_from_content_drops_repeated_chunks():
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    chunks = _chunks(("https://flowsdone.com", "Hola"), ("https://flowsdone.com/", "Hola"), ("https://flowsdone.com", "Adiós"))
+
+    _knowledge_component(ingest_data=chunks, ids_from_content=True).build_vector_store()
+
+    call = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]
+    assert call["texts"] == ["Hola", "Adiós"]
+    assert len(call["uuids"]) == 2
+
+
+def test_id_key_takes_precedence_over_ids_from_content():
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    productos = [Data(data={"text": "adaptador usb", "sku": "A1", "source": "catalogo"})]
+
+    _make_component(ingest_data=productos, id_key="sku", ids_from_content=True).build_vector_store()
+    with_both = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]["uuids"]
+    _make_component(ingest_data=productos, id_key="sku").build_vector_store()
+
+    assert with_both == _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]["uuids"]
+
+
+def test_url_sources_are_normalized_when_a_source_option_is_on():
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    chunks = _chunks(("https://flowsdone.com/#planes", "a"), ("manual-comercial.pdf", "b"))
+
+    _knowledge_component(ingest_data=chunks, ids_from_content=True).build_vector_store()
+
+    metadatas = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]["metadatas"]
+    assert [m["source"] for m in metadatas] == ["https://flowsdone.com", "manual-comercial.pdf"]
+
+
+def test_by_default_sources_ids_and_previous_objects_are_left_untouched():
+    _existing_knowledge_collection()
+    chunks = _chunks(("https://flowsdone.com/", "a"))
+
+    _knowledge_component(ingest_data=chunks).build_vector_store()
+
+    call = _FakeWeaviateVectorStore.last_instance.add_texts_calls[0]
+    assert "uuids" not in call
+    assert call["metadatas"][0]["source"] == "https://flowsdone.com/"
+    assert _FakeBatch.delete_calls == []
+
+
+def test_replace_by_source_deletes_the_tenants_objects_from_those_sources_before_adding():
+    _existing_knowledge_collection()
+    _FakeBatch.deleted_count = 7
+    chunks = _chunks(("https://flowsdone.com/", "a"), ("manual-comercial.pdf", "b"), ("manual-comercial.pdf", "c"))
+    component = _knowledge_component(ingest_data=chunks, replace_by_source=True, ids_from_content=True)
+
+    component.build_vector_store()
+
+    assert _FakeBatch.delete_calls == [{
+        "class_name": "Conocimiento",
+        "where": {"path": ["source"], "operator": "ContainsAny",
+                  "valueTextArray": ["https://flowsdone.com", "manual-comercial.pdf"]},
+        "tenant": "flowsdone",
+    }]
+    assert _FakeBatch.events == ["delete", "add"]
+    assert "7 objetos anteriores" in component.status
+
+
+def test_replace_by_source_uses_the_configured_source_field():
+    _existing_knowledge_collection(properties=("text", "documento"))
+    chunks = [Data(data={"text": "a", "documento": "tarifas-2026"})]
+
+    _knowledge_component(ingest_data=chunks, replace_by_source=True, source_field="documento").build_vector_store()
+
+    assert _FakeBatch.delete_calls[0]["where"]["path"] == ["documento"]
+    assert _FakeBatch.delete_calls[0]["where"]["valueTextArray"] == ["tarifas-2026"]
+
+
+def test_replace_by_source_on_a_first_load_deletes_nothing():
+    # auto_provision creates the collection and tenant, but no `source` property exists yet.
+    _reset_weaviate_schema_state()
+    _reset_batch_state()
+    component = _knowledge_component(ingest_data=_chunks(("https://flowsdone.com", "a")), replace_by_source=True)
+
+    component.build_vector_store()
+
+    assert _FakeBatch.delete_calls == []
+    assert _FakeBatch.events == ["add"]
+    assert "0 objetos anteriores" in component.status
+
+
+def test_replace_by_source_skips_a_tenant_that_does_not_exist_yet():
+    _existing_knowledge_collection()
+    _FakeSchema.tenants["Conocimiento"] = {"otro_tenant"}
+    chunks = _chunks(("https://flowsdone.com", "a"))
+
+    _knowledge_component(ingest_data=chunks, replace_by_source=True, auto_provision=False).build_vector_store()
+
+    assert _FakeBatch.delete_calls == []
+
+
+def test_replace_by_source_requires_a_source_on_every_object():
+    _existing_knowledge_collection()
+    chunks = [Data(data={"text": "sin fuente"})]
+    component = _knowledge_component(ingest_data=chunks, replace_by_source=True)
+
+    try:
+        component.build_vector_store()
+    except ValueError as exc:
+        assert "source" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+    assert _FakeBatch.delete_calls == []
 
