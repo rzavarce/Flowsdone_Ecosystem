@@ -277,6 +277,37 @@ def test_build_vector_store_rejects_lowercase_index_name():
         raise AssertionError("Expected ValueError")
 
 
+def test_build_vector_store_accepts_mixed_case_collection_names():
+    for name in ("SalesKnowledge", "AppHelp", "Help_center2", "Productos"):
+        _make_component(index_name=name).build_vector_store()
+
+        assert _FakeWeaviateVectorStore.last_instance.index_name == name
+
+
+def test_build_vector_store_rejects_invalid_collection_names_without_a_suggestion():
+    for name in ("Sales-knowledge", "sales knowledge", "", "1Sales"):
+        component = _make_component(index_name=name)
+
+        try:
+            component.build_vector_store()
+        except ValueError as exc:
+            assert "mayúscula" in str(exc)
+            assert "Usá:" not in str(exc)
+        else:
+            raise AssertionError(f"Expected ValueError for {name!r}")
+
+
+def test_lowercase_first_letter_suggests_the_capitalized_name_keeping_the_rest():
+    component = _make_component(index_name="salesKnowledge")
+
+    try:
+        component.build_vector_store()
+    except ValueError as exc:
+        assert "Usá: SalesKnowledge" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")
+
+
 def test_build_vector_store_passes_tenant_when_ingesting():
     productos = [
         Data(data={"text": "adaptador usb", "sku": "A1"}),

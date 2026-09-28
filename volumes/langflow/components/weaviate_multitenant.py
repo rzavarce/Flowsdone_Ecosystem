@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from typing import Any
 
@@ -67,6 +68,8 @@ from langflow.io import BoolInput, HandleInput, IntInput, SecretStrInput, StrInp
 from langflow.schema import Data
 
 _ID_NAMESPACE = uuid.NAMESPACE_URL
+# Weaviate collection (class) names: uppercase first letter, then letters, digits or "_".
+_COLLECTION_NAME = re.compile(r"[A-Z][A-Za-z0-9_]*")
 _DEFAULT_WEAVIATE_URL = os.environ.get("WEAVIATE_URL", "http://weaviate:8080")
 
 
@@ -87,7 +90,7 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
             name="index_name",
             display_name="Nombre de la colección",
             required=True,
-            info="Requiere nombre capitalizado (ej. 'Productos').",
+            info="Empieza por mayúscula; solo letras, números o '_' (ej. 'Productos', 'SalesKnowledge').",
         ),
         StrInput(
             name="tenant",
@@ -281,6 +284,29 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
             msg = f"'Filtro (JSON)' no es JSON válido: {exc}"
             raise ValueError(msg) from exc
 
+    def _validate_index_name(self) -> None:
+        """Checks `index_name` is a valid Weaviate collection name.
+
+        Weaviate's rule: an uppercase first letter, then letters, digits or
+        '_' ("Productos", "SalesKnowledge", "Help_center"). Mixed case is
+        fine; a lowercase first letter would make Weaviate store the class
+        under another name than the one searched later.
+
+        Raises:
+            ValueError: If the name breaks the rule; suggests a valid one
+                when only the first letter is wrong.
+        """
+        if _COLLECTION_NAME.fullmatch(self.index_name or ""):
+            return
+        msg = (
+            "Nombre de colección no válido: debe empezar por mayúscula y tener solo letras, "
+            "números o '_' (ej. 'SalesKnowledge')."
+        )
+        suggestion = (self.index_name or "")[:1].upper() + (self.index_name or "")[1:]
+        if _COLLECTION_NAME.fullmatch(suggestion):
+            msg += f" Usá: {suggestion}"
+        raise ValueError(msg)
+
     @check_cached_vector_store
     def build_vector_store(self) -> Weaviate:
         """Builds the Weaviate vector store and, if `ingest_data` has items, upserts them for `tenant`.
@@ -289,9 +315,7 @@ class WeaviateMultiTenantComponent(LCVectorStoreComponent):
             Weaviate: The LangChain Weaviate wrapper, scoped to `index_name`/`tenant` for
             the search methods called later in the same component run.
         """
-        if self.index_name != self.index_name.capitalize():
-            msg = f"Weaviate requiere el nombre de colección capitalizado. Usá: {self.index_name.capitalize()}"
-            raise ValueError(msg)
+        self._validate_index_name()
 
         client = self._connect_client()
         if self.auto_provision:
