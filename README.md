@@ -644,6 +644,8 @@ Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider 
 
 **Nota:** tras cerrar el auto-login la API key lista solo los flujos de su usuario (p. ej. 3 en local en lugar de 36): los demás son las **plantillas de ejemplo de Langflow** (Basic Prompting, Blog Writer…), que Langflow crea sin propietario a propósito. No hay que asignarles dueño; asignarlas llenaría tu lista de copias.
 
+**Archivos subidos a los flujos** (componente File, "My Files"): Langflow los guarda en su directorio de configuración, `/root/.cache/langflow`, montado en `./volumes/langflow/cache` (ignorado por git). Antes vivían solo dentro del contenedor y se perdían en cada recreación, aunque el flujo los siguiera referenciando ("File or directory not found"). Ojo: `scripts/backup-postgres.sh` solo copia Postgres; esta carpeta no entra en ninguna copia de seguridad.
+
 **Pendiente (endurecimiento):** el flujo "Onboarding - Alta de cliente (interno)" usa `GATEWAY_ADMIN_API_KEY` (control total de la API admin) desde dentro de Langflow; conviene darle una credencial de alcance limitado. Para editar agentes por tenant sin Langflow, plantillas mantenidas por el equipo y parámetros editables desde la consola; para un cliente que exija edición visual libre, una instancia de Langflow dedicada.
 
 ### Langflow embebido por tenant (inicio de sesión único)

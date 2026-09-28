@@ -473,6 +473,11 @@ services:
     volumes:
       - ./volumes/langflow/components:/app/langflow/components
       - ./volumes/langflow/settings:/app/langflow/settings
+      # Langflow's config dir: files uploaded to flows (File component, "My
+      # Files") are stored here. Inside the container only, they were lost on
+      # every recreate while flows kept pointing at them ("File or directory
+      # not found"). Ignored by git (volumes/langflow/*).
+      - ./volumes/langflow/cache:/root/.cache/langflow
     environment:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
