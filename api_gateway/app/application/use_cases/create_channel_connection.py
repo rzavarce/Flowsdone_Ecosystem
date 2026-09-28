@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-from app.domain.models.channel_connection import ChannelConnection
+from app.application.services.webchat import normalize_origins
+from app.domain.models.channel_connection import WEBCHAT, WEBCHAT_KEY_PREFIX, ChannelConnection
 from app.domain.ports.outbound import (
     ChannelConnectionRepositoryPort,
     SecretGeneratorPort,
@@ -13,7 +14,11 @@ from app.domain.ports.outbound import (
 )
 from app.application.services.webhook_registration import WebhookRegistrationError, register_or_compensate
 
-__all__ = ["CreateChannelConnectionUseCase", "WebhookRegistrationError"]
+__all__ = ["CreateChannelConnectionUseCase", "MissingExternalIdError", "WebhookRegistrationError"]
+
+
+class MissingExternalIdError(ValueError):
+    """A channel other than webchat was created without external_id (maps to 400)."""
 
 
 class CreateChannelConnectionUseCase:
@@ -73,6 +78,7 @@ class CreateChannelConnectionUseCase:
             channel_type (str): Channel type (e.g. "telegram").
             external_id (str): Identifier used to route inbound
                 webhooks (bot token, page id, instance name, ...).
+                Ignored for webchat, whose public key is generated here.
             display_name (Optional[str]): Optional human-readable label.
             credentials (Dict[str, Any]): Channel credentials to
                 encrypt and store. If the channel has a registrar and
@@ -84,11 +90,22 @@ class CreateChannelConnectionUseCase:
             ChannelConnection: The created channel connection.
 
         Raises:
+            MissingExternalIdError: If a non-webchat channel has no external_id.
+            InvalidOriginError: If a webchat allowed origin is not a website.
             WebhookRegistrationError: If the channel has a registrar
                 and the external platform rejects the registration.
                 The just-created channel_connection is deleted before
                 this is raised.
         """
+        if channel_type == WEBCHAT:
+            # The web chat has no external platform: its routing key is a
+            # public key the gateway generates (it goes in the widget
+            # snippet), and its config carries the allowed websites.
+            external_id = WEBCHAT_KEY_PREFIX + self._secret_generator.generate()[:32]
+            config = {**config, "allowed_origins": normalize_origins(config.get("allowed_origins"))}
+        elif not external_id:
+            raise MissingExternalIdError(f"{channel_type} needs an external_id")
+
         registrar = self._webhook_registrars.get(channel_type)
         credentials = dict(credentials)
 

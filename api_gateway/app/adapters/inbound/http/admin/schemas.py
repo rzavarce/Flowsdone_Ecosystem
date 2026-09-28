@@ -329,15 +329,17 @@ class ChannelConnectionCreate(BaseModel):
         agent_id (UUID): Id of the agent that answers messages on this channel.
         channel_type (ChannelType): Which platform this connection is for.
         external_id (str): Identifier used to route inbound webhooks.
+            Not needed for webchat: the gateway generates its public key.
         display_name (Optional[str]): Optional human-readable label.
         credentials (Dict[str, Any]): Channel credentials to encrypt and store.
-        config (Dict[str, Any]): Arbitrary channel configuration.
+        config (Dict[str, Any]): Arbitrary channel configuration (webchat:
+            {"allowed_origins": ["https://example.com"]}).
     """
 
     project_id: UUID
     agent_id: UUID
     channel_type: ChannelType
-    external_id: str
+    external_id: str = ""
     display_name: Optional[str] = None
     credentials: Dict[str, Any] = Field(default_factory=dict)
     config: Dict[str, Any] = Field(default_factory=dict)
@@ -380,6 +382,8 @@ class ChannelConnectionOut(BaseModel):
         status (str): Lifecycle status.
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.
+        webchat (Optional[WebchatEmbedOut]): For webchat channels, what the
+            console needs to show the snippet for the client's website.
     """
 
     id: UUID
@@ -393,6 +397,22 @@ class ChannelConnectionOut(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    webchat: Optional["WebchatEmbedOut"] = None
+
+
+class WebchatEmbedOut(BaseModel):
+    """Where a website loads the web chat from.
+
+    Attributes:
+        script_url (str): The widget script.
+        ws_url (str): The WebSocket the widget connects to (with `?key=`).
+    """
+
+    script_url: str
+    ws_url: str
+
+
+ChannelConnectionOut.model_rebuild()
 
 
 # Channel apps (shared per-provider app credentials)

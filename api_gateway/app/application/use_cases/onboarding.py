@@ -11,9 +11,11 @@ from typing import List, Literal, Optional
 from uuid import UUID
 
 from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError, PrepareLangflowSessionUseCase
+from app.application.use_cases.create_channel_connection import CreateChannelConnectionUseCase
 from app.application.use_cases.manage_agents import ManageAgentsUseCase
 from app.domain.models.agent import Agent
 from app.domain.models.base_agent import AgentTone, BaseAgentSpec, build_system_prompt
+from app.domain.models.channel_connection import WEBCHAT
 from app.domain.ports.outbound import (
     AgentRepositoryPort,
     ChannelConnectionRepositoryPort,
@@ -41,6 +43,9 @@ class CreateBaseAgentUseCase:
     The flow goes to the tenant's default Langflow folder (the editor's
     "Starter Project"), not to the project's folder: it is what the client
     sees first when opening the editor.
+
+    The project also gets its web chat channel, answered by this agent, if
+    it has none yet: every client comes with a chat for their website.
     """
 
     def __init__(
@@ -51,6 +56,8 @@ class CreateBaseAgentUseCase:
         workspace: PrepareLangflowSessionUseCase,
         langflow: LangflowAdminPort,
         manage_agents: ManageAgentsUseCase,
+        channel_connection_repo: ChannelConnectionRepositoryPort,
+        create_channel: CreateChannelConnectionUseCase,
     ) -> None:
         """Build the use case.
 
@@ -60,12 +67,17 @@ class CreateBaseAgentUseCase:
             workspace (PrepareLangflowSessionUseCase): Opens the tenant's Langflow.
             langflow (LangflowAdminPort): Creates the flow.
             manage_agents (ManageAgentsUseCase): Registers the agent.
+            channel_connection_repo (ChannelConnectionRepositoryPort): The
+                project's channels (is there a web chat already?).
+            create_channel (CreateChannelConnectionUseCase): Creates the web chat.
         """
         self._projects = project_repo
         self._tenants = tenant_repo
         self._workspace = workspace
         self._langflow = langflow
         self._agents = manage_agents
+        self._channels = channel_connection_repo
+        self._create_channel = create_channel
 
     async def execute(
         self, *, project_id: UUID, assistant_name: str, tone: AgentTone, instructions: str
@@ -103,9 +115,27 @@ class CreateBaseAgentUseCase:
         )
         logger.info("onboarding.base_agent.flow_created", extra={"project_id": str(project_id), "flow_id": flow_id})
         # Just created, and outside the project's folder on purpose: not verified.
-        return await self._agents.create(
+        agent = await self._agents.create(
             project_id=project_id, name=spec.assistant_name, langflow_flow_id=flow_id, is_default=True, verify_flow=False
         )
+        await self._ensure_webchat(project_id, agent)
+        return agent
+
+    async def _ensure_webchat(self, project_id: UUID, agent: Agent) -> None:
+        """Give the project its web chat channel (answered by `agent`) if it
+        has none. It can embed anywhere until the client lists their websites.
+
+        Args:
+            project_id (UUID): The project.
+            agent (Agent): The agent that will answer it.
+        """
+        if any(c.channel_type == WEBCHAT for c in await self._channels.list_by_project(project_id)):
+            return
+        channel = await self._create_channel.execute(
+            project_id=project_id, agent_id=agent.id, channel_type=WEBCHAT, external_id="",
+            display_name="Chat web", credentials={}, config={"allowed_origins": []},
+        )
+        logger.info("onboarding.webchat_created", extra={"project_id": str(project_id), "channel_connection_id": str(channel.id)})
 
 
 @dataclass(frozen=True)

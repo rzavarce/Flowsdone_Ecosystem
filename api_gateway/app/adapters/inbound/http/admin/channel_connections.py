@@ -10,14 +10,23 @@ and `tenant_manager`.
 from __future__ import annotations
 
 from typing import Optional
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.application.services.webchat import InvalidOriginError
 from app.application.services.webhook_registration import WebhookRegistrationError
-from app.domain.models.channel_connection import ChannelConnection
+from app.application.use_cases.create_channel_connection import MissingExternalIdError
+from app.core.config import settings
+from app.domain.models.channel_connection import WEBCHAT, ChannelConnection
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
-from app.adapters.inbound.http.admin.schemas import ChannelConnectionCreate, ChannelConnectionOut, ChannelConnectionUpdate
+from app.adapters.inbound.http.admin.schemas import (
+    ChannelConnectionCreate,
+    ChannelConnectionOut,
+    ChannelConnectionUpdate,
+    WebchatEmbedOut,
+)
 
 router = APIRouter(prefix="/channel-connections", tags=["admin:channel-connections"])
 
@@ -57,7 +66,21 @@ def _to_out(connection: ChannelConnection) -> ChannelConnectionOut:
         ChannelConnectionOut: The response schema, without credentials.
     """
     data = connection.model_dump(exclude={"credentials"})
-    return ChannelConnectionOut(**data, has_credentials=bool(connection.credentials))
+    webchat = webchat_embed() if connection.channel_type == WEBCHAT else None
+    return ChannelConnectionOut(**data, has_credentials=bool(connection.credentials), webchat=webchat)
+
+
+def webchat_embed() -> WebchatEmbedOut:
+    """The widget script and WebSocket URLs, from WEBCHAT_PUBLIC_URL.
+
+    Returns:
+        WebchatEmbedOut: e.g. https://chat.flowsdone.com/agent-chat-widget.js
+        and wss://chat.flowsdone.com/ws.
+    """
+    base = settings.WEBCHAT_PUBLIC_URL.rstrip("/") + "/"
+    parts = urlsplit(base)
+    scheme = "wss" if parts.scheme == "https" else "ws"
+    return WebchatEmbedOut(script_url=f"{base}agent-chat-widget.js", ws_url=f"{scheme}://{parts.netloc}/ws")
 
 
 @router.post("", response_model=ChannelConnectionOut, status_code=201)
@@ -84,7 +107,9 @@ async def create_channel_connection(
 
     Raises:
         HTTPException: 404 if the project is outside the caller's tenants,
-            400 if the agent does not belong to the project, 502 if the
+            400 if the agent does not belong to the project, the external_id
+            is missing (any channel but webchat) or an allowed origin is not
+            a website, 502 if the
             channel has an auto-registration flow and the external platform
             rejected it.
     """
@@ -100,6 +125,8 @@ async def create_channel_connection(
             credentials=body.credentials,
             config=body.config,
         )
+    except (MissingExternalIdError, InvalidOriginError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except WebhookRegistrationError as exc:
         raise HTTPException(status_code=502, detail=f"webhook registration failed: {exc}") from exc
     return _to_out(connection)
@@ -197,6 +224,8 @@ async def update_channel_connection(
         connection = await request.app.state.update_channel_connection_use_case.execute(
             channel_connection_id, **body.model_dump(exclude_unset=True)
         )
+    except InvalidOriginError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except WebhookRegistrationError as exc:
         raise HTTPException(status_code=502, detail=f"webhook registration failed: {exc}") from exc
     if not connection:

@@ -207,3 +207,22 @@ async def test_an_agent_with_channels_cannot_be_deleted():
 
     connections.items.clear()
     assert await manage.delete(agent) is True
+
+
+def test_webchat_test_link_is_signed_for_that_agent():
+    from urllib.parse import parse_qs, urlsplit
+
+    from app.application.services.webchat import verify_test_token
+    from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
+
+    now = datetime.now(timezone.utc)
+    agent = Agent(id=uuid4(), project_id=uuid4(), name="Fibi", langflow_flow_id="flow-7", is_default=True,
+                  status="active", config={}, created_at=now, updated_at=now)
+    link = IssueWebchatTestLinkUseCase(secret="s", ttl_seconds=900, demo_url="https://chat.flowsdone.com/").execute(agent)
+
+    parts = urlsplit(link.url)
+    query = parse_qs(parts.query)
+    assert f"{parts.scheme}://{parts.netloc}{parts.path}" == "https://chat.flowsdone.com/" and link.expires_in == 900
+    assert query["agent"] == ["Fibi"]
+    claims = verify_test_token(query["test_token"][0], "s")
+    assert (claims.agent_id, claims.workflow_id) == (str(agent.id), "flow-7")

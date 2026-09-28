@@ -29,21 +29,15 @@
     <section class="demo-section" id="demo">
       <div class="demo-section-head">
         <span class="demo-kicker">Demo en vivo</span>
-        <h2>Probá el widget con distintos backends</h2>
-        <p>Esta página inicializa el widget que ves abajo a la derecha. Elegí a qué workflow de prueba se conecta — el cambio se aplica al recargar.</p>
+        <h2>Probá un agente en el chat web</h2>
+        <p>Esta demo sirve para probar cualquier agente, pero solo se abre desde la consola de Flowsdone: en <strong>Agentes</strong>, botón <strong>Probar en webchat</strong>. El enlace lleva un permiso de prueba para ese agente que caduca en unos minutos; estas conversaciones no se registran ni se facturan.</p>
       </div>
       <div class="demo-card">
-        <div class="case-switch" id="case-switch">
-          <button class="case-btn" data-caso="langflow">Langflow (Kafka)</button>
-          <button class="case-btn" data-caso="n8n">n8n (RabbitMQ)</button>
-        </div>
-        <p class="demo-hint">
-          Caso activo: <code id="active-case">langflow</code> · workflow_id: <code id="active-workflow">—</code> · transport: <code id="active-transport">—</code>
-        </p>
-        <p class="demo-live-note">Hacé click en el botón flotante (abajo a la derecha) para abrir el chat. El WebSocket recién se abre en ese momento.</p>
+        <p class="demo-hint" id="demo-status">Abrí esta página desde la consola para elegir el agente a probar.</p>
+        <p class="demo-live-note" id="demo-open-note" hidden>Hacé click en el botón flotante (abajo a la derecha) para abrir el chat.</p>
         <p class="demo-live-note">
           <button class="case-btn" id="reset-conversation-btn" type="button">Nueva conversación</button>
-          — el <code>conversation_id</code> se guarda en <code>localStorage</code> y sobrevive a un simple refresh (es el comportamiento real del widget embebido). Usá este botón para arrancar una conversación limpia sin abrir una ventana de incógnito.
+          — el id de la conversación se guarda en <code>localStorage</code> y sobrevive a un refresh (como en el widget embebido). Usá este botón para empezar una conversación limpia.
         </p>
       </div>
     </section>
@@ -52,7 +46,7 @@
       <div class="demo-section-head">
         <span class="demo-kicker">Integración</span>
         <h2>Cómo agregarlo a tu página</h2>
-        <p>Tres pasos: cargar el CSS y el JS del widget, definir la configuración antes de que el script corra, y listo — se auto-inicializa solo.</p>
+        <p>Cada cliente tiene su canal <strong>Chat web</strong> en la consola (sección <strong>Canales</strong>), con su clave pública (<code>wc_…</code>) y el fragmento listo para copiar. Tres pasos: cargar el CSS y el JS del widget, definir la configuración antes de que el script corra, y listo — se auto-inicializa solo.</p>
       </div>
       <div class="demo-card">
 
@@ -73,13 +67,13 @@
           <span class="step-num">2</span>
           <div class="step-body">
             <h3>Definí <code>window.AgentChatConfig</code> antes del script</h3>
-            <p>El widget busca esta variable global apenas carga y se auto-inicializa. El único campo obligatorio es <code>workflowId</code>: sin él, no hay a dónde enviar los mensajes.</p>
+            <p>El widget busca esta variable global apenas carga y se auto-inicializa. El único campo obligatorio es <code>channelKey</code>, la clave del canal Chat web del cliente. Si el canal tiene dominios permitidos, el chat solo funciona en esas webs.</p>
             <div class="code-block">
               <button class="copy-btn" data-copy-target="snippet-2">Copiar</button>
               <pre id="snippet-2"><code>&lt;script&gt;
   window.AgentChatConfig = {
-    workflowId: "TU_WORKFLOW_ID",   // obligatorio
-    transport: "kafka",             // "kafka" (Langflow) o "rabbitmq" (n8n)
+    wsUrl: "wss://chat.flowsdone.com/ws",
+    channelKey: "wc_TU_CLAVE",      // obligatorio: la clave del canal Chat web
     title: "Mi Asistente",
     initialMessage: "¡Hola! ¿En qué te puedo ayudar?",
     launcherColor: "#4F46E5",
@@ -102,7 +96,7 @@
               <pre id="snippet-3"><code>&lt;script defer src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;
 &lt;script&gt;
   window.addEventListener("load", function () {
-    window.AgentChat.init({ workflowId: "TU_WORKFLOW_ID", transport: "kafka" });
+    window.AgentChat.init({ wsUrl: "wss://chat.flowsdone.com/ws", channelKey: "wc_TU_CLAVE" });
   });
 &lt;/script&gt;</code></pre>
             </div>
@@ -116,7 +110,7 @@
       <div class="demo-section-head">
         <span class="demo-kicker">Referencia</span>
         <h2>Variables de configuración disponibles</h2>
-        <p>Todo lo que acepta <code>AgentChatConfig</code> / <code>AgentChat.init(options)</code>, agrupado por para qué sirve. Ninguna es obligatoria salvo <code>workflowId</code>.</p>
+        <p>Todo lo que acepta <code>AgentChatConfig</code> / <code>AgentChat.init(options)</code>, agrupado por para qué sirve. Ninguna es obligatoria salvo <code>channelKey</code>.</p>
       </div>
 
       <div class="demo-card">
@@ -126,12 +120,10 @@
           <table class="config-table">
             <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
             <tbody>
-              <tr><td class="col-name"><code>workflowId</code></td><td class="col-default">—</td><td class="col-desc"><strong>Obligatorio.</strong> El workflow (Langflow o n8n) al que se enrutan los mensajes.</td></tr>
-              <tr><td class="col-name"><code>transport</code></td><td class="col-default"><code>rabbitmq</code></td><td class="col-desc"><code>kafka</code> para Langflow, <code>rabbitmq</code> para n8n. Define el camino que toma el mensaje dentro del gateway.</td></tr>
-              <tr><td class="col-name"><code>wsUrl</code></td><td class="col-default">auto</td><td class="col-desc">Endpoint del WebSocket. Por defecto se arma solo a partir del dominio actual (<code>wss://tu-dominio/ws</code>) — normalmente no hace falta tocarlo.</td></tr>
+              <tr><td class="col-name"><code>channelKey</code></td><td class="col-default">—</td><td class="col-desc"><strong>Obligatorio.</strong> Clave pública del canal Chat web del cliente (<code>wc_…</code>), en la consola → Canales. Decide qué agente responde; las conversaciones cuentan como las de cualquier canal.</td></tr>
+              <tr><td class="col-name"><code>wsUrl</code></td><td class="col-default">auto</td><td class="col-desc">Endpoint del WebSocket. Por defecto se arma a partir del dominio de la página (<code>wss://tu-dominio/ws</code>), así que en la web del cliente hay que indicarlo: <code>wss://chat.flowsdone.com/ws</code> (el fragmento de la consola ya lo incluye).</td></tr>
               <tr><td class="col-name"><code>sessionId</code></td><td class="col-default">auto</td><td class="col-desc">Id de sesión del visitante. Se genera y persiste en <code>localStorage</code> si no lo pasás.</td></tr>
               <tr><td class="col-name"><code>conversationId</code></td><td class="col-default">auto</td><td class="col-desc">Id de conversación, también persistido en <code>localStorage</code>. Pasalo vos si necesitás controlar cuándo empieza una conversación nueva.</td></tr>
-              <tr><td class="col-name"><code>userId</code></td><td class="col-default">—</td><td class="col-desc">Identificador del usuario que envía los mensajes (para trazabilidad del lado del workflow).</td></tr>
             </tbody>
           </table>
         </div>
@@ -226,49 +218,29 @@
     </section>
 
     <p class="demo-footer">
-      ¿Dudas sobre qué <code>workflow_id</code> usar o cómo levantar uno nuevo? Revisá el <a href="/">README del proyecto</a> o el equipo de Flowsdone.
+      ¿Dudas sobre cómo conectar el chat a la web de un cliente? Revisá el <a href="/">README del proyecto</a> o el equipo de Flowsdone.
     </p>
 
   </div>
 
   <script>
-    // Casos de uso básicos de prueba (ver ?caso=langflow o ?caso=n8n en la URL):
-    //   - langflow (default): transport=kafka -> kafka_inbound_worker -> Langflow ("Basic Prompting")
-    //   - n8n: transport=rabbitmq -> workflow de n8n "Flowsdone - Caso de uso basico (RabbitMQ)"
-    const CASES = {
-      langflow: { workflowId: "658e4dfa-ade3-4085-82bd-297b4a987d2d", transport: "kafka" },
-      n8n: { workflowId: "n8n-demo-workflow", transport: "rabbitmq" },
-    };
-
+    // La demo solo funciona con el permiso de prueba que da la consola
+    // (Agentes -> Probar en webchat): ?test_token=...&agent=<nombre>.
     const params = new URLSearchParams(location.search);
-    const caso = CASES[params.get("caso")] ? params.get("caso") : "langflow";
-    const selected = CASES[caso];
+    const testToken = params.get("test_token");
+    const agentName = params.get("agent") || "el agente";
 
-    const workflowId = params.get("workflow_id") || params.get("workflowId") || selected.workflowId;
-    const transport = params.get("transport") || selected.transport;
-
-    document.getElementById("active-case").textContent = caso;
-    document.getElementById("active-workflow").textContent = workflowId;
-    document.getElementById("active-transport").textContent = transport;
-
-    document.querySelectorAll(".case-btn").forEach(function (btn) {
-      if (btn.dataset.caso === caso) btn.classList.add("active");
-      btn.addEventListener("click", function () {
-        const url = new URL(location.href);
-        url.searchParams.set("caso", btn.dataset.caso);
-        url.searchParams.delete("workflow_id");
-        url.searchParams.delete("workflowId");
-        url.searchParams.delete("transport");
-        location.href = url.toString();
-      });
-    });
+    const status = document.getElementById("demo-status");
+    if (testToken) {
+      status.textContent = "Probando: " + agentName + ". Las conversaciones de prueba no se registran ni se facturan.";
+      document.getElementById("demo-open-note").hidden = false;
+    }
 
     document.getElementById("reset-conversation-btn").addEventListener("click", function () {
-      // El widget guarda su propio session_id (agent-chat-session-id /
-      // agent-chat-conversation-id) además del conversation_id que esta
-      // página fija a mano - se borran los tres para que el agente no
+      // El widget guarda sus ids en localStorage (agent-chat-session-id /
+      // agent-chat-conversation-id): se borran para que el agente no
       // arrastre historial de una conversación anterior.
-      ["conversation_id", "agent-chat-session-id", "agent-chat-conversation-id"].forEach(function (key) {
+      ["agent-chat-session-id", "agent-chat-conversation-id"].forEach(function (key) {
         localStorage.removeItem(key);
       });
       location.reload();
@@ -290,35 +262,26 @@
       });
     });
 
-    const conversationId =
-        localStorage.getItem("conversation_id") ||
-        crypto.randomUUID();
+    if (testToken) {
+      window.AgentChatConfig = {
+        wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
+        testToken: testToken,
+        transport: 'kafka',
 
-    localStorage.setItem("conversation_id", conversationId);
+        title: agentName,
+        initialMessage: '¡Hola! Estás probando ' + agentName + '. ¿En qué te ayudo?',
+        inputPlaceholder: 'Escribe tu mensaje...',
 
-    window.AgentChatConfig = {
-      wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://')
-           + location.host
-           + '/ws',
+        launcherColor: '#4F46E5',
+        launcherIconColor: '#ffffff',
+        launcherIconAccentColor: '#111827',
+        sendButtonColor: '#10B981',
 
-      workflowId: workflowId,
-      conversationId: conversationId,
-      userId: "anonymous",
-      transport: transport,
-
-      title: 'Flowsdone AI',
-      initialMessage: 'Hi! How can I help you today?',
-      inputPlaceholder: 'Type your message...',
-
-      launcherColor: '#4F46E5',
-      launcherIconColor: '#ffffff',
-      launcherIconAccentColor: '#111827',
-      sendButtonColor: '#10B981',
-
-      width: '420px',
-      height: '680px',
-      autoOpen: false
-    };
+        width: '420px',
+        height: '680px',
+        autoOpen: true
+      };
+    }
   </script>
 
   <!-- El widget DESPUÉS del config, sin defer -->
