@@ -81,15 +81,19 @@ http:
     # del chat nunca llega al gateway. Las reglas son mutuamente excluyentes
     # (!Path(`/ws`) en el router estático) en vez de depender de priority,
     # para que no haya ambigüedad de cuál router gana.
+    #
+    # El dominio sale de WEBCHAT_PUBLIC_URL (la misma variable que usa el
+    # gateway para el código del widget y el link de prueba): el file
+    # provider admite plantillas Go, y urlParse extrae el host de la URL.
     webchat-ws:
-      rule: "Host(`chat.flowsdone.com`) && Path(`/ws`)"
+      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && Path(`/ws`)'
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
       service: webchat-svc
 
     webchat:
-      rule: "Host(`chat.flowsdone.com`) && !Path(`/ws`)"
+      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && !Path(`/ws`)'
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
@@ -97,10 +101,10 @@ http:
       middlewares:
         - webchat-static
 
-    # platform.flowsdone.com: mismo backend que chat.flowsdone.com
+    # platform.flowsdone.com: mismo backend que el webchat
     # (webchat-svc = api:8000), pero SIN el middleware de reescritura — acá
     # sí llegan /internal/admin/*, /webhooks/* y /ws sin modificar.
-    # chat.flowsdone.com queda exclusivamente para servir el estático del
+    # El dominio del webchat queda exclusivamente para servir el estático del
     # widget de demo (más su propio /ws, que necesita same-origin para
     # funcionar en la demo).
     platform:
