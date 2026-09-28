@@ -1,4 +1,4 @@
-"""HTTP Request (Resilient): async httpx client with an explicit retry/failure policy.
+"""HTTP Request (Flowsdone): async httpx client with an explicit retry/failure policy.
 
 The native "API Request" component (langflow/components/data/api_request.py)
 makes HTTP calls with httpx but has no notion of retries or which failures
@@ -82,7 +82,7 @@ def _project_fields(value: Any, paths: list[list[str]]) -> Any:
 
 
 class ResilientHTTPRequestComponent(Component):
-    display_name = "HTTP Request (Resilient)"
+    display_name = "HTTP Request (Flowsdone)"
     description = (
         "Request HTTP asíncrono (httpx) con política de reintentos explícita: reintenta "
         "solo códigos transitorios (429/5xx) y errores de red, con backoff exponencial; "
