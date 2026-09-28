@@ -36,7 +36,10 @@ def _install_stubs() -> None:
     """Register minimal stand-ins for the third-party symbols this module imports."""
 
     class Component:
-        pass
+        def set(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            return self
 
     class _InputBase:
         def __init__(self, **kwargs):
@@ -175,6 +178,16 @@ class _FakeCalendarService:
         return _FreeBusy()
 
 
+# What the Agent sends on each call (Langflow resets these after every call).
+_TOOL_ARGS = {
+    "start_datetime": f"{_MONDAY}T10:00",
+    "duration_minutes": 0,
+    "customer_name": "Ana Pérez",
+    "customer_contact": "+34600111222",
+    "reason": "Demo del producto",
+}
+
+
 def _make_component(service=None, **overrides):
     component = GoogleCalendarAppointmentComponent()
     component.service_account_json = json.dumps({"client_email": "bot@proj.iam.gserviceaccount.com"})
@@ -184,11 +197,8 @@ def _make_component(service=None, **overrides):
     component.business_hours = ""
     component.business_days = ""
     component.title_template = "Cita: {customer_name}"
-    component.start_datetime = f"{_MONDAY}T10:00"
-    component.duration_minutes = 0
-    component.customer_name = "Ana Pérez"
-    component.customer_contact = "+34600111222"
-    component.reason = "Demo del producto"
+    for key, value in _TOOL_ARGS.items():
+        setattr(component, key, value)
     for key, value in overrides.items():
         setattr(component, key, value)
     fake = service or _FakeCalendarService()
@@ -196,7 +206,9 @@ def _make_component(service=None, **overrides):
     return component, fake
 
 
-def _run(component):
+def _run(component, **tool_args):
+    """Runs the tool once; `tool_args` are set first, like the Agent's arguments on a later call."""
+    component.set(**tool_args)
     return asyncio.run(component.create_appointment()).data
 
 
@@ -263,7 +275,7 @@ def test_retry_of_same_appointment_returns_existing_event():
     component, fake = _make_component()
     first = _run(component)
 
-    second = _run(component)
+    second = _run(component, **_TOOL_ARGS)
 
     assert second["success"] is True
     assert second["already_existed"] is True
@@ -276,7 +288,7 @@ def test_cancelled_event_with_same_id_is_revived_with_update():
     first = _run(component)
     fake.events_by_id[first["event_id"]]["status"] = "cancelled"
 
-    result = _run(component)
+    result = _run(component, **_TOOL_ARGS)
 
     assert result["success"] is True
     assert result["already_existed"] is False
@@ -448,3 +460,14 @@ def test_network_failure_is_reported_not_raised():
 
     assert result["success"] is False
     assert "No se pudo conectar" in result["error"]
+
+
+def test_arguments_of_a_previous_call_do_not_leak_into_the_next():
+    component, fake = _make_component(duration_minutes=90)
+    _run(component)
+    args = {k: v for k, v in _TOOL_ARGS.items() if k != "duration_minutes"}
+
+    result = _run(component, **{**args, "start_datetime": f"{_MONDAY}T15:00"})
+
+    assert result["end"] == f"{_MONDAY}T15:30:00+01:00"
+    assert component.start_datetime == ""

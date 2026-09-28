@@ -37,7 +37,10 @@ def _install_stubs() -> None:
     """Register minimal stand-ins for the third-party symbols this module imports."""
 
     class Component:
-        pass
+        def set(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            return self
 
     class _InputBase:
         def __init__(self, **kwargs):
@@ -162,7 +165,9 @@ def _make_component(service=None, **overrides):
     return component, fake
 
 
-def _run(component):
+def _run(component, **tool_args):
+    """Runs the tool once; `tool_args` are set first, like the Agent's arguments on a later call."""
+    component.set(**tool_args)
     return asyncio.run(component.check_availability()).data
 
 
@@ -417,3 +422,13 @@ def test_invalid_service_account_json_is_reported():
         assert "JSON" in str(exc)
     else:
         raise AssertionError("expected AvailabilityError")
+
+
+def test_arguments_of_a_previous_call_do_not_leak_into_the_next():
+    component, _ = _make_component(duration_minutes=120)
+    _run(component)
+
+    result = _run(component, date=_MONDAY)
+
+    assert result["duration_minutes"] == 30
+    assert component.date == ""

@@ -41,6 +41,8 @@ _SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 _HOURS = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$")
 _HTTP_NOT_FOUND = 404
 _HTTP_FORBIDDEN = 403
+# Tool-mode inputs and their defaults; see `_reset_tool_arguments`.
+_TOOL_ARGUMENT_DEFAULTS = {"date": "", "duration_minutes": 0}
 
 
 class AvailabilityError(ValueError):
@@ -144,8 +146,20 @@ class GoogleCalendarAvailabilityComponent(Component):
             result = {"success": False, "error": f"Google rechazó la credencial de la cuenta de servicio: {exc}"}
         except OSError as exc:
             result = {"success": False, "error": f"No se pudo conectar con Google Calendar: {exc}"}
+        finally:
+            self._reset_tool_arguments()
         self.status = result
         return Data(data=result)
+
+    def _reset_tool_arguments(self) -> None:
+        """Puts the tool-mode inputs back to their defaults after a call.
+
+        Langflow reuses this component instance for every call of the tool and
+        only sets the arguments the Agent sent (LangChain drops the omitted
+        ones), so an optional argument from a previous call would otherwise
+        leak into the next one.
+        """
+        self.set(**_TOOL_ARGUMENT_DEFAULTS)
 
     def _check(self) -> dict[str, Any]:
         """Runs the lookup synchronously (the Google client is blocking).
