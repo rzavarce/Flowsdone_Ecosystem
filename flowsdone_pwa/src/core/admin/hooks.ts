@@ -204,6 +204,12 @@ export function useDeleteProject() {
   })
 }
 
+/** Demo link to try an agent in the web chat (short-lived token; not tracked nor billed). */
+export function useWebchatTestLink() {
+  const api = useAdminApi()
+  return useMutation({ mutationFn: (agentId: string) => api.webchatTestLink(agentId) })
+}
+
 /** Agents visible to the current profile. */
 export function useAgents(enabled = true) {
   const api = useAdminApi()

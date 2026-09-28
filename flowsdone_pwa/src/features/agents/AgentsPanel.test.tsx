@@ -84,6 +84,21 @@ describe('Agentes: registro y gestión', { timeout: 20_000 }, () => {
     expect(screen.getByRole('button', { name: 'Reactivar Citas' })).toBeInTheDocument()
   })
 
+  it('"Probar en webchat" abre la demo con un enlace firmado para ese agente', async () => {
+    const admin = await setup()
+    const link = vi.spyOn(admin, 'webchatTestLink').mockResolvedValue({ url: 'https://chat.flowsdone.com/?test_token=x', expires_in: 1800 })
+    const tab = { location: { href: '' }, close: vi.fn() }
+    const openWindow = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window)
+    await agentRows()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Probar Recepción en webchat' }))
+
+    expect(openWindow).toHaveBeenCalledWith('', '_blank')
+    expect(link).toHaveBeenCalledWith('a1')
+    await vi.waitFor(() => expect(tab.location.href).toBe('https://chat.flowsdone.com/?test_token=x'))
+    openWindow.mockRestore()
+  })
+
   it('un tenant sin proyectos explica que hay que crear uno', async () => {
     await setup('t3')
     expect(await screen.findByText(/no tiene proyectos todavía/, undefined, { timeout: 5000 })).toBeInTheDocument()

@@ -54,10 +54,11 @@ describe('listado', () => {
     expect(screen.getAllByText('Atención', { selector: 'dd' })).toHaveLength(2)
   })
 
-  it('nunca pinta el token completo de Telegram (es un secreto)', async () => {
+  it('la tarjeta solo muestra proyecto y agente: ni identificadores ni el token de Telegram', async () => {
     await open()
     await screen.findByText('Bot de citas')
-    expect(screen.getByText('123456789:••••••••')).toBeInTheDocument()
+    expect(screen.queryByText('vital-wa')).not.toBeInTheDocument()
+    expect(screen.queryByText(/123456789/)).not.toBeInTheDocument()
     expect(document.body.textContent).not.toContain('SECRETTOKEN')
   })
 
@@ -104,6 +105,28 @@ describe('conectar un canal', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(await screen.findByText('WhatsApp Ventas')).toBeInTheDocument()
+  })
+
+  it('el chat web no pide identificador: guarda los dominios y muestra el código para la web', async () => {
+    const api = seeded()
+    const create = vi.spyOn(api, 'createChannelConnection')
+    const dialog = await openCreate('tenant_manager', api)
+    await userEvent.selectOptions(within(dialog).getByLabelText('Canal'), 'webchat')
+    expect(within(dialog).queryByLabelText('Clave pública')).not.toBeInTheDocument()
+
+    await userEvent.type(within(dialog).getByLabelText('Dominios permitidos'), 'https://clinicavital.com{enter}otra.com')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Conectar canal' }))
+
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    const input = create.mock.calls[0][0]
+    expect(input).toMatchObject({ channel_type: 'webchat', config: { allowed_origins: ['https://clinicavital.com', 'otra.com'] } })
+    expect(input).not.toHaveProperty('external_id')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Código para tu web' }))
+    const popup = screen.getByRole('dialog', { name: 'Código para tu web' })
+    expect(within(popup).getByText(/channelKey: "wc_mock/)).toBeInTheDocument()
+    await userEvent.click(within(popup).getAllByRole('button', { name: 'Cerrar' })[0]!)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('valida los campos obligatorios sin llamar a la API', async () => {

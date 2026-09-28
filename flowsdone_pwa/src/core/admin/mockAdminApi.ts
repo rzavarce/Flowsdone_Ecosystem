@@ -14,6 +14,9 @@ import type {
   UserRecord,
 } from './types'
 
+/** Where the mock web chat widget would load from. */
+const MOCK_WEBCHAT = { script_url: 'https://chat.flowsdone.com/agent-chat-widget.js', ws_url: 'wss://chat.flowsdone.com/ws' }
+
 /**
  * MOCK adapter: in-memory data consistent with the auth mock adapter's
  * tenants, with no backend. Replicates the gateway rules the UI needs to see
@@ -286,6 +289,11 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       if (patch.is_default) makeOnlyDefault(agent)
       return clone(agent)
     },
+    async webchatTestLink(agentId) {
+      await wait(latencyMs)
+      need(agents.find((a) => a.id === agentId), 'agent')
+      return { url: `about:blank#webchat-test=${agentId}`, expires_in: 1800 }
+    },
     async deleteAgent(id) {
       await wait(latencyMs)
       need(agents.find((a) => a.id === id), 'agent')
@@ -335,7 +343,9 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       need(projects.find((p) => p.id === input.project_id), 'project')
       assertAgentInProject(input.agent_id, input.project_id)
-      if (connections.some((c) => c.channel_type === input.channel_type && c.external_id === input.external_id)) {
+      const webchat = input.channel_type === 'webchat'
+      if (!webchat && !input.external_id) throw new ApiError(400, `${input.channel_type} needs an external_id`)
+      if (!webchat && connections.some((c) => c.channel_type === input.channel_type && c.external_id === input.external_id)) {
         throw new ApiError(409, 'already exists')
       }
       const now = new Date().toISOString()
@@ -344,10 +354,11 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
         project_id: input.project_id,
         agent_id: input.agent_id,
         channel_type: input.channel_type,
-        external_id: input.external_id,
+        external_id: webchat ? `wc_mock${++seq}` : (input.external_id ?? ''),
         display_name: input.display_name ?? null,
         has_credentials: Object.keys(input.credentials ?? {}).length > 0,
-        config: {},
+        config: webchat ? { allowed_origins: [], ...input.config } : { ...input.config },
+        webchat: webchat ? MOCK_WEBCHAT : null,
         status: 'active',
         created_at: now,
         updated_at: now,
@@ -363,6 +374,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       if (patch.display_name !== undefined) current.display_name = patch.display_name
       if (patch.status !== undefined) current.status = patch.status
       if (patch.credentials !== undefined) current.has_credentials = Object.keys(patch.credentials).length > 0
+      if (patch.config !== undefined) current.config = { ...current.config, ...patch.config }
       current.updated_at = new Date().toISOString()
       return clone(current)
     },

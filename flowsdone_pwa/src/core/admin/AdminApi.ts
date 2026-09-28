@@ -34,6 +34,7 @@ import type {
   Subscription,
   SubscriptionInput,
   UnratedMeter,
+  WebchatTestLink,
 } from './types'
 
 /**
@@ -77,6 +78,8 @@ export interface AdminApi {
   updateAgent(id: string, patch: UpdateAgentInput): Promise<Agent>
   /** Fails with 409 while channels are still connected to it. */
   deleteAgent(id: string): Promise<void>
+  /** Demo link to try an agent in the web chat (staff; short-lived token, not tracked nor billed). */
+  webchatTestLink(agentId: string): Promise<WebchatTestLink>
   /** Creates the project's base agent (new-client wizard) and makes it the default one. */
   createBaseAgent(input: BaseAgentInput): Promise<Agent>
   /** A tenant's onboarding checklist and the wizard step to resume at (admin/tenant_manager). */
