@@ -91,7 +91,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent.parent / "components" / "google_calendar_availability.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "google_calendar_availability.py"
 _spec = importlib.util.spec_from_file_location("google_calendar_availability", _MODULE_PATH)
 google_calendar_availability = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(google_calendar_availability)

@@ -81,7 +81,7 @@ def _install_stubs() -> None:
 
 
 _install_stubs()
-_PATH = Path(__file__).parent.parent / "components" / "document_to_markdown.py"
+_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "document_to_markdown.py"
 _spec = importlib.util.spec_from_file_location("document_to_markdown", _PATH)
 converter = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(converter)

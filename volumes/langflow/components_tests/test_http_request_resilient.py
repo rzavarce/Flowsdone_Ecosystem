@@ -132,7 +132,7 @@ def _install_stubs() -> None:
 
 _install_stubs()
 
-_MODULE_PATH = Path(__file__).parent.parent / "components" / "http_request_resilient.py"
+_MODULE_PATH = Path(__file__).parent.parent / "components" / "flowsdone" / "http_request_resilient.py"
 _spec = importlib.util.spec_from_file_location("http_request_resilient", _MODULE_PATH)
 http_request_resilient = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(http_request_resilient)
