@@ -6,7 +6,7 @@ from langflow.schema.message import Message
 
 
 class ChunksToJsonComponent(Component):
-    display_name = "Chunks to JSON"
+    display_name = "Chunks to JSON (Flowsdone)"
     description = (
         "Serializes a list of Data chunks (e.g. from a Text Splitter) into a single JSON Message, "
         "so it can be returned as plain text via the Langflow Run API and parsed by external callers (n8n)."

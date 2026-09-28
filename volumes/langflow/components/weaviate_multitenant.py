@@ -1,4 +1,4 @@
-"""Weaviate (Multi-Tenant): reusable vector store component with tenant isolation.
+"""Weaviate Multi-Tenant (Flowsdone): reusable vector store component with tenant isolation.
 
 The native "Weaviate" component that ships with this Langflow version
 (langflow/components/vectorstores/weaviate.py, built on
@@ -74,7 +74,7 @@ _DEFAULT_WEAVIATE_URL = os.environ.get("WEAVIATE_URL", "http://weaviate:8080")
 
 
 class WeaviateMultiTenantComponent(LCVectorStoreComponent):
-    display_name = "Weaviate (Multi-Tenant)"
+    display_name = "Weaviate Multi-Tenant (Flowsdone)"
     description = (
         "Vector store de Weaviate con soporte de multi-tenancy nativo (tenant obligatorio en "
         "cada escritura y búsqueda). Reusable en cualquier proyecto/tenant de Langflow: la "

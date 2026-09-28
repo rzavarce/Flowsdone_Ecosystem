@@ -1,4 +1,4 @@
-"""HTTP Request (Resilient): async httpx client with an explicit retry/failure policy.
+"""HTTP Request (Flowsdone): async httpx client with an explicit retry/failure policy.
 
 The native "API Request" component (langflow/components/data/api_request.py)
 makes HTTP calls with httpx but has no notion of retries or which failures
@@ -49,6 +49,8 @@ from langflow.schema import Data
 
 _DEFAULT_RETRYABLE_STATUS_CODES = "429,500,502,503,504"
 _HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+# Tool-mode inputs and their defaults; see `_reset_tool_arguments`.
+_TOOL_ARGUMENT_DEFAULTS = {"path": "", "query_params_json": "", "body_json": ""}
 
 
 def _project_fields(value: Any, paths: list[list[str]]) -> Any:
@@ -82,7 +84,7 @@ def _project_fields(value: Any, paths: list[list[str]]) -> Any:
 
 
 class ResilientHTTPRequestComponent(Component):
-    display_name = "HTTP Request (Resilient)"
+    display_name = "HTTP Request (Flowsdone)"
     description = (
         "Request HTTP asíncrono (httpx) con política de reintentos explícita: reintenta "
         "solo códigos transitorios (429/5xx) y errores de red, con backoff exponencial; "
@@ -377,6 +379,27 @@ class ResilientHTTPRequestComponent(Component):
 
     async def make_request(self) -> Data:
         """Runs the configured request, retrying transient failures per the policy above.
+
+        Returns:
+            Data: The success or failure envelope (see `_succeed`/`_fail`).
+        """
+        try:
+            return await self._make_request()
+        finally:
+            self._reset_tool_arguments()
+
+    def _reset_tool_arguments(self) -> None:
+        """Puts the tool-mode inputs back to their defaults after a call.
+
+        Langflow reuses this component instance for every call of the tool and
+        only sets the arguments the Agent sent (LangChain drops the omitted
+        ones), so a `body_json` or `query_params_json` from a previous call
+        would otherwise be sent again with the next one.
+        """
+        self.set(**_TOOL_ARGUMENT_DEFAULTS)
+
+    async def _make_request(self) -> Data:
+        """Body of `make_request`: builds the request and runs the retry loop.
 
         Returns:
             Data: The success or failure envelope (see `_succeed`/`_fail`).

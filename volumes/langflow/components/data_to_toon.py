@@ -23,7 +23,7 @@ from langflow.schema.message import Message
 
 
 class DataToToonComponent(Component):
-    display_name = "Data to TOON"
+    display_name = "Data to TOON (Flowsdone)"
     description = (
         "Encodes Data (e.g. RAG-retrieved chunks) as TOON "
         "(Token-Oriented Object Notation) text, trimming JSON's "

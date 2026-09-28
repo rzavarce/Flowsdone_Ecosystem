@@ -70,7 +70,10 @@ def _install_stubs() -> None:
     """Register minimal stand-ins for the third-party symbols this module imports."""
 
     class Component:
-        pass
+        def set(self, **kwargs):
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+            return self
 
     class _InputBase:
         def __init__(self, **kwargs):
@@ -557,3 +560,22 @@ def test_component_without_response_fields_still_works_for_flows_saved_before_it
 
     assert asyncio.run(component.make_request()).data["data"] == _PRODUCT
 
+
+
+def test_arguments_of_a_previous_call_do_not_leak_into_the_next():
+    _reset()
+    _FakeAsyncClient.next_script = [
+        _FakeResponse(200, json_data={"ok": 1}),
+        _FakeResponse(200, json_data={"ok": 2}),
+    ]
+    component = _make_component(method="POST", path="pedidos", body_json='{"sku": "CP-1045"}')
+    asyncio.run(component.make_request())
+
+    # Second tool call: the Agent only sends `path` (LangChain drops omitted arguments).
+    component.set(path="stock")
+    asyncio.run(component.make_request())
+
+    second = _FakeAsyncClient.calls[1]
+    assert second["url"].endswith("/stock")
+    assert second["json"] is None
+    assert component.path == ""
