@@ -15,7 +15,7 @@ import { useConversations } from '@/core/admin/billingHooks'
 import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
-import { channelLabel } from '@/features/billing/labels'
+import { channelLabel, contactLabel, DEMO_CHANNEL, identifierLabel } from '@/features/billing/labels'
 import { CHANNEL_TYPE_LIST } from '@/features/channels/channelTypes'
 import { cn } from '@/lib/cn'
 import { ConversationDetail } from './ConversationDetail'
@@ -82,6 +82,7 @@ export function ConversationsPage() {
                   {c.label}
                 </option>
               ))}
+              <option value={DEMO_CHANNEL}>{t('conversations.filters.demo')}</option>
             </Select>
             <Input
               className="col-span-2"
@@ -118,9 +119,10 @@ export function ConversationsPage() {
                         c.id === selectedId && 'bg-surface-muted',
                       )}
                     >
-                      <Avatar name={c.contact} />
+                      <Avatar name={contactLabel(c)} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{c.contact}</span>
+                        <span className="block truncate text-sm font-medium">{contactLabel(c)}</span>
+                        {c.contact_name && <span className="block truncate text-xs text-muted">{identifierLabel(c.contact)}</span>}
                         <span className="block truncate text-xs text-muted">
                           {channelLabel(c.channel_type)} · {t('conversations.messages', { count: c.inbound_count + c.outbound_count })}
                         </span>

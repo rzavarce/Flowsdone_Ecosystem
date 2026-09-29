@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ConversationFilters, CostRateInput, PlanInput, Subscription, SubscriptionInput } from './types'
+import type { ContactCardInput, ConversationFilters, CostRateInput, PlanInput, Subscription, SubscriptionInput } from './types'
 import { invalidateOnboarding } from './hooks'
 import { useAdminApi } from './useAdminApi'
 
@@ -40,6 +40,20 @@ export function useConversation(id?: string) {
     queryKey: [...billingKeys.conversation, id],
     queryFn: () => api.getConversation(id as string),
     enabled: Boolean(id),
+  })
+}
+
+/**
+ * Edits the card of a conversation's contact, then refreshes the inbox and
+ * every open conversation (the same contact may be in several).
+ */
+export function useUpdateConversationContact() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ContactCardInput }) => api.updateConversationContact(id, input),
+    onSuccess: () =>
+      Promise.all([billingKeys.conversations, billingKeys.conversation].map((queryKey) => qc.invalidateQueries({ queryKey }))),
   })
 }
 

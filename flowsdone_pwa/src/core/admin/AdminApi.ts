@@ -22,6 +22,8 @@ import type {
   UpdateUserInput,
   UserRecord,
   LangflowSession,
+  ContactCard,
+  ContactCardInput,
   Conversation,
   ConversationDetail,
   ConversationFilters,
@@ -139,6 +141,8 @@ export interface AdminApi {
   listConversations(filters?: ConversationFilters): Promise<Conversation[]>
   /** A conversation with its transcript and usage; cost only for admins. */
   getConversation(id: string): Promise<ConversationDetail>
+  /** Edits the card of a conversation's contact (staff); returns it as stored. */
+  updateConversationContact(id: string, input: ContactCardInput): Promise<ContactCard>
 
   /** Commercial plans (admin only). */
   listPlans(): Promise<Plan[]>

@@ -2,6 +2,7 @@ import { ApiError } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
 import type {
   ChannelConnection,
+  ContactCard,
   Conversation,
   ConversationMessage,
   CostRate,
@@ -18,6 +19,7 @@ export type BillingApi = Pick<
   AdminApi,
   | 'listConversations'
   | 'getConversation'
+  | 'updateConversationContact'
   | 'listPlans'
   | 'createPlan'
   | 'updatePlan'
@@ -74,6 +76,10 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
   let seq = 500
   const conversations: Conversation[] = []
   const transcripts = new Map<string, ConversationMessage[]>()
+  // Contact cards by tenant + channel + identifier, as the gateway keys them.
+  const contactCards = new Map<string, ContactCard>()
+  const cardKey = (c: Conversation) => `${c.tenant_id}|${c.channel_type}|${c.contact}`
+  const withName = (c: Conversation): Conversation => ({ ...c, contact_name: contactCards.get(cardKey(c))?.name ?? null })
 
   connections.forEach((connection, ci) => {
     const project = projects.find((p) => p.id === connection.project_id)
@@ -110,6 +116,38 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
       transcripts.set(id, messages)
     }
   })
+
+  // A chat from a share link (the agents' "Share"): channel "demo", not billable.
+  const demoSource = connections[0]
+  const demoProject = demoSource && projects.find((p) => p.id === demoSource.project_id)
+  if (demoSource && demoProject) {
+    const start = BASE - 2 * 3600 * 1000
+    const script = SCRIPTS[0]!
+    const messages: ConversationMessage[] = []
+    script.forEach(([question, answer], turn) => {
+      const at = start + turn * 90_000
+      messages.push({ message_id: `m-${++seq}`, timestamp: iso(at), direction: 'inbound', sender_type: 'contact', app: 'langflow', text: question, billable: false })
+      messages.push({ message_id: `m-${++seq}`, timestamp: iso(at + 4000), direction: 'outbound', sender_type: 'bot', app: 'langflow', text: answer, billable: true })
+    })
+    conversations.push({
+      id: 'conv-demo-1',
+      tenant_id: demoProject.tenant_id,
+      project_id: demoProject.id,
+      agent_id: demoSource.agent_id,
+      channel_type: 'demo',
+      channel_connection_id: 'share-mock-1',
+      contact: 'Demo · visitante 1a2b3c4d',
+      status: 'open',
+      started_at: iso(start),
+      last_inbound_at: messages.filter((m) => m.direction === 'inbound').at(-1)!.timestamp,
+      last_message_at: messages.at(-1)!.timestamp,
+      inbound_count: script.length,
+      outbound_count: script.length,
+      closed_at: null,
+      close_reason: null,
+    })
+    transcripts.set('conv-demo-1', messages)
+  }
 
   const plans: Plan[] = [
     {
@@ -196,7 +234,8 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
           .filter((c) => !filters.project_id || c.project_id === filters.project_id)
           .filter((c) => !filters.channel_type || c.channel_type === filters.channel_type)
           .filter((c) => !filters.status || c.status === filters.status)
-          .filter((c) => !contact || c.contact.toLowerCase().includes(contact))
+          .map(withName)
+          .filter((c) => !contact || `${c.contact} ${c.contact_name ?? ''}`.toLowerCase().includes(contact))
           .filter((c) => !filters.before || c.last_message_at < filters.before)
           .sort((a, b) => b.last_message_at.localeCompare(a.last_message_at))
           .slice(0, filters.limit ?? 50),
@@ -208,7 +247,8 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
       const messages = transcripts.get(id) ?? []
       const inbound = messages.filter((m) => m.direction === 'inbound').length
       return clone({
-        conversation,
+        conversation: withName(conversation),
+        contact_card: contactCards.get(cardKey(conversation)) ?? null,
         messages,
         usage: [
           { kind: 'channel', provider: conversation.channel_type, sku: 'message.inbound', unit: 'message', channel_type: conversation.channel_type, quantity: String(inbound), cost_micros: 0, rated: true },
@@ -220,6 +260,23 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
         llm_output_tokens: inbound * 60,
         llm_cached_input_tokens: 0,
       })
+    },
+    async updateConversationContact(id, input) {
+      await wait(latencyMs)
+      const conversation = need(conversations.find((c) => c.id === id), 'conversation')
+      const email = input.email?.trim().toLowerCase()
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError(422, 'email is not valid')
+      const current = contactCards.get(cardKey(conversation)) ?? {
+        name: null, email: null, phone: null, username: null, notes: null, updated_at: '',
+      }
+      const card: ContactCard = { ...current, updated_at: new Date().toISOString() }
+      for (const field of ['name', 'email', 'phone', 'username', 'notes'] as const) {
+        if (input[field] === undefined) continue
+        const value = field === 'email' ? email : input[field]?.trim()
+        card[field] = value || null
+      }
+      contactCards.set(cardKey(conversation), card)
+      return clone(card)
     },
 
     async listPlans() {

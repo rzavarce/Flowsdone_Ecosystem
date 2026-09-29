@@ -8,9 +8,10 @@ import { useConversation } from '@/core/admin/billingHooks'
 import type { ConversationMessage } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
-import { channelLabel, kindLabel, unitLabel } from '@/features/billing/labels'
+import { channelLabel, contactLabel, identifierLabel, kindLabel, unitLabel } from '@/features/billing/labels'
 import { cn } from '@/lib/cn'
 import { formatMoney, formatNumber } from '@/lib/money'
+import { ContactCardPanel } from './ContactCardPanel'
 import { useTranslation } from 'react-i18next'
 
 /** Date and time in the active language. */
@@ -51,7 +52,7 @@ export interface ConversationDetailProps {
 }
 
 /**
- * One conversation: status and dates, the transcript (kept 6 months) and its
+ * One conversation: status and dates, the contact's card, the transcript (kept 6 months) and its
  * usage - tokens per model and, for admins only (the gateway strips it for
  * everyone else), what it cost Flowsdone.
  */
@@ -73,8 +74,9 @@ export function ConversationDetail({ conversationId, onBack }: ConversationDetai
       <Card className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="truncate text-xl font-semibold">{c.contact}</h2>
+            <h2 className="truncate text-xl font-semibold">{contactLabel(c)}</h2>
             <p className="mt-0.5 text-sm text-muted">
+              {c.contact_name && `${identifierLabel(c.contact)} · `}
               {channelLabel(c.channel_type)} · {t('conversations.messages', { count: c.inbound_count + c.outbound_count })}
             </p>
           </div>
@@ -92,6 +94,8 @@ export function ConversationDetail({ conversationId, onBack }: ConversationDetai
         </dl>
         {c.close_reason && <p className="mt-3 text-xs text-muted">{t(`conversations.closeReason.${c.close_reason}`)}</p>}
       </Card>
+
+      <ContactCardPanel conversation={c} card={detail.data.contact_card ?? null} />
 
       <Card>
         <CardHeader title={t('conversations.transcript')} />

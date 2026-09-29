@@ -7,7 +7,7 @@ import { useAgents, useChannelConnections, useProjects, useUsers } from '@/core/
 import { useAdminApi } from '@/core/admin/useAdminApi'
 import { ALL_TENANTS } from '@/core/tenant/TenantContext'
 import { useTenant } from '@/core/tenant/useTenant'
-import { channelLabel } from '@/features/billing/labels'
+import { channelLabel, contactLabel } from '@/features/billing/labels'
 import { cn } from '@/lib/cn'
 import { matchesQuery } from '@/lib/search'
 import { useNavItems } from './useNavItems'
@@ -87,7 +87,7 @@ function useSearchHits(query: string, active: boolean): { hits: Hit[]; loading: 
         (conversations.data ?? []).map((c) => ({
           key: `conversation:${c.id}`,
           group: 'conversations',
-          label: c.contact,
+          label: contactLabel(c),
           detail: [channelLabel(c.channel_type), tenantName.get(c.tenant_id)].filter(Boolean).join(' · '),
           tenantId: c.tenant_id,
           to: `/conversations?c=${encodeURIComponent(c.id)}`,

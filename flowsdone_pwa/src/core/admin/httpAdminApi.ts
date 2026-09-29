@@ -4,6 +4,7 @@ import type {
   Agent,
   ChannelApp,
   ChannelConnection,
+  ContactCard,
   Conversation,
   ConversationDetail,
   LangflowFlow,
@@ -94,6 +95,7 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
         )}`,
       ),
     getConversation: (id) => call<ConversationDetail>(`/conversations/${id}`),
+    updateConversationContact: (id, input) => call<ContactCard>(`/conversations/${id}/contact`, 'PATCH', input),
 
     listPlans: () => call<Plan[]>('/plans'),
     createPlan: (input) => call<Plan>('/plans', 'POST', input),
