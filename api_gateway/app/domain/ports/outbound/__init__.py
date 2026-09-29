@@ -1,25 +1,22 @@
 """Outbound port interfaces implemented by outbound adapters.
 
 `MessagePublisherPort` and `LangflowExecutorPort` are defined here
-directly (the sibling outbound.py module that used to hold them is
-shadowed and unreachable, kept only for history). The remaining ports
-are re-exported from their own files so callers can import everything
-from `domain.ports.outbound`.
+directly; the remaining ports are re-exported from their own files so
+callers can import everything from `domain.ports.outbound`.
 """
 
-from typing import Optional, Protocol
-
-from app.application.dto.message_dto import MessageDTO
+from typing import Any, Optional, Protocol
 
 
 class MessagePublisherPort(Protocol):
-    """Contract for publishing a message envelope to a message broker."""
+    """Contract for publishing an event to a message broker."""
 
-    async def publish(self, message: MessageDTO, *, key: Optional[str] = None) -> None:
-        """Publish a message.
+    async def publish(self, event: Any, *, key: Optional[str] = None) -> None:
+        """Publish an event.
 
         Args:
-            message (MessageDTO): The message DTO to publish.
+            event (Any): The event, JSON-serializable (e.g. a
+                `MessageEnvelope.model_dump()`).
             key (Optional[str]): Optional partition/routing key (e.g. a
                 Kafka partition key).
         """
@@ -119,3 +116,4 @@ from app.domain.ports.outbound.contacts import ContactKey, ContactRepositoryPort
 from app.domain.ports.outbound.webchat_share import WebchatShareLinkRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.webhook_registrar import WebhookRegistrarPort  # noqa: F401
 from app.domain.ports.outbound.callbacks import CallbackSenderPort  # noqa: F401
+from app.domain.ports.outbound.connections import JsonConnection  # noqa: F401

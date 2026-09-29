@@ -21,6 +21,12 @@ class LangflowExecutionError(Exception):
     'El workflow no devolvió una respuesta válida'")."""
 
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        """Build the error.
+
+        Args:
+            message (str): What went wrong.
+            status_code (int | None): HTTP status Langflow answered with, if any.
+        """
         super().__init__(message)
         self.status_code = status_code
 
@@ -39,6 +45,8 @@ class LangflowExecutor(LangflowExecutorPort):
     """Calls the Langflow REST API to run a flow synchronously."""
 
     def __init__(self) -> None:
+        """Build the HTTP client for LANGFLOW_BASE_URL, with the default
+        LANGFLOW_API_KEY (a per-tenant key can override it on each run)."""
         headers = {}
         if settings.LANGFLOW_API_KEY:
             headers["x-api-key"] = settings.LANGFLOW_API_KEY
