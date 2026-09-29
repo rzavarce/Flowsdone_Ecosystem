@@ -26,7 +26,13 @@ from uuid import uuid4
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.services.switchboard import ChannelMessageNotRoutable, build_conversation_id
-from app.application.services.webchat import TestTokenClaims, origin_allowed, verify_test_token
+from app.application.services.webchat import (
+    WEBCHAT_TEST_CHANNEL,
+    TestTokenClaims,
+    is_test_token_expired,
+    origin_allowed,
+    verify_test_token,
+)
 from app.core.config import settings
 from app.domain.models.channel_connection import WEBCHAT
 from app.domain.models.channel_resolution import ChannelResolution
@@ -35,6 +41,9 @@ logger = logging.getLogger("ws")
 router = APIRouter()
 
 _VISITOR_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")
+# Close code for an expired demo link (4000-4999 are free for applications);
+# the widget stops reconnecting when it sees it.
+TEST_TOKEN_EXPIRED_CLOSE_CODE = 4001
 
 
 @dataclass(frozen=True)
@@ -137,6 +146,15 @@ async def websocket_endpoint(ws: WebSocket, key: Optional[str] = None, test_toke
     """
     route = await _authorize(ws, key, test_token)
     if route is None:
+        if test_token and is_test_token_expired(test_token, settings.CALLBACK_HMAC_SECRET):
+            # A refused handshake is just a failed connection to the browser,
+            # which the widget keeps retrying without a word. For a link that
+            # merely expired, accept, say so, and close with a code the
+            # widget knows not to retry.
+            await ws.accept()
+            await _error(ws, "test_token_expired")
+            await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+            return
         await ws.close(code=1008)
         return
 
@@ -224,6 +242,6 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             sender_id=f"test:{visitor_id}",
             transport=frame.get("transport") or "rabbitmq",
             payload={"message": text, "conversation_id": registry_id},
-            channel="webchat-test",
+            channel=WEBCHAT_TEST_CHANNEL,
         )
     await ws.send_json({"type": "accepted", "conversation_id": visitor_id})

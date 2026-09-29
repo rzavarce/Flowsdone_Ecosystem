@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -25,11 +25,13 @@ def _to_domain(model: LangflowAccountModel) -> LangflowAccount:
     Returns:
         LangflowAccount: The domain object.
     """
+    credentials = decrypt_credentials(model.credentials)
     return LangflowAccount(
         tenant_id=model.tenant_id,
         username=model.username,
-        password=decrypt_credentials(model.credentials).get("password", ""),
+        password=credentials.get("password", ""),
         langflow_user_id=model.langflow_user_id,
+        run_api_key=credentials.get("run_api_key") or None,
         created_at=model.created_at,
     )
 
@@ -81,6 +83,39 @@ class SqlAlchemyLangflowAccountRepository(LangflowAccountRepositoryPort):
                 await session.commit()
             await session.refresh(model)
             return _to_domain(model)
+
+    async def get_by_langflow_user_id(self, langflow_user_id: str) -> Optional[LangflowAccount]:
+        """Find the tenant account that stands for a Langflow user.
+
+        Args:
+            langflow_user_id (str): Id of the user inside Langflow.
+
+        Returns:
+            Optional[LangflowAccount]: The account, or None.
+        """
+        async with self._sessionmaker() as session:
+            model = (
+                await session.execute(
+                    select(LangflowAccountModel).where(LangflowAccountModel.langflow_user_id == langflow_user_id)
+                )
+            ).scalar_one_or_none()
+            return _to_domain(model) if model else None
+
+    async def set_run_api_key(self, tenant_id: UUID, api_key: str) -> None:
+        """Store the tenant's run key, encrypted next to its password.
+
+        Args:
+            tenant_id (UUID): The tenant.
+            api_key (str): The Langflow API key of the tenant's user.
+        """
+        async with self._sessionmaker() as session:
+            model = await session.get(LangflowAccountModel, tenant_id, with_for_update=True)
+            if model is None:
+                return
+            credentials = decrypt_credentials(model.credentials)
+            credentials["run_api_key"] = api_key
+            model.credentials = encrypt_credentials(credentials)
+            await session.commit()
 
     async def set_langflow_user_id(self, tenant_id: UUID, langflow_user_id: str) -> None:
         """Record the id Langflow gave the user.

@@ -173,6 +173,9 @@ class Settings(BaseModel):
     # Where the widget and the demo page are served (chat.flowsdone.com in
     # production); the WebSocket is "/ws" on the same host.
     WEBCHAT_PUBLIC_URL: str = "http://localhost:8000/static/webchat/"
+    # What the customer gets when their agent's workflow fails (Langflow
+    # down, a broken flow...), instead of silence.
+    WORKFLOW_FAILURE_MESSAGE: str = "Lo siento, ahora mismo no puedo responder. Inténtalo de nuevo en unos minutos."
 
     # Channels (inbound webhooks)
     # Meta/X/TikTok app secrets (shared across the whole SaaS) and the
@@ -348,6 +351,10 @@ settings = Settings(
     WEBCHAT_MAX_MESSAGE_CHARS=int(os.getenv("WEBCHAT_MAX_MESSAGE_CHARS", "2000")),
     WEBCHAT_TEST_TOKEN_TTL_SECONDS=int(os.getenv("WEBCHAT_TEST_TOKEN_TTL_SECONDS", "1800")),
     WEBCHAT_PUBLIC_URL=os.getenv("WEBCHAT_PUBLIC_URL", "http://localhost:8000/static/webchat/"),
+    WORKFLOW_FAILURE_MESSAGE=os.getenv(
+        "WORKFLOW_FAILURE_MESSAGE",
+        "Lo siento, ahora mismo no puedo responder. Inténtalo de nuevo en unos minutos.",
+    ),
 
     CHANNEL_CREDENTIALS_ENCRYPTION_KEY=os.getenv("CHANNEL_CREDENTIALS_ENCRYPTION_KEY"),
 

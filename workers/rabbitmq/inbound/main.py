@@ -21,6 +21,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
+from workers.langflow_run_keys import build_langflow_run_keys
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
@@ -60,6 +61,7 @@ async def main() -> None:
     use_case = ExecuteWorkflowUseCase(
         idempotency_repo=idempotency_repo,
         executor=executor,
+        run_keys=build_langflow_run_keys(),
     )
 
     # Publisher (for responses)
@@ -72,7 +74,7 @@ async def main() -> None:
     await publisher.start()
 
     outbound_use_case = HandleOutboundResponseUseCase(
-        publisher=publisher
+        publisher=publisher, failure_message=settings.WORKFLOW_FAILURE_MESSAGE
     )
 
     async def handler(body: bytes) -> None:
@@ -110,7 +112,13 @@ async def main() -> None:
             },
         )
 
-        result = await use_case.execute(envelope)
+        try:
+            result = await use_case.execute(envelope)
+        except Exception as exc:
+            # Answer the customer instead of leaving them waiting; the
+            # error is re-raised so the consumer handles it as before.
+            await outbound_use_case.notify_failure(envelope, exc)
+            raise
 
         if not result:
             logger.warning(

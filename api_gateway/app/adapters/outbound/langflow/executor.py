@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -55,6 +55,7 @@ class LangflowExecutor(LangflowExecutorPort):
         workflow_id: str,
         payload: dict[str, Any],
         conversation_id,
+        api_key: Optional[str] = None,
     ) -> dict | None:
         """Run a Langflow flow and return its parsed response.
 
@@ -65,6 +66,10 @@ class LangflowExecutor(LangflowExecutorPort):
                 whole payload is JSON-encoded as the input text.
             conversation_id: Id of the conversation, sent as the
                 Langflow session_id for session continuity.
+            api_key (Optional[str]): Key to run the flow with, replacing
+                the platform's LANGFLOW_API_KEY for this call. Langflow
+                resolves a flow's global variables for the key's owner, so
+                a tenant's flow must run with that tenant's key.
 
         Returns:
             dict | None: The parsed JSON response on success, or None
@@ -110,6 +115,7 @@ class LangflowExecutor(LangflowExecutorPort):
                 "input_type": _RUN_INPUT_TYPE,
                 "session_id": str(conversation_id),
             },
+            headers={"x-api-key": api_key} if api_key else None,
         )
 
         if response.status_code >= 400:
@@ -147,23 +153,29 @@ class LangflowExecutor(LangflowExecutorPort):
             logger.info("langflow.call.success")
             return response.json()
 
-        # A 2xx with a non-JSON body is not a real result — most often
-        # Langflow's frontend SPA catch-all answering for a workflow_id
-        # that doesn't exist (or isn't PUBLIC) with its index.html
-        # instead of a 404. Treating this as success used to mark the
-        # run completed and publish a bogus outbound message built from
-        # HTML, silently and indefinitely, for a message that never
-        # actually ran.
+        # A 2xx with a non-JSON body is not a real result: it is Langflow's
+        # 404 in disguise. Langflow 1.4 answers *every* 404 - API routes
+        # included - with its frontend's index.html and status 200, and its
+        # /run endpoint turns any ValueError mentioning "not found" into a
+        # 404. So this covers an unknown workflow_id, but also a flow that
+        # exists and fails mid-run on something missing - typically a
+        # global variable (an API key) that belongs to another Langflow
+        # user than the one owning LANGFLOW_API_KEY: variables are looked
+        # up for the API key's user. Treating this as success used to
+        # publish a bogus outbound message built from HTML.
         logger.error(
-            "langflow.call.non_json_response",
+            "langflow.call.not_found_as_html",
             extra={
                 "status_code": response.status_code,
                 "content_type": content_type,
-                "response_preview": response.text[:500],
+                "workflow_id": workflow_id,
+                "response_preview": response.text[:200],
             },
         )
         raise LangflowExecutionError(
-            f"Langflow returned a non-JSON 2xx response (content-type={content_type!r}); "
-            "likely an unknown or non-PUBLIC workflow_id falling through to the frontend SPA.",
-            status_code=response.status_code,
+            "Langflow answered with its web page instead of a result, which is how it reports a "
+            "404: either the workflow doesn't exist, or something it needs wasn't found while "
+            "running - usually a global variable (e.g. an API key) that belongs to another Langflow "
+            "user than the owner of LANGFLOW_API_KEY. The exact cause is in the langflow logs.",
+            status_code=404,
         )

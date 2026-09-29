@@ -73,6 +73,27 @@ class LangflowAccountRepositoryPort(Protocol):
         """
         ...
 
+    async def get_by_langflow_user_id(self, langflow_user_id: str) -> Optional[LangflowAccount]:
+        """Find the tenant account that stands for a Langflow user.
+
+        Args:
+            langflow_user_id (str): Id of the user inside Langflow.
+
+        Returns:
+            Optional[LangflowAccount]: The account, or None if that user is
+            not a tenant's (e.g. the platform superuser).
+        """
+        ...
+
+    async def set_run_api_key(self, tenant_id: UUID, api_key: str) -> None:
+        """Store (encrypted) the key the tenant's flows are run with.
+
+        Args:
+            tenant_id (UUID): The tenant.
+            api_key (str): The Langflow API key of the tenant's user.
+        """
+        ...
+
     async def set_langflow_user_id(self, tenant_id: UUID, langflow_user_id: str) -> None:
         """Record the id Langflow gave the user.
 
@@ -117,6 +138,36 @@ class LangflowAdminPort(Protocol):
 
         Returns:
             str: The user's id inside Langflow.
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        ...
+
+    async def flow_owner(self, flow_id: str) -> Optional[str]:
+        """Id of the Langflow user that owns a flow (read with the platform key).
+
+        Args:
+            flow_id (str): The flow.
+
+        Returns:
+            Optional[str]: The owner's Langflow user id, or None if the flow
+            doesn't exist or has no owner.
+
+        Raises:
+            LangflowSessionError: If Langflow is unreachable or rejects the request.
+        """
+        ...
+
+    async def create_api_key(self, access_token: str, name: str) -> str:
+        """Create an API key for the logged-in user.
+
+        Args:
+            access_token (str): The user's access token.
+            name (str): Label shown in the user's key list.
+
+        Returns:
+            str: The new key (only readable now; Langflow stores it masked).
 
         Raises:
             LangflowSessionError: If Langflow rejects the request.

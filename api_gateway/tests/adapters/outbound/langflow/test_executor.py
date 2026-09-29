@@ -99,10 +99,10 @@ async def test_run_raises_on_http_error_status(monkeypatch):
 
 
 async def test_run_raises_on_non_json_2xx_response(monkeypatch):
-    """Regression guard for the bug this fix addresses: an unknown or
-    non-PUBLIC workflow_id makes Langflow's API fall through to its own
-    frontend SPA, which answers 200 with index.html instead of a 404 —
-    that must not be treated as a successful run.
+    """Langflow 1.4 answers every 404 (unknown workflow, or a flow that
+    fails mid-run on a missing global variable) with its index.html and
+    status 200: that must not be treated as a successful run, and the
+    error must point at the likely cause.
     """
     _patch_client(
         monkeypatch,
@@ -119,4 +119,26 @@ async def test_run_raises_on_non_json_2xx_response(monkeypatch):
             workflow_id="nonexistent-flow", payload={"message": "hola"}, conversation_id="conv-1"
         )
 
-    assert exc_info.value.status_code == 200
+    assert exc_info.value.status_code == 404
+    assert "global variable" in str(exc_info.value)
+    assert "LANGFLOW_API_KEY" in str(exc_info.value)
+
+
+async def test_run_uses_the_given_api_key_for_this_call(monkeypatch):
+    """A tenant's flow runs with the tenant's key, so Langflow resolves the
+    flow's global variables for the tenant's user."""
+    fake_client = _patch_client(monkeypatch, FakeResponse(200, json_body={"result": "ok"}))
+
+    await LangflowExecutor().run(
+        workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1", api_key="sk-tenant"
+    )
+
+    assert fake_client.calls[0].kwargs["headers"] == {"x-api-key": "sk-tenant"}
+
+
+async def test_run_without_api_key_keeps_the_platform_key(monkeypatch):
+    fake_client = _patch_client(monkeypatch, FakeResponse(200, json_body={"result": "ok"}))
+
+    await LangflowExecutor().run(workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1")
+
+    assert fake_client.calls[0].kwargs["headers"] is None

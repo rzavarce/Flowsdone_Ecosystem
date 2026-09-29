@@ -23,6 +23,9 @@ class LangflowAccount(BaseModel):
             browser never sees it (the SSO endpoint logs in server-side).
         langflow_user_id (Optional[str]): Id of the user inside Langflow, or
             None while the Langflow side has not been created yet.
+        run_api_key (Optional[SecretStr]): The user's own Langflow API key,
+            used to run the tenant's flows: Langflow resolves a flow's global
+            variables for the key's owner. None until first needed.
         created_at (datetime): Creation timestamp.
     """
 
@@ -30,4 +33,5 @@ class LangflowAccount(BaseModel):
     username: str
     password: SecretStr = Field(repr=False)
     langflow_user_id: Optional[str] = None
+    run_api_key: Optional[SecretStr] = Field(default=None, repr=False)
     created_at: datetime

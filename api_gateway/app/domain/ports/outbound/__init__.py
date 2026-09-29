@@ -35,6 +35,7 @@ class LangflowExecutorPort(Protocol):
         workflow_id: str,
         payload: dict,
         conversation_id: str,
+        api_key: Optional[str] = None,
     ) -> dict:
         """Run a Langflow workflow.
 
@@ -43,6 +44,9 @@ class LangflowExecutorPort(Protocol):
             payload (dict): Input payload for the flow.
             conversation_id (str): Id of the conversation, used for
                 session continuity in Langflow.
+            api_key (Optional[str]): Langflow API key to run it with -
+                the flow owner's, so its global variables resolve. None
+                uses the platform's key.
 
         Returns:
             dict: The raw response returned by Langflow.

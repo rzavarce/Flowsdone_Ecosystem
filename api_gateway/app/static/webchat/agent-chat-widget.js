@@ -80,6 +80,9 @@
       this.reconnectTimer = null;
       this.reconnectDelay = this.config.reconnectInterval;
       this.pendingBubbles = new Map();
+      // Set when the gateway says the demo link expired: from then on the
+      // widget stops reconnecting (it would be refused forever).
+      this.linkExpired = false;
 
       this.injectCssVariables();
       this.init();
@@ -163,6 +166,9 @@
     }
 
     ensureSocket() {
+      if (this.linkExpired) {
+        return Promise.reject(new Error(this.config.messages.testExpired));
+      }
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         return Promise.resolve(this.socket);
       }
@@ -202,10 +208,15 @@
         this.handleSocketMessage(event);
       });
 
-      this.socket.addEventListener('close', () => {
+      this.socket.addEventListener('close', (event) => {
         this.setConnectionState(false, this.config.messages.socketDisconnected);
         this.socketReadyPromise = null;
-        if (this.isOpen || this.isLoading) {
+        // 4001: the gateway closed because the demo link expired.
+        if (event.code === 4001) {
+          this.expireLink();
+          return;
+        }
+        if (!this.linkExpired && (this.isOpen || this.isLoading)) {
           this.scheduleReconnect();
         }
       });
@@ -214,7 +225,7 @@
     }
 
     scheduleReconnect() {
-      if (this.reconnectTimer) return;
+      if (this.reconnectTimer || this.linkExpired) return;
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
         if (this.isOpen) {
@@ -253,6 +264,10 @@
       }
 
       if (data.type === 'chat.error') {
+        if (data.error === 'test_token_expired') {
+          this.expireLink();
+          return;
+        }
         const known = {
           rate_limited: this.config.messages.rateLimited,
           message_too_long: this.config.messages.messageTooLong,
@@ -262,6 +277,29 @@
         this.showToast(known[data.error] || this.config.messages.genericError, 'error');
         this.setLoading(false);
       }
+    }
+
+    expireLink() {
+      // Once per page: say it in the conversation (a toast is easy to
+      // miss), drop pending "typing" bubbles and lock the input, since
+      // nothing can be sent with this link any more.
+      if (this.linkExpired) return;
+      this.linkExpired = true;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      this.pendingBubbles.forEach((bubble) => {
+        if (bubble && bubble.parentNode) bubble.parentNode.removeChild(bubble);
+      });
+      this.pendingBubbles.clear();
+      this.setLoading(false);
+      this.addMessage(this.config.messages.testExpired, 'bot');
+      if (this.input) {
+        this.input.disabled = true;
+        this.input.placeholder = this.config.messages.testExpired;
+      }
+      this.setConnectionState(false, this.config.messages.socketDisconnected);
     }
 
     replaceWaitingMessage(bubble, text) {
