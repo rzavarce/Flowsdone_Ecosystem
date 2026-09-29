@@ -77,6 +77,12 @@ services:
 
   redis-insight:
     <<: *common
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5540/api/health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     image: ${REDISINSIGHT_IMAGE}
     container_name: ${CONTAINER_PREFIX}_redisinsight
     networks:
@@ -96,6 +102,13 @@ services:
 
   rabbitmq-scout:
     <<: *common
+    healthcheck:
+      # Next.js escucha en el hostname del contenedor, no en 127.0.0.1.
+      test: ["CMD-SHELL", "wget -q --spider http://$$(hostname):3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     image: ${RABBITSCOUT_IMAGE}
     container_name: ${CONTAINER_PREFIX}_rabbitmq_scout
     networks:
@@ -145,6 +158,12 @@ services:
 
   weaviate-gui:
     <<: *common
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: ${WEAVIATE_GUI_BUILD_CONTEXT}
     container_name: ${CONTAINER_PREFIX}_weaviate_gui
@@ -238,6 +257,9 @@ services:
     cpus: ${OPENSEARCH_DASH_CPUS}
 
   otel-collector:
+    # Sin healthcheck a propósito: la imagen oficial es distroless (sin shell ni
+    # curl/wget), así que no puede ejecutar ninguna comprobación dentro. Si cae,
+    # restart la levanta; las trazas/logs perdidos se ven en OpenSearch.
     <<: *common
     # profiles: [prod]
     image: ${OTEL_COLLECTOR_IMAGE}
@@ -313,6 +335,12 @@ services:
 
   kafka:
     <<: *common
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
     image: ${KAFKA_IMAGE}
     container_name: ${CONTAINER_PREFIX}_kafka
     ports:
@@ -370,6 +398,12 @@ services:
 
   langfuse-web:
     <<: *common
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/public/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     image: ${LANGFUSE_IMAGE}
     container_name: ${CONTAINER_PREFIX}_langfuse
     depends_on: &langfuse-deps
@@ -436,6 +470,12 @@ services:
 
   langfuse-worker:
     <<: *common
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3030/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     image: ${LANGFUSE_WORKER_IMAGE}
     container_name: ${CONTAINER_PREFIX}_langfuse_worker
     depends_on:
@@ -461,6 +501,12 @@ services:
 
   langflow:
     <<: *common
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
     build:
       context: .
       dockerfile: dockers/Dockerfile.langflow
@@ -590,7 +636,11 @@ services:
       langflow:
         condition: service_started
     healthcheck:
-      disable: true
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - flowsdone-net
     mem_limit: ${N8N_MEM_LIMIT}
@@ -602,6 +652,13 @@ services:
 
   api:
     <<: *common
+    healthcheck:
+      # Liveness del gateway (/health); /ready comprueba además Postgres y Redis.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     build:
       context: .
       dockerfile: dockers/Dockerfile.api
@@ -623,7 +680,7 @@ services:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
       redis:
@@ -672,6 +729,13 @@ services:
 
   kafka_inbound_worker:
     <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/kafka-inbound-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: dockers/Dockerfile.worker
@@ -683,7 +747,7 @@ services:
       OTEL_SERVICE_NAME: fd-kafka-inbound-worker
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
       postgres:
         condition: service_healthy
       langflow:
@@ -695,6 +759,13 @@ services:
 
   kafka_outbound_worker:
     <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/kafka-outbound-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: dockers/Dockerfile.worker
@@ -708,7 +779,7 @@ services:
       OTEL_SERVICE_NAME: fd-kafka-outbound-worker
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - flowsdone-net
     mem_limit: ${KAFKA_OUTBOUND_WORKER_MEM_LIMIT}
@@ -719,6 +790,13 @@ services:
   # burst of calls never competes with them for capacity.
   kafka_voice_worker:
     <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/kafka-voice-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: dockers/Dockerfile.worker
@@ -732,7 +810,7 @@ services:
       OTEL_SERVICE_NAME: fd-kafka-voice-worker
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
       postgres:
         condition: service_healthy
       langflow:
@@ -768,7 +846,7 @@ services:
       start_period: 30s
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
       postgres:
         condition: service_healthy
       clickhouse:
@@ -816,6 +894,13 @@ services:
 
   rabbitmq_inbound_worker:
     <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/rabbitmq-inbound-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: dockers/Dockerfile.worker
@@ -839,6 +924,13 @@ services:
 
   rabbitmq_outbound_worker:
     <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/rabbitmq-outbound-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     build:
       context: .
       dockerfile: dockers/Dockerfile.worker
@@ -893,7 +985,11 @@ services:
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      disable: true
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     networks:
       - flowsdone-net
     mem_limit: ${EVOLUTION_MEM_LIMIT}
@@ -955,6 +1051,13 @@ services:
 
   traefik:
     <<: *common
+    healthcheck:
+      # Requiere --ping=true (endpoint interno :8080/ping, no publicado).
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     profiles: [prod]
     image: ${TRAEFIK_IMAGE}
     container_name: ${CONTAINER_PREFIX}_traefik
@@ -972,6 +1075,8 @@ services:
       - "--certificatesresolvers.myresolver.acme.preferredchain=ISRG Root X1"
       - "--accesslog=true"
       - "--log.level=${TRAEFIK_LOG_LEVEL}"
+      # Endpoint interno para el healthcheck (:8080/ping, no publicado).
+      - "--ping=true"
     environment:
       # traefik/dynamic.yml saca de aquí el dominio del webchat (una sola
       # variable para el gateway y para el ruteo).

@@ -144,6 +144,8 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
 
 ¹ Solo corren en `profile: prod` — ver sección 4.
 
+**Healthchecks.** Todos los servicios tienen healthcheck salvo `otel-collector` (su imagen es distroless: sin shell ni curl, no puede ejecutar ninguna comprobación). El gateway expone `GET /health` (vivo, sin tocar dependencias; es lo que mira Docker) y `GET /ready` (Postgres y Redis responden en < 2 s; 503 si no, solo `ok`/`fail` por dependencia). Los workers de Kafka/RabbitMQ tocan un fichero de latido cada 30 s (`workers/heartbeat.py`) y el healthcheck comprueba que tenga menos de 2 min. Los servicios que dependen de Kafka esperan a que esté *healthy*. El deploy termina esperando a que ningún servicio siga arrancando y **falla si alguno queda unhealthy**.
+
 ---
 
 ## 4. Perfiles de Docker (dev / prod)

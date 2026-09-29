@@ -22,6 +22,7 @@ from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
 from app.adapters.inbound.http.voice_demo import router as voice_demo_router
+from app.adapters.inbound.http.health import router as health_router
 from app.adapters.inbound.http.webhooks import router as webhooks_router
 from app.adapters.inbound.http.websocket import router as ws_router
 from app.adapters.outbound.http.callback_sender import build_callback_sender
@@ -801,6 +802,7 @@ app.mount("/static", NoCacheStaticFiles(directory=static_dir, html=True), name="
 
 # Routers
 app.include_router(ws_router)
+app.include_router(health_router)
 app.include_router(webhooks_router)
 app.include_router(internal_router)
 app.include_router(channels_router)

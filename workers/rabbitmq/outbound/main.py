@@ -15,10 +15,16 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
+from pathlib import Path
+from workers.heartbeat import heartbeat_forever
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
 logger = logging.getLogger("rabbitmq.outbound.worker")
+
+# Checked by the docker-compose healthcheck (see workers/heartbeat.py).
+HEARTBEAT_FILE = Path("/tmp/rabbitmq-outbound-worker.heartbeat")
+
 
 
 async def main() -> None:
@@ -95,7 +101,12 @@ async def main() -> None:
         routing_key=settings.RABBITMQ_OUTBOUND_ROUTING_KEY,
     )
 
-    await consumer.start(handler)
+    # Liveness for the docker-compose healthcheck (see workers/heartbeat.py).
+    heartbeat = asyncio.create_task(heartbeat_forever(HEARTBEAT_FILE))
+    try:
+        await consumer.start(handler)
+    finally:
+        heartbeat.cancel()
 
 
 if __name__ == "__main__":

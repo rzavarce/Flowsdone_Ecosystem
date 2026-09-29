@@ -144,5 +144,16 @@ jobs:
             # espera a que Metabase esté sano).
             docker compose --profile prod run --rm --no-deps -v ./scripts/metabase:/scripts/metabase api python /scripts/metabase/provision.py
 
+            # Verificar los healthchecks (CLAUDE.md): esperar a que ningún servicio
+            # siga arrancando y fallar el deploy si alguno queda unhealthy (se ve
+            # en rojo en Actions en vez de descubrirlo en producción).
+            timeout 300 sh -c 'while docker compose --profile prod ps --format "{{.Health}}" | grep -q starting; do sleep 5; done' || true
+            UNHEALTHY=$(docker compose --profile prod ps --format "{{.Service}} {{.Health}}" | grep -E " (unhealthy|starting)$" || true)
+            if [ -n "$UNHEALTHY" ]; then
+              echo "Servicios sin salud tras el deploy:"
+              echo "$UNHEALTHY"
+              exit 1
+            fi
+
             # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco
             docker image prune -f
