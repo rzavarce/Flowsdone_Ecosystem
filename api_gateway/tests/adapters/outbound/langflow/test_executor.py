@@ -122,3 +122,23 @@ async def test_run_raises_on_non_json_2xx_response(monkeypatch):
     assert exc_info.value.status_code == 404
     assert "global variable" in str(exc_info.value)
     assert "LANGFLOW_API_KEY" in str(exc_info.value)
+
+
+async def test_run_uses_the_given_api_key_for_this_call(monkeypatch):
+    """A tenant's flow runs with the tenant's key, so Langflow resolves the
+    flow's global variables for the tenant's user."""
+    fake_client = _patch_client(monkeypatch, FakeResponse(200, json_body={"result": "ok"}))
+
+    await LangflowExecutor().run(
+        workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1", api_key="sk-tenant"
+    )
+
+    assert fake_client.calls[0].kwargs["headers"] == {"x-api-key": "sk-tenant"}
+
+
+async def test_run_without_api_key_keeps_the_platform_key(monkeypatch):
+    fake_client = _patch_client(monkeypatch, FakeResponse(200, json_body={"result": "ok"}))
+
+    await LangflowExecutor().run(workflow_id="flow-1", payload={"message": "hola"}, conversation_id="conv-1")
+
+    assert fake_client.calls[0].kwargs["headers"] is None

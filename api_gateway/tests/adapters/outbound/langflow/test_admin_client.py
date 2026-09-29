@@ -366,3 +366,42 @@ async def test_delete_user_uses_the_gateway_key_and_tolerates_a_missing_user():
     client, _ = _client(lambda r: httpx.Response(403, json={}))
     with pytest.raises(LangflowSessionError):
         await client.delete_user("u1")
+
+
+async def test_flow_owner_reads_the_flow_with_the_gateway_key():
+    client, seen = _client(lambda request: httpx.Response(200, json={"id": "f1", "user_id": "u7", "data": {}}))
+
+    assert await client.flow_owner("f1") == "u7"
+    assert (seen[0].method, seen[0].url.path) == ("GET", "/api/v1/flows/f1")
+    assert seen[0].headers["x-api-key"] == "gateway-key"
+
+
+async def test_flow_owner_is_none_for_an_unknown_flow_served_as_html():
+    # Langflow 1.4 answers its 404s with the frontend's index.html and status 200.
+    html = httpx.Response(200, text="<!doctype html>", headers={"content-type": "text/html; charset=utf-8"})
+    client, _ = _client(lambda request: html)
+
+    assert await client.flow_owner("missing") is None
+
+
+async def test_flow_owner_raises_when_the_gateway_key_is_refused():
+    client, _ = _client(lambda request: httpx.Response(403, json={"detail": "Invalid API key"}))
+
+    with pytest.raises(LangflowSessionError):
+        await client.flow_owner("f1")
+
+
+async def test_create_api_key_uses_the_users_token_and_returns_the_unmasked_key():
+    client, seen = _client(lambda request: httpx.Response(200, json={"id": "k1", "api_key": "sk-new", "name": "x"}))
+
+    assert await client.create_api_key("user-token", "flowsdone-runner") == "sk-new"
+    assert (seen[0].method, seen[0].url.path) == ("POST", "/api/v1/api_key/")
+    assert seen[0].headers["authorization"] == "Bearer user-token"
+    assert b'"name":"flowsdone-runner"' in seen[0].content.replace(b" ", b"")
+
+
+async def test_create_api_key_raises_when_refused():
+    client, _ = _client(lambda request: httpx.Response(400, json={"detail": "nope"}))
+
+    with pytest.raises(LangflowSessionError):
+        await client.create_api_key("user-token", "flowsdone-runner")

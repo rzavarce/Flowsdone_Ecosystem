@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -55,6 +55,7 @@ class LangflowExecutor(LangflowExecutorPort):
         workflow_id: str,
         payload: dict[str, Any],
         conversation_id,
+        api_key: Optional[str] = None,
     ) -> dict | None:
         """Run a Langflow flow and return its parsed response.
 
@@ -65,6 +66,10 @@ class LangflowExecutor(LangflowExecutorPort):
                 whole payload is JSON-encoded as the input text.
             conversation_id: Id of the conversation, sent as the
                 Langflow session_id for session continuity.
+            api_key (Optional[str]): Key to run the flow with, replacing
+                the platform's LANGFLOW_API_KEY for this call. Langflow
+                resolves a flow's global variables for the key's owner, so
+                a tenant's flow must run with that tenant's key.
 
         Returns:
             dict | None: The parsed JSON response on success, or None
@@ -110,6 +115,7 @@ class LangflowExecutor(LangflowExecutorPort):
                 "input_type": _RUN_INPUT_TYPE,
                 "session_id": str(conversation_id),
             },
+            headers={"x-api-key": api_key} if api_key else None,
         )
 
         if response.status_code >= 400:

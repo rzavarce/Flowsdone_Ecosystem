@@ -20,6 +20,7 @@ from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
+from workers.langflow_run_keys import build_langflow_run_keys
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
@@ -60,6 +61,7 @@ async def main() -> None:
     use_case = ExecuteWorkflowUseCase(
         idempotency_repo=idempotency_repo,
         executor=executor,
+        run_keys=build_langflow_run_keys(),
     )
 
     # Outbound publisher (responses)

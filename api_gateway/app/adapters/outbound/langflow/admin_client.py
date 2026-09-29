@@ -200,6 +200,51 @@ class LangflowAdminClient(LangflowAdminPort):
             raise LangflowSessionError(f"langflow rejected update user (HTTP {updated.status_code})")
         return str(user_id)
 
+    async def flow_owner(self, flow_id: str) -> Optional[str]:
+        """Id of the Langflow user that owns a flow.
+
+        Read with the platform key: with AUTO_LOGIN off Langflow lets any
+        authenticated user read a flow by id.
+
+        Args:
+            flow_id (str): The flow.
+
+        Returns:
+            Optional[str]: The owner's Langflow user id, or None if the flow
+            doesn't exist (Langflow serves its 404s as the frontend's HTML,
+            so anything that isn't a JSON flow counts as "not found").
+
+        Raises:
+            LangflowSessionError: If Langflow is unreachable or rejects the key.
+        """
+        response = await self._request("GET", f"/api/v1/flows/{flow_id}", headers=self._key_headers())
+        if response.status_code in (401, 403):
+            raise LangflowSessionError(f"langflow rejected get flow owner (HTTP {response.status_code})")
+        if response.status_code != 200 or "application/json" not in response.headers.get("content-type", ""):
+            return None
+        owner = self._json(response, "get flow owner").get("user_id")
+        return str(owner) if owner else None
+
+    async def create_api_key(self, access_token: str, name: str) -> str:
+        """Create an API key for the logged-in user.
+
+        Args:
+            access_token (str): The user's access token.
+            name (str): Label shown in the user's key list.
+
+        Returns:
+            str: The new key (Langflow only returns it unmasked now).
+
+        Raises:
+            LangflowSessionError: If Langflow rejects the request.
+        """
+        response = await self._request(
+            "POST", "/api/v1/api_key/", json={"name": name}, headers={"Authorization": f"Bearer {access_token}"}
+        )
+        if response.status_code != 200:
+            raise LangflowSessionError(f"langflow rejected create api key (HTTP {response.status_code})")
+        return str(self._json(response, "create api key")["api_key"])
+
     async def delete_user(self, langflow_user_id: str) -> None:
         """Delete a Langflow user; Langflow deletes its folders and flows too.
 
