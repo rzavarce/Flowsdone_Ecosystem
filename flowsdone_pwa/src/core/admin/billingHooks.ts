@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { ContactCardInput, ConversationFilters, CostRateInput, PlanInput, Subscription, SubscriptionInput } from './types'
+import type { ContactCardInput, ContactFilters, ConversationFilters, CostRateInput, PlanInput, Subscription, SubscriptionInput } from './types'
 import { invalidateOnboarding } from './hooks'
 import { useAdminApi } from './useAdminApi'
 
@@ -7,6 +7,8 @@ import { useAdminApi } from './useAdminApi'
 export const billingKeys = {
   conversations: ['conversations'] as const,
   conversation: ['conversation'] as const,
+  contacts: ['contacts'] as const,
+  contact: ['contact'] as const,
   plans: ['plans'] as const,
   pricingInsight: ['pricing-insight'] as const,
   costRates: ['cost-rates'] as const,
@@ -17,7 +19,7 @@ export const billingKeys = {
 }
 
 /** Page size of the conversation inbox. */
-export const CONVERSATIONS_PAGE = 30
+export const CONVERSATIONS_PAGE = 10
 
 /**
  * Conversation inbox with "load more": each page asks for the conversations
@@ -52,8 +54,49 @@ export function useUpdateConversationContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: ContactCardInput }) => api.updateConversationContact(id, input),
-    onSuccess: () =>
-      Promise.all([billingKeys.conversations, billingKeys.conversation].map((queryKey) => qc.invalidateQueries({ queryKey }))),
+    onSuccess: () => invalidateContacts(qc),
+  })
+}
+
+/** Page size of the contact list. */
+export const CONTACTS_PAGE = 10
+
+/** After a card changes: the contact list and every conversation may show it. */
+const invalidateContacts = (qc: ReturnType<typeof useQueryClient>) =>
+  Promise.all(
+    [billingKeys.conversations, billingKeys.conversation, billingKeys.contacts, billingKeys.contact].map((queryKey) =>
+      qc.invalidateQueries({ queryKey }),
+    ),
+  )
+
+/** Contact list with "load more" (offset pagination). */
+export function useContacts(filters: Omit<ContactFilters, 'limit' | 'offset'>) {
+  const api = useAdminApi()
+  return useInfiniteQuery({
+    queryKey: [...billingKeys.contacts, filters],
+    queryFn: ({ pageParam }) => api.listContacts({ ...filters, offset: pageParam, limit: CONTACTS_PAGE }),
+    initialPageParam: 0,
+    getNextPageParam: (last, pages) => (last.length < CONTACTS_PAGE ? undefined : pages.length * CONTACTS_PAGE),
+  })
+}
+
+/** One contact with their latest conversations. */
+export function useContact(id?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...billingKeys.contact, id],
+    queryFn: () => api.getContact(id as string),
+    enabled: Boolean(id),
+  })
+}
+
+/** Edits a contact's card from the contact list. */
+export function useUpdateContact() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: ContactCardInput }) => api.updateContact(id, input),
+    onSuccess: () => invalidateContacts(qc),
   })
 }
 

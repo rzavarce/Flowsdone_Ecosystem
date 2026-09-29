@@ -348,6 +348,33 @@ export interface ContactCard {
   updated_at: string
 }
 
+/** A contact in the contact list: their card plus a summary of their conversations. */
+export interface ContactRecord extends ContactCard {
+  id: string
+  tenant_id: string
+  channel_type: ConversationChannelType
+  /** The channel's identifier (the `contact` of their conversations). */
+  identifier: string
+  created_at: string
+  last_message_at: string | null
+  conversation_count: number
+}
+
+/** Filters for listing contacts; `offset` paginates. */
+export interface ContactFilters {
+  tenant_id?: string
+  q?: string
+  channel_type?: string
+  limit?: number
+  offset?: number
+}
+
+/** A contact with their latest conversations (a few; the inbox has them all). */
+export interface ContactDetail {
+  contact: ContactRecord
+  conversations: Conversation[]
+}
+
 /** Fields to change on a contact card; an empty string clears one. */
 export type ContactCardInput = Partial<Record<'name' | 'email' | 'phone' | 'username' | 'notes', string>>
 

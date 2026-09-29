@@ -3,6 +3,8 @@ import type { AdminApi } from './AdminApi'
 import type {
   ChannelConnection,
   ContactCard,
+  ContactCardInput,
+  ContactRecord,
   Conversation,
   ConversationMessage,
   CostRate,
@@ -20,6 +22,9 @@ export type BillingApi = Pick<
   | 'listConversations'
   | 'getConversation'
   | 'updateConversationContact'
+  | 'listContacts'
+  | 'getContact'
+  | 'updateContact'
   | 'listPlans'
   | 'createPlan'
   | 'updatePlan'
@@ -80,6 +85,45 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
   const contactCards = new Map<string, ContactCard>()
   const cardKey = (c: Conversation) => `${c.tenant_id}|${c.channel_type}|${c.contact}`
   const withName = (c: Conversation): Conversation => ({ ...c, contact_name: contactCards.get(cardKey(c))?.name ?? null })
+  const contactKeyOf = (c: ContactRecord) => `${c.tenant_id}|${c.channel_type}|${c.identifier}`
+  const emptyCard = (): ContactCard => ({ name: null, email: null, phone: null, username: null, notes: null, updated_at: iso(BASE) })
+
+  /** Applies an edit to a card, like the gateway: trimmed, empty clears, email checked. */
+  function saveCard(key: string, input: ContactCardInput): ContactCard {
+    const email = input.email?.trim().toLowerCase()
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError(422, 'email is not valid')
+    const card: ContactCard = { ...(contactCards.get(key) ?? emptyCard()), updated_at: new Date().toISOString() }
+    for (const field of ['name', 'email', 'phone', 'username', 'notes'] as const) {
+      if (input[field] === undefined) continue
+      const value = field === 'email' ? email : input[field]?.trim()
+      card[field] = value || null
+    }
+    contactCards.set(key, card)
+    return card
+  }
+
+  /** Every contact with conversations (the gateway backfills a card for each), most recent activity first. */
+  function contactRecords(): ContactRecord[] {
+    const byKey = new Map<string, Conversation[]>()
+    for (const c of conversations) byKey.set(cardKey(c), [...(byKey.get(cardKey(c)) ?? []), c])
+    return [...byKey.entries()]
+      .map(([key, items]) => {
+        const first = items[0]!
+        const last = items.map((c) => c.last_message_at).sort().at(-1)!
+        return {
+          ...emptyCard(),
+          ...contactCards.get(key),
+          id: `contact-${first.id}`,
+          tenant_id: first.tenant_id,
+          channel_type: first.channel_type,
+          identifier: first.contact,
+          created_at: first.started_at,
+          last_message_at: last,
+          conversation_count: items.length,
+        }
+      })
+      .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''))
+  }
 
   connections.forEach((connection, ci) => {
     const project = projects.find((p) => p.id === connection.project_id)
@@ -264,19 +308,36 @@ export function createMockBilling({ latencyMs, tenants, projects, connections }:
     async updateConversationContact(id, input) {
       await wait(latencyMs)
       const conversation = need(conversations.find((c) => c.id === id), 'conversation')
-      const email = input.email?.trim().toLowerCase()
-      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new ApiError(422, 'email is not valid')
-      const current = contactCards.get(cardKey(conversation)) ?? {
-        name: null, email: null, phone: null, username: null, notes: null, updated_at: '',
-      }
-      const card: ContactCard = { ...current, updated_at: new Date().toISOString() }
-      for (const field of ['name', 'email', 'phone', 'username', 'notes'] as const) {
-        if (input[field] === undefined) continue
-        const value = field === 'email' ? email : input[field]?.trim()
-        card[field] = value || null
-      }
-      contactCards.set(cardKey(conversation), card)
-      return clone(card)
+      return clone(saveCard(cardKey(conversation), input))
+    },
+
+    async listContacts(filters = {}) {
+      await wait(latencyMs)
+      const q = filters.q?.trim().toLowerCase()
+      const offset = filters.offset ?? 0
+      return clone(
+        contactRecords()
+          .filter((c) => !filters.tenant_id || c.tenant_id === filters.tenant_id)
+          .filter((c) => !filters.channel_type || c.channel_type === filters.channel_type)
+          .filter((c) => !q || [c.name, c.email, c.phone, c.username, c.identifier].some((v) => v?.toLowerCase().includes(q)))
+          .slice(offset, offset + (filters.limit ?? 30)),
+      )
+    },
+    async getContact(id) {
+      await wait(latencyMs)
+      const contact = need(contactRecords().find((c) => c.id === id), 'contact')
+      const theirs = conversations
+        .filter((c) => cardKey(c) === contactKeyOf(contact))
+        .sort((a, b) => b.last_message_at.localeCompare(a.last_message_at))
+        .slice(0, 5)
+        .map(withName)
+      return clone({ contact, conversations: theirs })
+    },
+    async updateContact(id, input) {
+      await wait(latencyMs)
+      const contact = need(contactRecords().find((c) => c.id === id), 'contact')
+      saveCard(contactKeyOf(contact), input)
+      return clone(need(contactRecords().find((c) => c.id === id), 'contact'))
     },
 
     async listPlans() {

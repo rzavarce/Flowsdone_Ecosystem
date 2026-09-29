@@ -7,7 +7,7 @@ import { useAgents, useChannelConnections, useProjects, useUsers } from '@/core/
 import { useAdminApi } from '@/core/admin/useAdminApi'
 import { ALL_TENANTS } from '@/core/tenant/TenantContext'
 import { useTenant } from '@/core/tenant/useTenant'
-import { channelLabel, contactLabel } from '@/features/billing/labels'
+import { channelLabel, contactLabel, identifierLabel } from '@/features/billing/labels'
 import { cn } from '@/lib/cn'
 import { matchesQuery } from '@/lib/search'
 import { useNavItems } from './useNavItems'
@@ -18,7 +18,7 @@ const SEARCH_MIN_CHARS = 2
 /** Maximum results shown per group. */
 const PER_GROUP = 5
 
-type Group = 'pages' | 'tenants' | 'conversations' | 'users' | 'agents' | 'channels'
+type Group = 'pages' | 'tenants' | 'contacts' | 'conversations' | 'users' | 'agents' | 'channels'
 
 /** One search hit: what to show and where it leads. */
 interface Hit {
@@ -55,6 +55,12 @@ function useSearchHits(query: string, active: boolean): { hits: Hit[]; loading: 
   const agents = useAgents(active && scope.agents)
   const channels = useChannelConnections(active && scope.channels)
   const projects = useProjects(undefined, active && (scope.agents || scope.channels))
+  const contacts = useQuery({
+    queryKey: ['global-search', 'contacts', query],
+    queryFn: () => api.listContacts({ q: query, limit: PER_GROUP }),
+    enabled: ready && scope.conversations,
+    staleTime: 30_000,
+  })
   const conversations = useQuery({
     queryKey: ['global-search', 'conversations', query],
     queryFn: () => api.listConversations({ contact: query, limit: PER_GROUP }),
@@ -83,6 +89,16 @@ function useSearchHits(query: string, active: boolean): { hits: Hit[]; loading: 
       )
     }
     if (scope.conversations) {
+      push(
+        (contacts.data ?? []).map((c) => ({
+          key: `contact:${c.id}`,
+          group: 'contacts',
+          label: c.name || c.username || identifierLabel(c.identifier),
+          detail: [channelLabel(c.channel_type), tenantName.get(c.tenant_id)].filter(Boolean).join(' · '),
+          tenantId: c.tenant_id,
+          to: `/contacts?id=${encodeURIComponent(c.id)}`,
+        })),
+      )
       push(
         (conversations.data ?? []).map((c) => ({
           key: `conversation:${c.id}`,
@@ -141,12 +157,12 @@ function useSearchHits(query: string, active: boolean): { hits: Hit[]; loading: 
       )
     }
     return out
-  }, [ready, query, pages, tenants, canSelectAll, scope.tenants, scope.conversations, scope.users, scope.agents, scope.channels, conversations.data, users.data, agents.data, channels.data, projects.data])
+  }, [ready, query, pages, tenants, canSelectAll, scope.tenants, scope.conversations, scope.users, scope.agents, scope.channels, contacts.data, conversations.data, users.data, agents.data, channels.data, projects.data])
 
   const loading =
     ready &&
     [
-      scope.conversations && conversations.isFetching,
+      scope.conversations && (conversations.isFetching || contacts.isFetching),
       scope.users && users.isPending,
       scope.agents && agents.isPending,
       scope.channels && channels.isPending,

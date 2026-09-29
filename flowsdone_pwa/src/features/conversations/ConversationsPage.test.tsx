@@ -93,6 +93,22 @@ describe('ConversationsPage', { timeout: 20_000 }, () => {
     expect(screen.getByRole('dialog', { name: 'Editar contacto' })).toBeInTheDocument()
   })
 
+  it('muestra solo las 10 últimas y "Cargar más" trae las siguientes', async () => {
+    const admin = setup()
+    const list = vi.spyOn(admin, 'listConversations')
+    const items = () => within(screen.getByRole('list', { name: 'Conversaciones' })).getAllByRole('button')
+    await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+
+    expect(items()).toHaveLength(10)
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10 }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    // The next page: the 10 before the last one shown.
+    await vi.waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, before: expect.any(String) })),
+    )
+  })
+
   it('sin resultados muestra el estado vacío', async () => {
     setup()
     await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })

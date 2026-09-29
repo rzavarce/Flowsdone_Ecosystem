@@ -7,7 +7,7 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field } from '@/components/ui/Field'
 import { Input } from '@/components/ui/Input'
 import { useUpdateConversationContact } from '@/core/admin/billingHooks'
-import type { ContactCard, Conversation } from '@/core/admin/types'
+import type { ContactCard, ContactCardInput, Conversation } from '@/core/admin/types'
 import { describeError } from '@/core/http/describeError'
 import { identifierLabel } from '@/features/billing/labels'
 import { useTranslation } from 'react-i18next'
@@ -17,8 +17,11 @@ const FIELDS = ['name', 'email', 'phone', 'username', 'notes'] as const
 
 /** Props for {@link ContactCardDialog}. */
 export interface ContactCardDialogProps {
-  conversation: Conversation
+  /** The channel identifier the card belongs to (shown in the description). */
+  identifier: string
   card: ContactCard | null
+  /** Saves the changed fields; rejecting keeps the dialog open with the error. */
+  onSave: (input: ContactCardInput) => Promise<unknown>
   onClose: () => void
 }
 
@@ -28,9 +31,10 @@ export interface ContactCardDialogProps {
  * same identifier on the same channel; the gateway starts it with what the
  * channel and the chat tell, and what staff type here always wins.
  */
-export function ContactCardDialog({ conversation, card, onClose }: ContactCardDialogProps) {
+export function ContactCardDialog({ identifier, card, onSave, onClose }: ContactCardDialogProps) {
   const { t } = useTranslation()
-  const update = useUpdateConversationContact()
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<unknown>(null)
   const initial = Object.fromEntries(FIELDS.map((f) => [f, card?.[f] ?? ''])) as Record<(typeof FIELDS)[number], string>
   const [fields, setFields] = useState(initial)
 
@@ -41,27 +45,30 @@ export function ContactCardDialog({ conversation, card, onClose }: ContactCardDi
     event.preventDefault()
     const changed = Object.fromEntries(FIELDS.filter((f) => fields[f].trim() !== initial[f].trim()).map((f) => [f, fields[f]]))
     if (Object.keys(changed).length === 0) return onClose()
+    setPending(true)
+    setError(null)
     try {
-      await update.mutateAsync({ id: conversation.id, input: changed })
+      await onSave(changed)
       onClose()
-    } catch {
-      // El error queda en update.error y se muestra abajo.
+    } catch (err) {
+      setError(err)
+      setPending(false)
     }
   }
 
   return (
     <Dialog
       open
-      onClose={update.isPending ? () => {} : onClose}
+      onClose={pending ? () => {} : onClose}
       title={t('conversations.contactCard.edit')}
-      description={t('conversations.contactCard.description', { identifier: identifierLabel(conversation.contact) })}
+      description={t('conversations.contactCard.description', { identifier: identifierLabel(identifier) })}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={update.isPending}>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
             {t('common.cancel')}
           </Button>
-          <Button type="submit" form={FORM_ID} disabled={update.isPending}>
-            {update.isPending ? t('common.saving') : t('common.save')}
+          <Button type="submit" form={FORM_ID} disabled={pending}>
+            {pending ? t('common.saving') : t('common.save')}
           </Button>
         </>
       }
@@ -92,20 +99,21 @@ export function ContactCardDialog({ conversation, card, onClose }: ContactCardDi
             className="w-full rounded-lg border border-input bg-transparent px-4 py-3 text-sm shadow-theme-xs placeholder:text-muted/70 focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/15 focus-visible:outline-none"
           />
         </Field>
-        {update.isError && <Alert tone="danger">{describeError(update.error)}</Alert>}
+        {error !== null && <Alert tone="danger">{describeError(error)}</Alert>}
       </form>
     </Dialog>
   )
 }
 
-/** Props for {@link ContactCardPanel}. */
-export interface ContactCardPanelProps {
-  conversation: Conversation
+/** Props for {@link ContactCardView}. */
+export interface ContactCardViewProps {
+  identifier: string
   card: ContactCard | null
+  onSave: (input: ContactCardInput) => Promise<unknown>
 }
 
-/** The contact's card next to a conversation, with a button to edit it. */
-export function ContactCardPanel({ conversation, card }: ContactCardPanelProps) {
+/** A contact's card with a button to edit it (used by conversations and contacts). */
+export function ContactCardView({ identifier, card, onSave }: ContactCardViewProps) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const details = FIELDS.filter((f) => card?.[f])
@@ -131,12 +139,30 @@ export function ContactCardPanel({ conversation, card }: ContactCardPanelProps) 
           ))}
           <div className={details.length % 2 ? undefined : 'sm:col-span-2'}>
             <dt className="text-muted">{t('conversations.contactCard.identifier')}</dt>
-            <dd className="font-medium break-all">{conversation.contact}</dd>
+            <dd className="font-medium break-all">{identifier}</dd>
           </div>
         </dl>
         {details.length === 0 && <p className="mt-3 text-sm text-muted">{t('conversations.contactCard.empty')}</p>}
       </div>
-      {editing && <ContactCardDialog conversation={conversation} card={card} onClose={() => setEditing(false)} />}
+      {editing && <ContactCardDialog identifier={identifier} card={card} onSave={onSave} onClose={() => setEditing(false)} />}
     </Card>
+  )
+}
+
+/** Props for {@link ContactCardPanel}. */
+export interface ContactCardPanelProps {
+  conversation: Conversation
+  card: ContactCard | null
+}
+
+/** The contact's card next to a conversation. */
+export function ContactCardPanel({ conversation, card }: ContactCardPanelProps) {
+  const update = useUpdateConversationContact()
+  return (
+    <ContactCardView
+      identifier={conversation.contact}
+      card={card}
+      onSave={(input) => update.mutateAsync({ id: conversation.id, input })}
+    />
   )
 }

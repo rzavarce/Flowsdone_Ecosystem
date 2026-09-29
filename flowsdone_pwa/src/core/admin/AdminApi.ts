@@ -24,6 +24,9 @@ import type {
   LangflowSession,
   ContactCard,
   ContactCardInput,
+  ContactDetail,
+  ContactFilters,
+  ContactRecord,
   Conversation,
   ConversationDetail,
   ConversationFilters,
@@ -143,6 +146,12 @@ export interface AdminApi {
   getConversation(id: string): Promise<ConversationDetail>
   /** Edits the card of a conversation's contact (staff); returns it as stored. */
   updateConversationContact(id: string, input: ContactCardInput): Promise<ContactCard>
+  /** Contacts of the visible tenants, most recent activity first (staff). */
+  listContacts(filters?: ContactFilters): Promise<ContactRecord[]>
+  /** A contact with their latest conversations. */
+  getContact(id: string): Promise<ContactDetail>
+  /** Edits a contact's card from the contact list (staff). */
+  updateContact(id: string, input: ContactCardInput): Promise<ContactRecord>
 
   /** Commercial plans (admin only). */
   listPlans(): Promise<Plan[]>
