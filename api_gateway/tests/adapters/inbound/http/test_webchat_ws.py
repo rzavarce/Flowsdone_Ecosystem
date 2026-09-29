@@ -56,6 +56,14 @@ class FakeIngest:
         self.calls.append(kwargs)
 
 
+class FakeDemoRecorder:
+    def __init__(self):
+        self.calls: List[Dict[str, Any]] = []
+
+    async def record_inbound(self, **kwargs):
+        self.calls.append(kwargs)
+
+
 class FakeAgents:
     def __init__(self):
         now = datetime.now(timezone.utc)
@@ -79,6 +87,7 @@ def _world(origins=None, switchboard=None):
             links=FakeWebchatShareLinkRepo(), agents=agents, demo_url="https://chat.test/"
         ),
         agents=agents,
+        demo_conversation_recorder=FakeDemoRecorder(),
     )
     for name, value in state.items():
         setattr(app.state, name, value)
@@ -214,6 +223,20 @@ def test_a_share_link_goes_straight_to_the_agents_flow_on_its_own_channel():
     assert call["conversation_id"] == f"share:{share_id}:visitor-1"
     assert call["channel"] == "webchat-share" and call["sender_id"] == "share:visitor-1"
     assert state["switchboard"].turns == []
+    [recorded] = state["demo_conversation_recorder"].calls
+    assert recorded["session_id"] == f"share:{share_id}:visitor-1" and recorded["share_id"] == share_id
+    assert recorded["agent_id"] == state["agents"].agent.id
+    assert recorded["project_id"] == state["agents"].agent.project_id
+    assert recorded["visitor_id"] == "visitor-1" and recorded["text"] == "Hola"
+
+
+def test_the_console_demo_is_not_recorded_as_a_conversation():
+    client, state, _ = _world()
+    with client.websocket_connect(f"/ws?test_token={_token()}") as ws:
+        ws.send_json(_message("Hola"))
+        assert ws.receive_json()["type"] == "connected"
+        assert ws.receive_json()["type"] == "accepted"
+    assert state["demo_conversation_recorder"].calls == []
 
 
 def test_a_revoked_share_link_is_told_so_and_closed_with_the_no_retry_code():

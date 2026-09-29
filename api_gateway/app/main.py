@@ -73,6 +73,7 @@ from app.adapters.outbound.session.redis_session_repository import RedisSessionR
 from app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
 from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
 from app.application.services.conversation_tracker import ConversationTracker
+from app.application.services.demo_conversations import DemoConversationRecorder
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
 from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
@@ -331,6 +332,14 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.conversation_tracker = conversation_tracker
+    # Share link ("Share") chats, recorded as "demo" conversations, not billed.
+    app.state.demo_conversation_recorder = DemoConversationRecorder(
+        sessions=session_repo,
+        history=session_history_repo,
+        tracker=conversation_tracker,
+        projects=app.state.project_repo,
+        session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+    )
     logger.info("conversations.tracker.ready")
 
     # Console (PWA) authentication: users in Postgres, opaque sessions and

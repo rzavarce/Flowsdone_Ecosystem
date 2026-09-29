@@ -16,7 +16,7 @@ from app.domain.ports.outbound import (
 )
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.langflow_result import extract_text_from_langflow_result
-from app.application.services.webchat import WEBCHAT_TEST_CHANNEL
+from app.application.services.webchat import WEBCHAT_SHARE_CHANNEL, WEBCHAT_TEST_CHANNEL
 
 DEFAULT_FAILURE_MESSAGE = "Lo siento, ahora mismo no puedo responder. Inténtalo de nuevo en unos minutos."
 
@@ -291,6 +291,12 @@ class HandleOutboundResponseUseCase:
                 )
             except Exception:
                 logger.error("handle.outbound.ws.deliver.failed", exc_info=True)
+
+        if envelope.channel == WEBCHAT_SHARE_CHANNEL:
+            # Share link chats are recorded as "demo" conversations (see
+            # DemoConversationRecorder): the reply joins the visitor's one.
+            await self._record_outbound_turn(envelope.meta.conversation_id, envelope.payload.get("message", ""))
+            return
 
         await self._deliver_to_channel(envelope)
 

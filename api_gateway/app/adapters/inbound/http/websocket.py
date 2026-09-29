@@ -10,8 +10,8 @@ Two ways in, chosen by the query string (see application/services/webchat.py):
   and are neither tracked nor billed.
 - `?share=...`: a **share link** (the console's "Share"), for anyone outside
   the team. The link is looked up in the database, so it can be revoked;
-  like the demo, messages go straight to the agent's current flow and are
-  neither tracked nor billed.
+  messages go straight to the agent's current flow and are not billed, but
+  are recorded as "demo" conversations so staff can see what was asked.
 
 A connection without either is refused before the handshake completes (the
 browser gets HTTP 403). Frames keep the widget's format: the first one
@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -273,6 +274,18 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
             # Ends the connection loop as a normal disconnect.
             raise WebSocketDisconnect(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+        if shared.project_id is not None:
+            # Staff see what prospects asked, in Conversations ("Demo"),
+            # without it counting for the plan's quota.
+            await ws.app.state.demo_conversation_recorder.record_inbound(
+                session_id=registry_id,
+                share_id=shared.share_id,
+                agent_id=shared.agent_id,
+                project_id=shared.project_id,
+                visitor_id=visitor_id,
+                text=text,
+                now=datetime.now(timezone.utc),
+            )
         await ws.app.state.ingest_message_use_case.execute(
             workflow_id=shared.workflow_id,
             conversation_id=registry_id,
