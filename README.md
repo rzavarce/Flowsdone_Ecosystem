@@ -1040,13 +1040,13 @@ TEST_CLICKHOUSE_DATABASE=conversations_it pytest api_gateway/tests/integration
 docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest --cov --cov-report=term-missing"
 ```
 
-Hoy da ~69% total, pero es un número engañoso si se lee suelto: `application/` y la mayor parte de `adapters/` están arriba del 90-100%, mientras que `admin/`, `adapters/outbound/db/`, `infrastructure/` y `main.py` están en 0% (no son parte de esta suite todavía, ver arriba). `fail_under = 65` en `pyproject.toml` es un **piso inicial**, no una meta — dejar margen bajo el actual evita que el gate rompa por fluctuaciones menores, pero la idea es subirlo a medida que se sumen tests a esas capas, nunca bajarlo para acomodar código nuevo sin cubrir.
+Con Postgres (como en la CI) da **~87 %**: dominio ~96 %, aplicación ~98 %, adaptadores ~88 % (los repositorios SQL se cubren con los tests de integración). `fail_under = 82` en `pyproject.toml` es el piso: subirlo a medida que crezca la cobertura, nunca bajarlo para acomodar código nuevo sin tests. Sin `TEST_POSTGRES_URL` los tests de integración se omiten y el total queda por debajo del piso, así que para medir cobertura en local levanta un Postgres desechable, migra (`alembic -c api_gateway/alembic.ini upgrade head`) y exporta `TEST_POSTGRES_URL`.
 
 ### CI
 
 `.github/workflows/deploy.yml` tiene dos triggers (`push` a `main` y `pull_request` contra `main`) y dos jobs:
 
-- **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), con `--cov` respetando el `fail_under` de `pyproject.toml`.
+- **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`) con un **Postgres de servicio** (`postgres:17-alpine`, migrado con Alembic) para los tests de integración, y con `--cov` respetando el `fail_under` de `pyproject.toml`.
 - **`deploy`** solo corre en el evento `push` (`if: github.event_name == 'push'`) y depende de `test` (`needs: test`) — nunca se dispara desde una PR (evitaría deployar código sin mergear al VPS), y si los tests o la cobertura fallan en el push a `main`, no llega a pegarle por SSH al servidor.
 
 ---

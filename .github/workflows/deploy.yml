@@ -12,6 +12,28 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Postgres desechable para los tests de integración de los repositorios
+    # (api_gateway/tests/integration, marcados con TEST_POSTGRES_URL): sin él
+    # se omitían siempre y los repositorios SQL quedaban sin probar en CI.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: it
+          POSTGRES_PASSWORD: it
+          POSTGRES_DB: it
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U it -d it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL_SQLALCHEMY: postgresql+asyncpg://it:it@localhost:5432/it
+      TEST_POSTGRES_URL: postgresql+asyncpg://it:it@localhost:5432/it
+
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
@@ -31,7 +53,15 @@ jobs:
       # stack de docker-compose. El piso de cobertura vive en
       # pyproject.toml ([tool.coverage.report].fail_under) para que
       # local y CI usen el mismo número.
-      - name: Correr tests con cobertura
+      # Clave de cifrado de credenciales de canal solo para los tests
+      # (generada en cada run; nunca un secreto real).
+      - name: Clave de cifrado de prueba
+        run: echo "CHANNEL_CREDENTIALS_ENCRYPTION_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Migrar el Postgres de pruebas
+        run: alembic -c api_gateway/alembic.ini upgrade head
+
+      - name: Correr tests con cobertura (unitarios + integración con Postgres)
         run: python -m pytest api_gateway/tests --cov --cov-report=term-missing
 
   deploy:

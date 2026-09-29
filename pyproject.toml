@@ -81,12 +81,9 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "\\.\\.\\.$",
 ]
-# Piso inicial, no aspiracional: hoy application/ y buena parte de
-# adapters/ están cubiertos, pero admin/ (routers CRUD), db/
-# (repositorios SQLAlchemy), infrastructure/ y main.py todavía no
-# tienen tests (ver README sección 17) y arrastran el numero global.
-# 65 da margen bajo el ~69% actual para que el gate no rompa por
-# fluctuaciones menores; conviene subirlo a medida que se sume
-# cobertura en esas capas, no bajarlo para acomodar código nuevo sin
-# tests.
-fail_under = 65
+# Piso de cobertura. Con los tests de integración contra Postgres (la CI
+# levanta uno, ver deploy.yml) el total ronda el 87 %; 82 deja margen para
+# fluctuaciones menores. Subirlo a medida que crezca la cobertura, no
+# bajarlo para acomodar código nuevo sin tests. Sin Postgres (tests de
+# integración omitidos) el total baja: en local, usar TEST_POSTGRES_URL.
+fail_under = 82
