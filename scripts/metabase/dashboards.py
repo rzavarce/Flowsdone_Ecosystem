@@ -9,7 +9,7 @@ Every question is native SQL over the read-only sources:
 Each dashboard has two filters:
 - `tenant`: LOCKED in the signed embed URL by the gateway (the viewer can't
   change it; an empty list means every tenant the viewer may see);
-- `fecha`: a date range the viewer can change (last 30 days by default).
+- `fecha`: a date range the viewer can change (last 30 days, today included, by default).
 
 Dashboards are identified by a marker in their description
 (`[flowsdone:<key>]`), which the gateway uses to find their id.
@@ -492,8 +492,10 @@ DASHBOARDS += REPORT_DASHBOARDS
 
 PARAMETERS = [
     {"id": "tenant", "name": "Tenant", "slug": "tenant", "type": "string/=", "sectionId": "string"},
+    # "~" includes the current day: plain "past30days" is the 30 days *before*
+    # today, so today's conversations never showed up by default.
     {"id": "fecha", "name": "Periodo", "slug": "fecha", "type": "date/all-options", "sectionId": "date",
-     "default": "past30days"},
+     "default": "past30days~"},
 ]
 EMBEDDING_PARAMS = {"tenant": "locked", "fecha": "enabled"}
 
