@@ -7,6 +7,7 @@ import pytest
 from app.application.services.webchat import (
     InvalidOriginError,
     TestTokenClaims,
+    is_test_token_expired,
     normalize_origins,
     origin_allowed,
     sign_test_token,
@@ -44,3 +45,16 @@ def test_test_tokens_are_signed_and_expire():
     assert verify_test_token(f"{forged}.{signature}", "secret", now=1_000) is None  # tampered
     for junk in ("", "abc", "a.b.c", "!!.??"):
         assert verify_test_token(junk, "secret", now=1_000) is None
+
+
+def test_only_genuine_tokens_past_their_expiry_count_as_expired():
+    claims = TestTokenClaims(agent_id="a1", workflow_id="f1", expires_at=2_000)
+    token = sign_test_token(claims, "secret")
+
+    assert is_test_token_expired(token, "secret", now=2_000) is True
+    assert is_test_token_expired(token, "secret", now=1_999) is False  # still valid
+    assert is_test_token_expired(token, "other-secret", now=3_000) is False  # not ours
+    payload, _ = token.split(".")
+    assert is_test_token_expired(f"{payload}.forged", "secret", now=3_000) is False
+    for junk in ("", "abc", "a.b.c", "!!.??"):
+        assert is_test_token_expired(junk, "secret", now=3_000) is False

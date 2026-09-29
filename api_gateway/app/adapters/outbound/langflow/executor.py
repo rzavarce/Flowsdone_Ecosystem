@@ -147,23 +147,29 @@ class LangflowExecutor(LangflowExecutorPort):
             logger.info("langflow.call.success")
             return response.json()
 
-        # A 2xx with a non-JSON body is not a real result — most often
-        # Langflow's frontend SPA catch-all answering for a workflow_id
-        # that doesn't exist (or isn't PUBLIC) with its index.html
-        # instead of a 404. Treating this as success used to mark the
-        # run completed and publish a bogus outbound message built from
-        # HTML, silently and indefinitely, for a message that never
-        # actually ran.
+        # A 2xx with a non-JSON body is not a real result: it is Langflow's
+        # 404 in disguise. Langflow 1.4 answers *every* 404 - API routes
+        # included - with its frontend's index.html and status 200, and its
+        # /run endpoint turns any ValueError mentioning "not found" into a
+        # 404. So this covers an unknown workflow_id, but also a flow that
+        # exists and fails mid-run on something missing - typically a
+        # global variable (an API key) that belongs to another Langflow
+        # user than the one owning LANGFLOW_API_KEY: variables are looked
+        # up for the API key's user. Treating this as success used to
+        # publish a bogus outbound message built from HTML.
         logger.error(
-            "langflow.call.non_json_response",
+            "langflow.call.not_found_as_html",
             extra={
                 "status_code": response.status_code,
                 "content_type": content_type,
-                "response_preview": response.text[:500],
+                "workflow_id": workflow_id,
+                "response_preview": response.text[:200],
             },
         )
         raise LangflowExecutionError(
-            f"Langflow returned a non-JSON 2xx response (content-type={content_type!r}); "
-            "likely an unknown or non-PUBLIC workflow_id falling through to the frontend SPA.",
-            status_code=response.status_code,
+            "Langflow answered with its web page instead of a result, which is how it reports a "
+            "404: either the workflow doesn't exist, or something it needs wasn't found while "
+            "running - usually a global variable (e.g. an API key) that belongs to another Langflow "
+            "user than the owner of LANGFLOW_API_KEY. The exact cause is in the langflow logs.",
+            status_code=404,
         )

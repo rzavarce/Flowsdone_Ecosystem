@@ -19,6 +19,9 @@ from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional
 from urllib.parse import urlsplit
 
+# Channel name of the messages sent from the console's "try in web chat" demo.
+WEBCHAT_TEST_CHANNEL = "webchat-test"
+
 
 class InvalidOriginError(ValueError):
     """A value in allowed_origins is not a website origin (maps to 400)."""
@@ -165,3 +168,29 @@ def verify_test_token(token: str, secret: str, *, now: Optional[float] = None) -
     except (ValueError, KeyError, TypeError):
         return None
     return claims if claims.expires_at > (now if now is not None else time.time()) else None
+
+
+def is_test_token_expired(token: str, secret: str, *, now: Optional[float] = None) -> bool:
+    """Whether a test token is genuine but past its expiry.
+
+    Lets the web chat tell a visitor "this link expired, ask for a new
+    one" instead of refusing silently - but only for tokens this gateway
+    signed: a forged or malformed one is still just refused.
+
+    Args:
+        token (str): The token.
+        secret (str): Gateway secret.
+        now (Optional[float]): Current Unix time (tests).
+
+    Returns:
+        bool: True if the signature is valid and the token has expired.
+    """
+    try:
+        payload, signature = token.split(".")
+        expected = _b64(hmac.new(_key(secret), payload.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(signature, expected):
+            return False
+        expires_at = int(json.loads(_unb64(payload))["e"])
+    except (ValueError, KeyError, TypeError):
+        return False
+    return expires_at <= (now if now is not None else time.time())

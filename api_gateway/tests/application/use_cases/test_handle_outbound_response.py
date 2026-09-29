@@ -94,6 +94,55 @@ async def test_execute_falls_back_to_default_message_when_unparseable():
     )
 
 
+# --- notify_failure() ----------------------------------------------------
+
+
+async def test_notify_failure_answers_the_customer_with_the_failure_message():
+    publisher = FakePublisher()
+    use_case = HandleOutboundResponseUseCase(publisher=publisher, failure_message="Ahora no puedo, perdona.")
+    envelope = _envelope()
+
+    await use_case.notify_failure(envelope, RuntimeError("FLOWSDONE_OPENAI_KEY variable not found"))
+
+    published_envelope = publisher.published[0]["message"]
+    assert published_envelope["payload"]["message"] == "Ahora no puedo, perdona."
+    assert published_envelope["meta"]["direction"] == "outbound"
+    assert published_envelope["response_to"] == envelope.meta.message_id
+
+
+async def test_notify_failure_hides_the_error_from_real_customers():
+    publisher = FakePublisher()
+    use_case = HandleOutboundResponseUseCase(publisher=publisher)
+
+    await use_case.notify_failure(_envelope(), RuntimeError("secret internal detail"))
+
+    message = publisher.published[0]["message"]["payload"]["message"]
+    assert "secret internal detail" not in message
+    assert message == hor_module.DEFAULT_FAILURE_MESSAGE
+
+
+async def test_notify_failure_shows_the_error_on_the_console_test_channel():
+    publisher = FakePublisher()
+    use_case = HandleOutboundResponseUseCase(publisher=publisher)
+    envelope = _envelope().model_copy(update={"channel": "webchat-test"})
+
+    await use_case.notify_failure(envelope, RuntimeError("variable not found " + "x" * 1000))
+
+    message = publisher.published[0]["message"]["payload"]["message"]
+    assert message.startswith(hor_module.DEFAULT_FAILURE_MESSAGE)
+    assert "[Detalle para pruebas] variable not found" in message
+    assert len(message) < len(hor_module.DEFAULT_FAILURE_MESSAGE) + 550  # detail is truncated
+
+
+async def test_notify_failure_reaches_a_live_websocket():
+    ws_registry = FakeWSRegistry(connected_conversations=["conv-1"])
+    use_case = HandleOutboundResponseUseCase(ws_registry=ws_registry)
+
+    await use_case.notify_failure(_envelope(), RuntimeError("boom"))
+
+    assert ws_registry.sent[0]["message"]["message"] == hor_module.DEFAULT_FAILURE_MESSAGE
+
+
 async def test_execute_pushes_to_websocket_when_conversation_has_live_connection():
     ws_registry = FakeWSRegistry(connected_conversations=["conv-1"])
     use_case = HandleOutboundResponseUseCase(ws_registry=ws_registry)

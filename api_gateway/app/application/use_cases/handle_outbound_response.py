@@ -16,6 +16,9 @@ from app.domain.ports.outbound import (
 )
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.langflow_result import extract_text_from_langflow_result
+from app.application.services.webchat import WEBCHAT_TEST_CHANNEL
+
+DEFAULT_FAILURE_MESSAGE = "Lo siento, ahora mismo no puedo responder. Inténtalo de nuevo en unos minutos."
 
 logger = logging.getLogger("usecase.handle_outbound_response")
 
@@ -41,6 +44,7 @@ class HandleOutboundResponseUseCase:
         session_history_repo: Optional[SessionHistoryRepositoryPort] = None,
         session_ttl_seconds: int = 86400,
         conversation_tracker: Optional[ConversationTracker] = None,
+        failure_message: str = DEFAULT_FAILURE_MESSAGE,
     ):
         """Build the use case.
 
@@ -67,6 +71,8 @@ class HandleOutboundResponseUseCase:
             conversation_tracker (Optional[ConversationTracker]):
                 Records the delivered message into the session's current
                 Conversation. Optional, like the session ports.
+            failure_message (str): Sent to the customer by
+                `notify_failure` when their workflow fails.
         """
         self.publisher = publisher
         self.ws_registry = ws_registry
@@ -76,6 +82,7 @@ class HandleOutboundResponseUseCase:
         self.session_history_repo = session_history_repo
         self.session_ttl_seconds = session_ttl_seconds
         self.conversation_tracker = conversation_tracker
+        self.failure_message = failure_message
 
     def _extract_text(self, value: Any) -> Optional[str]:
         """Recursively extract a human-readable response string.
@@ -124,6 +131,37 @@ class HandleOutboundResponseUseCase:
             )
             response_message = "The workflow did not return a valid response."
 
+        await self._respond(envelope, response_message)
+
+    async def notify_failure(self, envelope: MessageEnvelope, error: BaseException) -> None:
+        """Tell the customer their message couldn't be answered.
+
+        Without this a failed workflow (Langflow down, a flow missing a
+        variable...) leaves the customer waiting forever. The reply goes
+        out the same way as a normal one. On the console's test channel
+        the error itself is appended, so whoever is trying the agent sees
+        why it failed without digging into logs.
+
+        Args:
+            envelope (MessageEnvelope): The inbound envelope whose workflow failed.
+            error (BaseException): What went wrong.
+        """
+        message = self.failure_message
+        if envelope.channel == WEBCHAT_TEST_CHANNEL:
+            message = f"{message}\n\n[Detalle para pruebas] {str(error)[:500]}"
+        logger.warning(
+            "handle.outbound.failure_notified",
+            extra={"message_id": envelope.meta.message_id, "channel": envelope.channel},
+        )
+        await self._respond(envelope, message)
+
+    async def _respond(self, envelope: MessageEnvelope, response_message: str) -> None:
+        """Send `response_message` back: callback URL, live WebSocket and outbound envelope.
+
+        Args:
+            envelope (MessageEnvelope): The inbound envelope being answered.
+            response_message (str): The text to send.
+        """
         response_payload = {
             "type": "chat.response",
             "response": response_message,

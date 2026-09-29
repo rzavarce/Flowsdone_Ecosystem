@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from app.adapters.inbound.http.websocket import router
+from app.adapters.inbound.http.websocket import TEST_TOKEN_EXPIRED_CLOSE_CODE, router
 from app.application.services.switchboard import ChannelMessageNotRoutable, build_conversation_id
 from app.application.services.webchat import TestTokenClaims, sign_test_token
 from app.application.services.ws_registry import WSRegistry
@@ -149,8 +149,24 @@ def test_the_demo_goes_straight_to_the_tested_agent_and_is_not_a_channel_turn():
     assert state["switchboard"].turns == []
 
 
-def test_an_expired_test_token_is_refused():
-    client, _, _ = _world()
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(f"/ws?test_token={_token(expires_at=int(time.time()) - 1)}") as ws:
+def test_an_expired_test_token_is_told_so_and_closed_with_the_no_retry_code():
+    """A genuine but expired demo link gets an explicit error (the widget
+    shows it and stops reconnecting) instead of a silent refusal."""
+    client, state, _ = _world()
+    with client.websocket_connect(f"/ws?test_token={_token(expires_at=int(time.time()) - 1)}") as ws:
+        assert ws.receive_json() == {"type": "chat.error", "error": "test_token_expired"}
+        with pytest.raises(WebSocketDisconnect) as closed:
             ws.receive_json()
+    assert closed.value.code == TEST_TOKEN_EXPIRED_CLOSE_CODE == 4001
+    assert state["ingest_message_use_case"].calls == []
+
+
+def test_a_forged_token_is_refused_silently_even_if_it_looks_expired():
+    """Only tokens this gateway signed get the "expired" explanation."""
+    genuine = _token(expires_at=int(time.time()) - 1)
+    payload, _ = genuine.split(".")
+    client, _, _ = _world()
+    with pytest.raises(WebSocketDisconnect) as refused:
+        with client.websocket_connect(f"/ws?test_token={payload}.forgedsignature") as ws:
+            ws.receive_json()
+    assert refused.value.code == 1008

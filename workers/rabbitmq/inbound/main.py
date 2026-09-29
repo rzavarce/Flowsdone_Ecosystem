@@ -72,7 +72,7 @@ async def main() -> None:
     await publisher.start()
 
     outbound_use_case = HandleOutboundResponseUseCase(
-        publisher=publisher
+        publisher=publisher, failure_message=settings.WORKFLOW_FAILURE_MESSAGE
     )
 
     async def handler(body: bytes) -> None:
@@ -110,7 +110,13 @@ async def main() -> None:
             },
         )
 
-        result = await use_case.execute(envelope)
+        try:
+            result = await use_case.execute(envelope)
+        except Exception as exc:
+            # Answer the customer instead of leaving them waiting; the
+            # error is re-raised so the consumer handles it as before.
+            await outbound_use_case.notify_failure(envelope, exc)
+            raise
 
         if not result:
             logger.warning(
