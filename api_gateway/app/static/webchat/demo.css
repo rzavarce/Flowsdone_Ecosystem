@@ -1,20 +1,25 @@
 *{box-sizing:border-box}
+/* Flowsdone brand, same as the landing and the demo page:
+   navy #04141F, cyan #19B4E6 -> green #3EFF8B, Outfit. */
 :root{
-  --ink:#111827;
-  --muted:#4b5563;
-  --line:#e5e7eb;
-  --bg:#f8fafc;
+  --navy:#04141f;
+  --navy-2:#0a2231;
+  --ink:#0b1b2b;
+  --muted:#4f5f70;
+  --line:#e1e7ef;
+  --bg:#f4f7fb;
   --card:#ffffff;
-  --accent:#4F46E5;
-  --accent-dark:#3730a3;
-  --accent-soft:#eef2ff;
-  --send:#10B981;
+  --accent:#0e86ad;
+  --accent-dark:#0a5f7c;
+  --accent-soft:#e3f5fb;
+  --send:#24e5a3;
+  --grad:linear-gradient(90deg,#19b4e6 0%,#24e5a3 70%,#3eff8b 100%);
 }
 html{scroll-behavior:smooth}
 body{
   margin:0;
   min-height:100vh;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  font-family:"Outfit",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   background:var(--bg);
   color:var(--ink);
   line-height:1.5;
@@ -25,7 +30,11 @@ body{
 /* Hero */
 .demo-hero{
   padding:72px 24px 88px;
-  background:radial-gradient(120% 140% at 15% -10%,#3730a3 0%,#4F46E5 45%,#111827 100%);
+  position:relative;
+  background:
+    radial-gradient(1200px 600px at 80% -10%,rgb(25 180 230 / .22),transparent 60%),
+    radial-gradient(900px 500px at 0% 110%,rgb(62 255 139 / .12),transparent 60%),
+    var(--navy);
   color:#fff;
   text-align:center;
 }
@@ -36,13 +45,15 @@ body{
   font-weight:700;
   letter-spacing:.08em;
   text-transform:uppercase;
-  background:rgba(255,255,255,.14);
+  color:#19b4e6;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.12);
   padding:6px 14px;
   border-radius:999px;
   margin-bottom:20px;
 }
 .demo-hero h1{font-size:clamp(28px,4vw,42px);margin:0 0 14px;font-weight:800}
-.demo-hero p{font-size:16px;color:rgba(255,255,255,.85);margin:0 auto;max-width:560px}
+.demo-hero p{font-size:17px;color:#9fb3c2;margin:0 auto;max-width:560px}
 .demo-hero-actions{display:flex;gap:12px;justify-content:center;margin-top:32px;flex-wrap:wrap}
 
 .btn{
@@ -59,10 +70,10 @@ body{
   transition:transform .15s ease,filter .15s ease,background .15s ease;
 }
 .btn:hover{transform:translateY(-1px)}
-.btn-light{background:#fff;color:var(--accent-dark)}
-.btn-light:hover{filter:brightness(.97)}
-.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.35)}
-.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-light{background:var(--grad);color:var(--navy);box-shadow:0 8px 24px -10px rgb(36 229 163 / .7)}
+.btn-light:hover{filter:brightness(1.03)}
+.btn-ghost{background:transparent;color:#eaf6f2;border-color:rgba(234,246,242,.35)}
+.btn-ghost:hover{background:rgba(234,246,242,.08)}
 
 /* Section shell */
 .demo-section{margin-top:56px}
@@ -105,8 +116,8 @@ body{
 .code-block{position:relative;margin-top:14px}
 .code-block pre{
   margin:0;
-  background:#0b1220;
-  color:#e5e7eb;
+  background:var(--navy);
+  color:#eaf6f2;
   padding:18px 50px 18px 18px;
   border-radius:14px;
   font-size:13px;
@@ -130,7 +141,7 @@ body{
   transition:background .15s ease;
 }
 .copy-btn:hover{background:rgba(255,255,255,.18)}
-.copy-btn.copied{background:var(--send);color:#fff;border-color:var(--send)}
+.copy-btn.copied{background:var(--send);color:var(--navy);border-color:var(--send)}
 
 .step{display:flex;gap:14px;margin-bottom:22px}
 .step:last-child{margin-bottom:0}
@@ -138,8 +149,8 @@ body{
   flex-shrink:0;
   width:28px;height:28px;
   border-radius:999px;
-  background:var(--accent-soft);
-  color:var(--accent-dark);
+  background:var(--grad);
+  color:var(--navy);
   font-size:13px;
   font-weight:700;
   display:flex;align-items:center;justify-content:center;
