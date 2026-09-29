@@ -77,3 +77,9 @@ def test_dashcards_map_both_filters_and_the_tenant_is_locked_for_embedding():
 ])
 def test_dashboards_the_gateway_asks_for_exist(key):
     assert key in {d.key for d in specs.DASHBOARDS}
+
+
+def test_the_default_period_includes_today():
+    """Plain "past30days" leaves today out: today's activity must show by default."""
+    [period] = [p for p in specs.PARAMETERS if p["slug"] == "fecha"]
+    assert period["default"] == "past30days~"
