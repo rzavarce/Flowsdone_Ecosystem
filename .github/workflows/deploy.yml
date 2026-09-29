@@ -70,6 +70,11 @@ jobs:
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
 
+            # Este es el ambiente de producción: el gateway oculta la documentación
+            # de la API y se niega a arrancar con claves por defecto (ver
+            # api_gateway/app/core/security_checks.py).
+            export ENV=production
+
             # Descargar los cambios más recientes desde main (guardando el commit
             # anterior para saber después qué cambió)
             PREV_HEAD=$(git rev-parse HEAD)

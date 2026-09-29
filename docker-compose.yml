@@ -608,6 +608,10 @@ services:
     container_name: ${CONTAINER_PREFIX}_gateway
     env_file: .env
     environment:
+      # "production" en el VPS (lo exporta el deploy; también puede ir en el
+      # .env del VPS): oculta /docs y /openapi.json y aborta el arranque si
+      # ADMIN_API_KEY o CALLBACK_HMAC_SECRET son valores por defecto/de ejemplo.
+      ENV: ${ENV:-local}
       OTEL_ENABLED: ${OTEL_ENABLED}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
       OTEL_SERVICE_NAME: fd-gateway

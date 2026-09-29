@@ -121,6 +121,7 @@ from app.application.use_cases.conversation_contacts import ManageConversationCo
 from app.application.use_cases.voice_demo import ResolveVoiceDemoTargetUseCase
 from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
+from app.core.security_checks import api_docs_urls, check_production_settings
 from app.core.config import settings
 from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
@@ -737,10 +738,14 @@ async def lifespan(app: FastAPI):
     logger.info("application.shutdown.complete")
 
 
+# Production: no public API map, and never start behind a well-known secret.
+check_production_settings(settings)
+
 app = FastAPI(
     title="Omni API Gateway",
     version="1.0.0",
     lifespan=lifespan,
+    **api_docs_urls(settings),
 )
 instrument_fastapi_app(app)
 register_error_handlers(app)

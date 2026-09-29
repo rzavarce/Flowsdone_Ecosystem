@@ -632,6 +632,10 @@ Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider 
 | Weaviate GUI | https://vector.flowsdone.com |
 | OpenSearch Dashboards | https://logs.flowsdone.com |
 
+**Producción (`ENV=production`).** El workflow de despliegue exporta `ENV=production` y el compose se lo pasa al gateway (en local vale `local`). Con él, el gateway (`core/security_checks.py`):
+- **no publica la documentación de la API**: `/docs`, `/redoc` y `/openapi.json` devuelven 404 (en local siguen disponibles);
+- **se niega a arrancar** si `ADMIN_API_KEY` o `CALLBACK_HMAC_SECRET` tienen el valor por defecto del código, el de `env.example.txt`, están vacíos o tienen menos de 24 caracteres. El error nombra la variable, nunca su valor. Si se levanta el stack a mano en el VPS, conviene tener también `ENV=production` en su `.env`.
+
 ### Langflow (`agents.flowsdone.com`): acceso y seguridad
 
 **Riesgo (corregido):** Langflow 1.4 arranca con `AUTO_LOGIN=true` y la cuenta `langflow`/`langflow`: quien abriera la URL entraba como superusuario **sin contraseña**, y un superusuario de Langflow ejecuta Python arbitrario en su contenedor (que recibe `ADMIN_API_KEY`, la URL de Postgres con su contraseña, claves de Langfuse…). Además Langflow **no tiene multi-tenancy**: una sola cuenta es dueña de todos los flujos (y el gateway los ejecuta con una única API key), así que quien vea su interfaz ve los flujos de **todos** los clientes y sus variables guardadas.
