@@ -12,6 +12,7 @@ import type {
   TenantBillingProfile,
   TenantRecord,
   UserRecord,
+  WebchatShareLink,
 } from './types'
 
 /** Where the mock web chat widget would load from. */
@@ -89,6 +90,8 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
   const avatars = new Map<string, string>()
   const apps = new Map<ChannelAppProvider, { app: ChannelApp; credentials: Record<string, unknown> }>()
   const billingProfiles = new Map<string, TenantBillingProfile>()
+  /** Share links by agent id, oldest first. */
+  const shareLinks = new Map<string, WebchatShareLink[]>()
   let seq = 100
 
   const emptyBillingProfile = (tenantId: string): TenantBillingProfile => ({
@@ -293,6 +296,31 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       need(agents.find((a) => a.id === agentId), 'agent')
       return { url: `about:blank#webchat-test=${agentId}`, expires_in: 1800 }
+    },
+    async listWebchatShares(agentId) {
+      await wait(latencyMs)
+      need(agents.find((a) => a.id === agentId), 'agent')
+      return clone((shareLinks.get(agentId) ?? []).slice().reverse())
+    },
+    async createWebchatShare(agentId, expiresInDays) {
+      await wait(latencyMs)
+      const agent = need(agents.find((a) => a.id === agentId), 'agent')
+      const now = Date.now()
+      const link: WebchatShareLink = {
+        id: `share-${++seq}`,
+        url: `https://chat.flowsdone.com/?share=mock-${seq}&agent=${encodeURIComponent(agent.name)}`,
+        created_at: new Date(now).toISOString(),
+        expires_at: expiresInDays ? new Date(now + expiresInDays * 86_400_000).toISOString() : null,
+        expired: false,
+      }
+      shareLinks.set(agentId, [...(shareLinks.get(agentId) ?? []), link])
+      return clone(link)
+    },
+    async revokeWebchatShare(agentId, shareId) {
+      await wait(latencyMs)
+      const links = shareLinks.get(agentId) ?? []
+      need(links.find((l) => l.id === shareId), 'share link')
+      shareLinks.set(agentId, links.filter((l) => l.id !== shareId))
     },
     async deleteAgent(id) {
       await wait(latencyMs)

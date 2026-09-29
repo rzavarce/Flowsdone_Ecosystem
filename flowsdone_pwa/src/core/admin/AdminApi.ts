@@ -35,6 +35,8 @@ import type {
   SubscriptionInput,
   UnratedMeter,
   WebchatTestLink,
+  ShareLinkDays,
+  WebchatShareLink,
 } from './types'
 
 /**
@@ -80,6 +82,12 @@ export interface AdminApi {
   deleteAgent(id: string): Promise<void>
   /** Demo link to try an agent in the web chat (staff; short-lived token, not tracked nor billed). */
   webchatTestLink(agentId: string): Promise<WebchatTestLink>
+  /** The agent's share links that were not revoked, newest first. */
+  listWebchatShares(agentId: string): Promise<WebchatShareLink[]>
+  /** Creates a public link to chat with the agent (7 or 30 days, or never expiring). */
+  createWebchatShare(agentId: string, expiresInDays: ShareLinkDays): Promise<WebchatShareLink>
+  /** Revokes a share link: it stops working at once, open chats included. */
+  revokeWebchatShare(agentId: string, shareId: string): Promise<void>
   /** Creates the project's base agent (new-client wizard) and makes it the default one. */
   createBaseAgent(input: BaseAgentInput): Promise<Agent>
   /** A tenant's onboarding checklist and the wizard step to resume at (admin/tenant_manager). */

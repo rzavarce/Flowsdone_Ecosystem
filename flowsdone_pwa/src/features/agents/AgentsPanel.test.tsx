@@ -99,6 +99,71 @@ describe('Agentes: registro y gestión', { timeout: 20_000 }, () => {
     openWindow.mockRestore()
   })
 
+  it('"Compartir" crea por defecto un enlace sin vencimiento y lo muestra para copiarlo', async () => {
+    const admin = await setup()
+    const create = vi.spyOn(admin, 'createWebchatShare')
+    await agentRows()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Compartir Recepción' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Compartir Recepción' }))
+    expect(dialog.getByRole('radio', { name: 'Sin vencimiento' })).toHaveAttribute('aria-checked', 'true')
+    expect(await dialog.findByText('Este agente todavía no tiene enlaces compartidos.')).toBeInTheDocument()
+
+    await userEvent.click(dialog.getByRole('button', { name: 'Crear enlace' }))
+
+    expect(create).toHaveBeenCalledWith('a1', null)
+    const url = await dialog.findByRole('textbox', { name: 'Enlace compartido' })
+    expect((url as HTMLInputElement).value).toMatch(/^https:\/\/chat\.flowsdone\.com\/\?share=/)
+    expect(dialog.getByText('Sin vencimiento', { selector: 'span' })).toBeInTheDocument()
+  })
+
+  it('"Compartir" permite elegir 7 o 30 días', async () => {
+    const admin = await setup()
+    const create = vi.spyOn(admin, 'createWebchatShare')
+    await agentRows()
+    await userEvent.click(screen.getByRole('button', { name: 'Compartir Recepción' }))
+    const dialog = within(screen.getByRole('dialog'))
+
+    await userEvent.click(dialog.getByRole('radio', { name: '30 días' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Crear enlace' }))
+    await userEvent.click(dialog.getByRole('radio', { name: '7 días' }))
+    await userEvent.click(dialog.getByRole('button', { name: 'Crear enlace' }))
+
+    await vi.waitFor(() => expect(create.mock.calls).toEqual([['a1', 30], ['a1', 7]]))
+    await vi.waitFor(() => expect(dialog.getAllByText(/^Vence el /)).toHaveLength(2))
+  })
+
+  it('revocar un enlace pide confirmación y lo quita de la lista', async () => {
+    const admin = await setup()
+    const revoke = vi.spyOn(admin, 'revokeWebchatShare')
+    await admin.createWebchatShare('a1', null)
+    await agentRows()
+    await userEvent.click(screen.getByRole('button', { name: 'Compartir Recepción' }))
+    const dialog = within(screen.getByRole('dialog'))
+    await dialog.findByRole('textbox', { name: 'Enlace compartido' })
+
+    await userEvent.click(dialog.getByRole('button', { name: 'Revocar' }))
+    expect(dialog.getByText(/Dejará de funcionar al instante/)).toBeInTheDocument()
+    expect(revoke).not.toHaveBeenCalled()
+    await userEvent.click(dialog.getByRole('button', { name: 'Revocar' }))
+
+    expect(revoke).toHaveBeenCalledWith('a1', expect.any(String))
+    expect(await dialog.findByText('Este agente todavía no tiene enlaces compartidos.')).toBeInTheDocument()
+  })
+
+  it('un agente suspendido no se puede compartir', async () => {
+    await setup()
+    await agentRows()
+    expect(screen.getByRole('button', { name: 'Compartir Citas' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Suspender Citas' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Suspender agente' }))
+
+    const [, citas] = await agentRows()
+    await vi.waitFor(() => expect(citas).toHaveTextContent('Suspendido'))
+    expect(within(citas).queryByRole('button', { name: 'Compartir Citas' })).not.toBeInTheDocument()
+  })
+
   it('un tenant sin proyectos explica que hay que crear uno', async () => {
     await setup('t3')
     expect(await screen.findByText(/no tiene proyectos todavía/, undefined, { timeout: 5000 })).toBeInTheDocument()
