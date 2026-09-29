@@ -2,7 +2,7 @@
 # Dev-only helper: exposes the local api:8000 stack publicly via a
 # Cloudflare quick tunnel (no account/domain needed) so Twilio can
 # reach /webhooks/voice for the browser softphone demo
-# (static/voice_demo/). Not used in production - PUBLIC_BASE_URL there
+# (the "Llamar" tab of the demo page, static/webchat/). Not used in production - PUBLIC_BASE_URL there
 # is the real domain, routed through the deployed Traefik.
 #
 # Usage:
@@ -104,8 +104,8 @@ cmd_start() {
     --data-urlencode "VoiceMethod=POST" >/dev/null
 
   echo ""
-  echo "Listo. Abre en tu navegador:"
-  echo "  $tunnel_url/static/voice_demo/index.html"
+  echo "Listo. Para probar la llamada:"
+  echo "  En la consola: Probar en webchat en un agente con canal de voz -> pestaña Llamar"
   echo ""
   echo "Para revertir: scripts/dev/voice_demo_tunnel.sh stop"
 }

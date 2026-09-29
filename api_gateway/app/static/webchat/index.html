@@ -49,7 +49,30 @@
         <p class="test-badge" id="test-badge" hidden>Modo prueba · estas conversaciones no se registran ni se facturan</p>
       </section>
 
-      <div class="chat-frame" id="chat-frame" hidden></div>
+      <div class="stage" id="stage" hidden>
+        <div class="tabs" role="tablist" aria-label="Cómo hablar con el asistente" id="tabs" hidden>
+          <button class="tab" type="button" role="tab" id="tab-chat" aria-controls="chat-frame" aria-selected="true">Chatear</button>
+          <button class="tab" type="button" role="tab" id="tab-call" aria-controls="call-panel" aria-selected="false">Llamar</button>
+        </div>
+
+        <div class="chat-frame" id="chat-frame" role="tabpanel" aria-labelledby="tab-chat"></div>
+
+        <div class="chat-frame call-panel" id="call-panel" role="tabpanel" aria-labelledby="tab-call" data-state="ready" hidden>
+          <div class="call-card">
+            <div class="call-avatar" aria-hidden="true"><span id="call-initial">A</span></div>
+            <p class="call-name" id="call-name">Asistente</p>
+            <p class="call-status" id="call-status" role="status" aria-live="polite">Listo para llamar</p>
+            <p class="call-timer" id="call-timer" hidden>00:00</p>
+            <div class="call-controls">
+              <button class="call-btn call-start" type="button" id="call-start"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span>Llamar</span></button>
+              <button class="call-btn call-mute" type="button" id="call-mute" aria-pressed="false" hidden><span>Silenciar</span></button>
+              <button class="call-btn call-hangup" type="button" id="call-hangup" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span>Colgar</span></button>
+            </div>
+            <p class="call-hint">Hablarás desde el navegador, con el micrófono y el altavoz de tu dispositivo. La primera vez te pedirá permiso para usar el micrófono.</p>
+            <p class="call-alt">¿Prefieres tu teléfono? Llama al <a id="call-alt-number" href="#"></a></p>
+          </div>
+        </div>
+      </div>
 
       <div class="notice-card" id="no-link" hidden>
         <h2>Este enlace no es válido</h2>
@@ -87,9 +110,36 @@
       location.reload();
     });
 
+    function selectTab(name) {
+      const call = name === "call";
+      document.getElementById("tab-chat").setAttribute("aria-selected", String(!call));
+      document.getElementById("tab-call").setAttribute("aria-selected", String(call));
+      document.getElementById("chat-frame").hidden = call;
+      document.getElementById("call-panel").hidden = !call;
+    }
+
     if (shareToken || testToken) {
-      document.getElementById("chat-frame").hidden = false;
+      document.getElementById("stage").hidden = false;
       document.getElementById("test-badge").hidden = !testToken;
+      document.getElementById("call-name").textContent = agentName;
+      document.getElementById("call-initial").textContent = agentName.trim().charAt(0).toUpperCase() || "A";
+      document.getElementById("tab-chat").addEventListener("click", function () { selectTab("chat"); });
+      document.getElementById("tab-call").addEventListener("click", function () { selectTab("call"); });
+
+      // Si el agente tiene un canal de voz, aparece la pestaña "Llamar".
+      window.addEventListener("load", function () {
+        window.FlowsdoneVoiceDemo.init({
+          shareToken: shareToken,
+          testToken: testToken,
+          onAvailable: function () {
+            document.getElementById("tabs").hidden = false;
+            document.getElementById("lead").textContent =
+              "Un asistente virtual creado con Flowsdone. Escríbele o llámale como lo haría uno de tus clientes: " +
+              "responde al momento, con la información real del negocio.";
+            if (location.hash === "#llamar") selectTab("call");
+          }
+        });
+      });
 
       window.AgentChatConfig = {
         wsUrl: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
@@ -132,5 +182,6 @@
 
   <!-- El widget DESPUÉS del config, sin defer -->
   <script src="agent-chat-widget.js?v=20260929"></script>
+  <script src="voice-call.js?v=20260929"></script>
 </body>
 </html>

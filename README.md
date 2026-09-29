@@ -585,7 +585,7 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 | Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
 | Webhook de voz (Twilio) | http://localhost:8000/webhooks/voice — sin el nombre del proveedor en la ruta, a propósito (sección 18) |
 | WebSocket de streaming de voz | ws://localhost:8000/voice/stream/{call_sid} (lo abre Twilio, no se usa a mano — sección 18) |
-| Softphone de prueba (demo) | http://localhost:8000/static/voice_demo/ (sección 19) |
+| Softphone de prueba (demo) | pestaña *Llamar* de la demo del agente (sección 19) |
 | Langflow | http://localhost:7860 |
 | Langfuse | http://localhost:4100 |
 | n8n | http://localhost:5678 |
@@ -1224,9 +1224,15 @@ Si `human_transfer_number` no está configurado, el `<Connect>` inicial no lleva
 
 ## 19. Softphone de prueba (demo)
 
-Herramienta de dev/testing — **no** es parte del canal de voz de producción (sección 18). Deja llamar por WebRTC (Twilio Voice JS SDK) desde el navegador al mismo `/webhooks/voice` que usa una llamada real, sin gastar minutos ni necesitar un teléfono. Vive en `static/voice_demo/`, mismo patrón que el widget de webchat (`static/webchat/`, sección 10).
+La demo de voz es la pestaña **Llamar** de la página de demo del agente (`static/webchat/index.html`, sección 8): la misma que se abre con *Probar en webchat* o con un enlace de *Compartir*. Llama por WebRTC (Twilio Voice JS SDK, `static/webchat/voice-call.js`) desde el navegador al mismo `/webhooks/voice` que usa una llamada real, sin necesitar un teléfono. **No** es parte del canal de voz de producción (sección 18): la llamada entra por el canal de voz del agente como cualquier otra.
 
-El TwiML App que usa el softphone apunta su Voice Request URL al mismo `/webhooks/voice` de siempre — no hay lógica de backend nueva para la llamada en sí, solo un endpoint que emite el Access Token que el SDK necesita para autenticar al navegador contra Twilio (`GET /voice-demo/token`, `adapters/inbound/http/voice_demo.py`).
+- La pestaña solo aparece si el agente del enlace tiene un **canal de voz activo**; marca su número (`external_id` del canal). La página muestra además ese número para llamar desde un teléfono.
+- `GET /voice-demo/token?share=…` o `?test_token=…` (`adapters/inbound/http/voice_demo.py`) emite el Access Token del SDK y devuelve el número (`ResolveVoiceDemoTargetUseCase`). **Sin un enlace válido no hay token**: el token permite llamar con la cuenta de Twilio, así que ya no se entrega a cualquiera que abra la página.
+- En producción la página vive en `chat.flowsdone.com`, así que Traefik manda también `/voice-demo/*` de ese dominio al gateway sin reescribirlo a estáticos (igual que `/ws`).
+- A diferencia del chat de la demo, **la llamada sí se registra y se factura** como cualquier llamada del canal: pasa por el `/webhooks/voice` normal.
+- La antigua página `static/voice_demo/` ahora solo explica dónde está la demo.
+
+El TwiML App que usa el softphone apunta su Voice Request URL al mismo `/webhooks/voice` de siempre — no hay lógica de backend nueva para la llamada en sí.
 
 ### Puesta en marcha
 
@@ -1253,7 +1259,7 @@ print('API_KEY_SECRET=' + key.secret)
 docker compose up -d --force-recreate api
 ```
 
-Luego abrí `http://localhost:8000/static/voice_demo/index.html?to=+1XXXXXXXXXX` (o el dominio público) — pide permiso de micrófono, y el botón "Llamar" dispara `device.connect({params: {To: "+1XXXXXXXXXX"}})`, que Twilio traduce en una request a `/webhooks/voice` con `To=+1XXXXXXXXXX` y `From=client:<identity>` — el mismo webhook de siempre, sin cambios.
+Luego, en la consola, *Probar en webchat* (o *Compartir*) en un agente con canal de voz y pestaña **Llamar**: pide permiso de micrófono, y el botón "Llamar" dispara `device.connect({params: {To: <número del canal>}})`, que Twilio traduce en una request a `/webhooks/voice` con `To=<número>` y `From=client:<identity>` — el mismo webhook de siempre, sin cambios.
 
 ### Exponer el stack local a internet (`scripts/dev/voice_demo_tunnel.sh`)
 

@@ -115,8 +115,23 @@ p { margin: 0; }
 }
 
 /* The chat, framed like the landing's phone mockup. */
+.stage { justify-self: center; width: min(440px, 100%); display: grid; gap: 14px; }
+
+/* Chatear / Llamar switch, only when the agent also has a phone. */
+.tabs {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 999px;
+  background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.1);
+}
+.tab {
+  padding: 9px 12px; border: 0; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--on-dark-muted); background: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.tab:hover { color: #fff; }
+.tab[aria-selected="true"] { background: var(--grad); color: var(--navy); }
+
 .chat-frame {
-  justify-self: center; width: min(440px, 100%); height: min(680px, 78vh); min-height: 460px;
+  width: 100%; height: min(680px, 78vh); min-height: 460px;
   padding: 10px; border-radius: 30px;
   background: linear-gradient(180deg, #0f2a3b, #0a1f2d);
   border: 1px solid rgb(255 255 255 / 0.08);
@@ -146,3 +161,52 @@ p { margin: 0; }
   .demo { padding: 64px 0 80px; }
   .demo-grid { grid-template-columns: 1.05fr 0.95fr; gap: 56px; }
 }
+
+/* ---------- Llamar ---------- */
+.call-panel { display: grid; }
+.call-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  height: 100%; padding: 28px 22px; border-radius: 22px;
+  background: radial-gradient(420px 300px at 50% 0%, rgb(25 180 230 / 0.18), transparent 70%), var(--navy-2);
+}
+.call-avatar {
+  position: relative; display: grid; place-items: center; width: 112px; height: 112px; border-radius: 50%;
+  background: var(--grad); color: var(--navy); font-size: 44px; font-weight: 700;
+}
+.call-avatar::before, .call-avatar::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgb(62 255 139 / 0.5);
+  opacity: 0; pointer-events: none;
+}
+.call-panel[data-state="connecting"] .call-avatar::before,
+.call-panel[data-state="inCall"] .call-avatar::before { animation: ring 1.8s infinite; }
+.call-panel[data-state="connecting"] .call-avatar::after,
+.call-panel[data-state="inCall"] .call-avatar::after { animation: ring 1.8s 0.9s infinite; }
+@keyframes ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .call-avatar::before, .call-avatar::after { animation: none !important; } }
+
+.call-name { margin-top: 20px; font-size: 24px; font-weight: 700; color: #fff; }
+.call-status { margin-top: 6px; min-height: 1.6em; color: var(--on-dark-muted); max-width: 320px; }
+.call-panel[data-state="error"] .call-status { color: #ffb4a8; }
+.call-timer { margin-top: 4px; font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; }
+
+.call-controls { display: flex; gap: 12px; margin-top: 26px; flex-wrap: wrap; justify-content: center; }
+.call-btn {
+  display: inline-flex; align-items: center; gap: 10px; padding: 14px 26px; border-radius: 999px; border: 1.5px solid transparent;
+  font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.call-btn:hover { transform: translateY(-1px); }
+.call-btn[disabled] { opacity: 0.6; cursor: progress; transform: none; }
+.call-btn svg { width: 20px; height: 20px; }
+.call-start { background: var(--grad); color: var(--navy); box-shadow: 0 8px 24px -10px rgb(36 229 163 / 0.7); }
+.call-hangup { background: #e5484d; color: #fff; box-shadow: 0 8px 24px -10px rgb(229 72 77 / 0.8); }
+.call-hangup svg { transform: rotate(135deg); }
+.call-mute { background: transparent; color: var(--on-dark); border-color: rgb(234 246 242 / 0.35); }
+.call-mute[aria-pressed="true"] { background: rgb(234 246 242 / 0.12); }
+
+.call-hint { margin-top: 26px; font-size: 14px; color: var(--on-dark-muted); max-width: 320px; }
+.call-alt { margin-top: 12px; font-size: 14px; color: var(--on-dark-muted); }
+.call-alt a { color: var(--green-2); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.call-alt a:hover { text-decoration: underline; }
