@@ -4,6 +4,9 @@ import type {
   Agent,
   ChannelApp,
   ChannelConnection,
+  ContactCard,
+  ContactDetail,
+  ContactRecord,
   Conversation,
   ConversationDetail,
   LangflowFlow,
@@ -94,6 +97,17 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
         )}`,
       ),
     getConversation: (id) => call<ConversationDetail>(`/conversations/${id}`),
+    updateConversationContact: (id, input) => call<ContactCard>(`/conversations/${id}/contact`, 'PATCH', input),
+    listContacts: (filters = {}) =>
+      call<ContactRecord[]>(
+        `/contacts${query(
+          Object.fromEntries(
+            Object.entries(filters).map(([k, v]) => [k, v === undefined || v === '' ? undefined : String(v)]),
+          ),
+        )}`,
+      ),
+    getContact: (id) => call<ContactDetail>(`/contacts/${id}`),
+    updateContact: (id, input) => call<ContactRecord>(`/contacts/${id}`, 'PATCH', input),
 
     listPlans: () => call<Plan[]>('/plans'),
     createPlan: (input) => call<Plan>('/plans', 'POST', input),

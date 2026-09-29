@@ -42,6 +42,7 @@ Resource = Literal[
     "langflow",
     "tenant_billing",
     "conversations",
+    "contacts",
     "plans",
     "cost_rates",
     "billing",
@@ -83,6 +84,9 @@ POLICY: dict[str, dict[str, FrozenSet[str]]] = {
     # Conversation inbox (records, transcripts, per-conversation cost) of
     # the caller's tenants. Nothing writes through it yet.
     "conversations": {"read": _ALL_STAFF, "write": _MANAGERS},
+    # Contact cards (name, email, phone of whoever is behind a conversation):
+    # whoever works the conversations may name their contacts.
+    "contacts": {"read": _ALL_STAFF, "write": _ALL_STAFF},
     # Commercial plans and the cost catalog: Flowsdone's own pricing and
     # costs, admin only.
     "plans": {"read": _ADMIN, "write": _ADMIN},

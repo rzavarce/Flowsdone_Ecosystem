@@ -37,6 +37,7 @@ class ConversationOut(BaseModel):
         outbound_count (int): Messages to the contact.
         closed_at (Optional[datetime]): End.
         close_reason (Optional[str]): Why it ended.
+        contact_name (Optional[str]): Name on the contact's card, if it has one.
     """
 
     id: UUID
@@ -46,6 +47,7 @@ class ConversationOut(BaseModel):
     channel_type: str
     channel_connection_id: UUID
     contact: str
+    contact_name: Optional[str] = None
     status: str
     started_at: datetime
     last_inbound_at: datetime
@@ -113,15 +115,106 @@ class ConversationDetailOut(BaseModel):
         llm_input_tokens (int): Input tokens.
         llm_output_tokens (int): Output tokens.
         llm_cached_input_tokens (int): Cached input tokens.
+        contact_card (Optional[ContactCardOut]): The contact's card, if any.
     """
 
     conversation: ConversationOut
+    contact_card: Optional["ContactCardOut"] = None
     messages: List[ConversationMessageOut]
     usage: List[UsageLineOut]
     cost_micros: Optional[int] = None
     llm_input_tokens: int
     llm_output_tokens: int
     llm_cached_input_tokens: int
+
+
+class ContactCardOut(BaseModel):
+    """The card of the person behind a conversation.
+
+    Attributes:
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
+        notes (Optional[str]): Notes.
+        updated_at (datetime): Last change.
+    """
+
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
+    notes: Optional[str] = None
+    updated_at: datetime
+
+
+class ContactCardIn(BaseModel):
+    """Fields to set on a contact's card; the ones left out are not touched,
+    an empty one is cleared.
+
+    Attributes:
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
+        notes (Optional[str]): Notes.
+    """
+
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ContactOut(BaseModel):
+    """A contact in the contact list.
+
+    Attributes:
+        id (UUID): Contact id.
+        tenant_id (UUID): Tenant.
+        channel_type (str): Channel the identifier is from.
+        identifier (str): The channel's identifier (conversations' `contact`).
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
+        notes (Optional[str]): Notes.
+        created_at (datetime): When the card was created.
+        updated_at (datetime): Last change.
+        last_message_at (Optional[datetime]): Last activity in their conversations.
+        conversation_count (int): How many conversations they have had.
+    """
+
+    id: UUID
+    tenant_id: UUID
+    channel_type: str
+    identifier: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: Optional[datetime] = None
+    conversation_count: int = 0
+
+
+class ContactDetailOut(BaseModel):
+    """A contact with their latest conversations.
+
+    Attributes:
+        contact (ContactOut): The contact.
+        conversations (List[ConversationOut]): Their latest conversations
+            (a few; the inbox has them all).
+    """
+
+    contact: ContactOut
+    conversations: List[ConversationOut]
+
+
+ConversationDetailOut.model_rebuild()
 
 
 # Plans

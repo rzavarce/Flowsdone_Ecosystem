@@ -63,11 +63,14 @@ class SharedAgent:
         share_id (UUID): The link (rate-limit and conversation scope).
         agent_id (UUID): The agent.
         workflow_id (str): The agent's current Langflow flow.
+        project_id (Optional[UUID]): The agent's project (where its demo
+            conversations are recorded).
     """
 
     share_id: UUID
     agent_id: UUID
     workflow_id: str
+    project_id: Optional[UUID] = None
 
 
 class ManageWebchatShareLinksUseCase:
@@ -164,7 +167,9 @@ class ManageWebchatShareLinksUseCase:
         agent = await self._agents.get_by_id(link.agent_id)
         if agent is None or agent.status != "active":
             return None
-        return SharedAgent(share_id=link.id, agent_id=agent.id, workflow_id=agent.langflow_flow_id)
+        return SharedAgent(
+            share_id=link.id, agent_id=agent.id, workflow_id=agent.langflow_flow_id, project_id=agent.project_id
+        )
 
     async def exists(self, token: str) -> bool:
         """Whether a token belongs to a link at all (expired or revoked included).

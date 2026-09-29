@@ -28,6 +28,8 @@ from app.adapters.outbound.apps.factory import AppConnectorFactory
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
 from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from app.adapters.outbound.db.conversation_contact_repository import SqlAlchemyContactRepository
+from app.adapters.outbound.channels.meta_profile_lookup import MetaSenderProfileLookup
 from app.adapters.outbound.db.webchat_share_link_repository import SqlAlchemyWebchatShareLinkRepository
 from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
@@ -73,6 +75,7 @@ from app.adapters.outbound.session.redis_session_repository import RedisSessionR
 from app.adapters.outbound.voice.redis_call_session_repository import RedisCallSessionRepository
 from app.adapters.outbound.voice.twilio_voice_provider import TwilioVoiceProviderAdapter
 from app.application.services.conversation_tracker import ConversationTracker
+from app.application.services.demo_conversations import DemoConversationRecorder
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
 from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
@@ -113,6 +116,7 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.send_contact_request import SendContactRequestUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from app.application.use_cases.voice_demo import ResolveVoiceDemoTargetUseCase
 from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
@@ -331,6 +335,17 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.conversation_tracker = conversation_tracker
+    conversation_contacts = ManageConversationContactsUseCase(contacts=SqlAlchemyContactRepository(db_sessionmaker))
+    app.state.conversation_contacts_use_case = conversation_contacts
+    # Share link ("Share") chats, recorded as "demo" conversations, not billed.
+    app.state.demo_conversation_recorder = DemoConversationRecorder(
+        sessions=session_repo,
+        history=session_history_repo,
+        tracker=conversation_tracker,
+        projects=app.state.project_repo,
+        session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        contacts=conversation_contacts,
+    )
     logger.info("conversations.tracker.ready")
 
     # Console (PWA) authentication: users in Postgres, opaque sessions and
@@ -656,6 +671,9 @@ async def lifespan(app: FastAPI):
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
         conversation_tracker=conversation_tracker,
         quota_gate=quota_gate,
+        # Each contact's card starts with their first message (see README).
+        contacts=conversation_contacts,
+        profile_lookup=MetaSenderProfileLookup(),
     )
 
     logger.info("switchboard.initialized")

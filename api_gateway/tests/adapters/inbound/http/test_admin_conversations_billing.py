@@ -64,6 +64,40 @@ async def test_conversation_filters_are_passed_through(world):
     assert bad_status.status_code == 422
 
 
+async def test_staff_name_the_contact_and_the_list_and_detail_show_it(world):
+    token = await world.token("botmaster")
+    path = f"/conversations/{world.conversation_a.id}"
+    async with world.client() as c:
+        before = await _call(c, "GET", path, token=token)
+        edited = await _call(c, "PATCH", f"{path}/contact", token=token,
+                             json={"name": "Ana Pérez", "email": "ANA@example.com", "notes": "Pidió demo"})
+        listed = await _call(c, "GET", "/conversations", token=token)
+        detail = await _call(c, "GET", path, token=token)
+
+    assert before.json()["contact_card"] is None and before.json()["conversation"]["contact_name"] is None
+    assert edited.status_code == 200
+    assert edited.json()["name"] == "Ana Pérez" and edited.json()["email"] == "ana@example.com"
+    assert listed.json()[0]["contact_name"] == "Ana Pérez"
+    assert listed.json()[0]["contact"] == "+34 600 111"
+    assert detail.json()["contact_card"]["notes"] == "Pidió demo"
+
+
+async def test_contacts_of_other_tenants_cannot_be_edited_and_bad_emails_are_refused(world):
+    token = await world.token("botmaster")
+    async with world.client() as c:
+        foreign = await _call(c, "PATCH", f"/conversations/{world.conversation_b.id}/contact", token=token, json={"name": "X"})
+        missing = await _call(c, "PATCH", f"/conversations/{uuid4()}/contact", token=token, json={"name": "X"})
+        bad = await _call(c, "PATCH", f"/conversations/{world.conversation_a.id}/contact", token=token,
+                          json={"email": "no-es-un-email"})
+        client_role = await _call(c, "PATCH", f"/conversations/{world.conversation_a.id}/contact",
+                                  token=await world.token("client"), json={"name": "X"})
+
+    assert foreign.status_code == 404 and missing.status_code == 404
+    assert bad.status_code == 422
+    assert client_role.status_code == 403
+    assert world.contacts.contacts == {}
+
+
 async def test_conversation_detail_shows_costs_only_to_admins(world):
     conversation = world.conversation_a
     world.archived_messages.append(ConversationMessageRecorded(

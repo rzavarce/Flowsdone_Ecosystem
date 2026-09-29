@@ -437,7 +437,9 @@ El webchat es un canal más (`channel_type: webchat`), uno por proyecto:
 - Endpoints: `POST|GET /internal/admin/agents/{id}/webchat-shares` y `DELETE …/webchat-shares/{share_id}`. Crear y revocar piden permiso de escritura sobre agentes (quien tenga el enlace podrá usar el agente); listar, de lectura.
 - Se guardan en `webchat_share_links` (migración `0015`): el token va **cifrado** (para poder volver a copiarlo) y se busca por su **hash**. Al ser una fila de base de datos, un enlace sin vencimiento se puede revocar.
 - El enlace apunta al **agente**, no a un flujo: si el agente pasa a otro flujo, el enlace sigue funcionando con el nuevo. Se vuelve a comprobar en cada mensaje: revocarlo, que caduque o suspender el agente corta también los chats abiertos.
-- Como la demo, los mensajes van directos al flujo (canal `webchat-share`) y **no se registran ni se facturan**; si el agente falla, quien escribe ve el aviso genérico sin el detalle técnico (que solo se muestra en *Probar en webchat*).
+- Los mensajes van directos al flujo (canal `webchat-share`), sin pasar por la cuota del plan, y **no se facturan**. Pero **sí se registran**: cada visitante tiene su conversación en *Conversaciones*, con el canal **Demo** (filtrable), para ver qué preguntaron los clientes potenciales (`DemoConversationRecorder`). Se registran con `billable=False` (no cuentan como mensajes de IA ni para la cuota); el id del enlace hace de `channel_connection_id`, así que el esquema no cambia. La demo lo avisa en una línea («El equipo de Flowsdone puede revisar esta conversación…»). Las de *Probar en webchat* siguen sin registrarse.
+- Para que los mensajes del canal Demo (y del webchat) no aparezcan como consumo sin tarifa, `scripts/billing/seed_pricing.py` añade tarifas de coste 0 para `webchat` y `demo` (idempotente: se puede volver a ejecutar en producción).
+- Si el agente falla, quien escribe ve el aviso genérico sin el detalle técnico (que solo se muestra en *Probar en webchat*).
 - Un enlace revocado o caducado abre el chat con el aviso «Este enlace ya no está disponible» y el campo de texto desactivado (el WebSocket cierra con el código 4001, que el widget no reintenta).
 
 **Página de demo** (`static/webchat/index.html`, lo que ve quien abre el enlace): mismo estilo que la landing (Outfit, navy, degradado cian→verde, logo en `static/webchat/brand/`), con el chat **integrado en la página** (modo `inline` del widget: `mode: "inline", mountTarget: "#…"`, sin botón flotante) y botones *Quiero uno para mi negocio* y *Nueva conversación*. Sin enlace válido explica que el enlace no es válido. La guía técnica para integrar el widget (snippets y todas las opciones de `AgentChatConfig`) está aparte, en `integracion.html`.
@@ -1483,8 +1485,34 @@ El id de la Conversation viaja en el envelope como `meta.llm_session_id`, y `Exe
 | Catálogo de costes, planes, suscripciones y extractos cerrados | Postgres: `cost_rates`, `plans`, `tenant_subscriptions`, `usage_statements` (migraciones `0011` y `0012`) | Configuración y cierres mensuales congelados |
 | Contadores de cuota del mes | Redis, `billing:quota:{tenant}:{YYYY-MM}` | Se consultan en cada mensaje. Si se pierden, se reconstruyen desde ClickHouse |
 | Auditoría de sesión | Postgres, `session_events` | Un evento `closed` por cada conversación cerrada |
+| Ficha del contacto (nombre, email, teléfono, notas) | Postgres, tabla `contacts` (migración `0016`) | Editable; se comparte entre todas las conversaciones de la misma persona |
 
 `session_messages` (Postgres) se sigue escribiendo en paralelo por ahora. Se retira cuando el archivo de ClickHouse esté validado en producción.
+
+### Ficha del contacto
+
+Cada conversación tiene un contacto, identificado por lo que da su canal (el `remoteJid` de WhatsApp, el PSID de Facebook, un visitante del webchat…). La **API** le crea una **ficha** con su primer mensaje y la va completando; el equipo la puede editar.
+
+- La ficha es de un tenant, un canal y ese identificador (`uq_contacts_identity`, tabla `contacts`, migración `0016`). Todas las conversaciones de la misma persona por ese canal comparten ficha; el mismo número por otro canal (o en otro tenant) es otra ficha.
+- **Lo que da el canal**, en el primer mensaje de cada sesión (`Switchboard._record_contact`; cada adaptador de entrada construye un `SenderProfile`):
+
+  | Canal | Qué se guarda |
+  |---|---|
+  | WhatsApp (Evolution) | Teléfono (del `remoteJid`, solo de personas: ni grupos `@g.us` ni ids ocultos `@lid`) y el nombre de su cuenta (`pushName`) |
+  | Telegram | Nombre (`first_name last_name`) y `@usuario`. Telegram no comparte el teléfono |
+  | Facebook Messenger | Nombre, pedido a la Graph API (`GET /{psid}?fields=first_name,last_name`, con el `page_access_token` del canal; `MetaSenderProfileLookup`) |
+  | Instagram | Nombre y cuenta `@usuario` (`GET /{igsid}?fields=name,username`) |
+  | Voz | El número que llama. Una llamada desde el navegador (softphone de la demo) no tiene número: su identidad es el nombre genérico (`client:demo-1890on91`) |
+  | Webchat / Demo (*Compartir*) | Un nombre genérico: `client:webchat-xxxxxxxx` / `client:demo-xxxxxxxx` (el id del visitante) |
+
+- **Lo que el cliente dice en la conversación**, en cada mensaje (`contact_extraction.py`, reglas, sin LLM ni coste): un **email** siempre; un **teléfono** o un **nombre** solo si el mensaje anterior del agente los pidió («¿me das tu teléfono?», «¿cómo te llamas?»), porque un número suelto puede ser un pedido y una respuesta corta cualquier cosa. «Me llamo Ana» / «mi nombre es Ana Pérez» se toman sin preguntar.
+- Todo eso **solo rellena campos vacíos**: lo que escribió el equipo (o lo que ya se sabía) no se sobrescribe. Es best-effort: si falla, el mensaje sigue su curso. Si la Graph API no da el nombre (falta el permiso de perfil de usuario en la app de Meta), la ficha se queda sin él.
+- **El equipo la edita** en el detalle de la conversación (*Añadir datos* / *Editar contacto*): `PATCH /internal/admin/conversations/{id}/contact`, recurso `contacts`, todo el staff. Un campo vacío lo borra; un email no válido o un valor demasiado largo devuelve 422. Para cambiar un nombre genérico, se edita.
+- **Sección *Contactos*** en la consola: `GET /internal/admin/contacts` (búsqueda `q` en nombre, email, teléfono, @usuario e identificador; filtro `channel_type`; paginación `limit`/`offset`), ordenados por su última actividad, con el número de conversaciones de cada uno. `GET /contacts/{id}` devuelve la ficha y solo sus **5 últimas conversaciones** (el enlace *Ver todas* abre *Conversaciones* filtrada por ese contacto); `PATCH /contacts/{id}` la edita. Mismo permiso `contacts` (todo el staff, dentro de sus tenants). La búsqueda global de la barra superior también encuentra contactos.
+- La migración `0016` crea una ficha para cada contacto que ya tenía conversaciones (con el teléfono de WhatsApp/voz y el nombre genérico de las llamadas del navegador), para que la lista no empiece vacía.
+- La lista, el detalle y la búsqueda muestran el nombre de la ficha, con el identificador debajo (un `…@s.whatsapp.net` se muestra como `+número`, una llamada del navegador como «Llamada desde el navegador · demo-…»); el filtro *Contacto* busca también por ese nombre.
+- El navegador guarda la identidad del softphone de la demo (`localStorage`, `fd-voice-demo-identity`), así que las llamadas de una misma persona son el mismo contacto.
+- Las conversaciones de los enlaces de *Compartir* pasan su id a Langflow como `session_id`, como el resto de canales (la memoria del agente sigue a la conversación).
 
 ### Flujo
 

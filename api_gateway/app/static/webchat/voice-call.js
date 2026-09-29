@@ -50,7 +50,7 @@
      */
     init: async function (options) {
       this.options = options || {};
-      this.identity = "demo-" + Math.random().toString(36).slice(2, 10);
+      this.identity = this.storedIdentity();
       let data;
       try {
         data = await this.fetchToken();
@@ -61,6 +61,22 @@
       this.toNumber = data.to_number;
       this.bindUi();
       if (typeof this.options.onAvailable === "function") this.options.onAvailable(this.toNumber);
+    },
+
+    /**
+     * The caller's identity, kept in localStorage so every call from this
+     * browser is the same contact (and the name staff give it sticks).
+     * @returns {string}
+     */
+    storedIdentity: function () {
+      const key = "fd-voice-demo-identity";
+      let identity = null;
+      try { identity = localStorage.getItem(key); } catch (e) { /* no storage */ }
+      if (!identity || !/^demo-[a-z0-9]{8}$/.test(identity)) {
+        identity = "demo-" + Math.random().toString(36).slice(2, 10).padEnd(8, "0");
+        try { localStorage.setItem(key, identity); } catch (e) { /* no storage: one per page load */ }
+      }
+      return identity;
     },
 
     fetchToken: async function () {

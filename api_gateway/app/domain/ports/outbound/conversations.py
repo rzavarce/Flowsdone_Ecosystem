@@ -84,6 +84,7 @@ class ConversationRepositoryPort(Protocol):
         channel_type: Optional[str] = None,
         status: Optional[str] = None,
         contact: Optional[str] = None,
+        contact_identifier: Optional[str] = None,
         before: Optional[datetime] = None,
         limit: int = 50,
     ) -> List[Conversation]:
@@ -96,6 +97,8 @@ class ConversationRepositoryPort(Protocol):
             channel_type (Optional[str]): Only this channel.
             status (Optional[str]): "open" or "closed".
             contact (Optional[str]): Contact contains this text.
+            contact_identifier (Optional[str]): Only this exact contact
+                identifier (one person's conversations).
             before (Optional[datetime]): Only last_message_at before this
                 (pagination cursor).
             limit (int): Page size.

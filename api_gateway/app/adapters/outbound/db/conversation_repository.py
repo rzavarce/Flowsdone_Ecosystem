@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 from typing import Collection, List, Optional
 from uuid import UUID
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import exists, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.adapters.outbound.db.models import ConversationModel
+from app.adapters.outbound.db.models import ConversationContactModel, ConversationModel
 from app.domain.models.conversation import Conversation, ConversationCloseReason
 from app.domain.models.session import MessageDirection
 from app.domain.ports.outbound import ConversationRepositoryPort
@@ -186,6 +186,7 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
         channel_type: Optional[str] = None,
         status: Optional[str] = None,
         contact: Optional[str] = None,
+        contact_identifier: Optional[str] = None,
         before: Optional[datetime] = None,
         limit: int = 50,
     ) -> List[Conversation]:
@@ -196,7 +197,10 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
             project_id (Optional[UUID]): Only this project.
             channel_type (Optional[str]): Only this channel.
             status (Optional[str]): "open" or "closed".
-            contact (Optional[str]): Contact contains this text (case-insensitive).
+            contact (Optional[str]): The contact, or the name on its contact
+                card, contains this text (case-insensitive).
+            contact_identifier (Optional[str]): Only this exact contact
+                identifier (one person's conversations).
             before (Optional[datetime]): Only last_message_at before this.
             limit (int): Page size.
 
@@ -216,7 +220,17 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
             query = query.where(ConversationModel.status == status)
         if contact:
             escaped = contact.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            query = query.where(ConversationModel.contact.ilike(f"%{escaped}%", escape="\\"))
+            pattern = f"%{escaped}%"
+            # The identifier (phone, @user...) or the name on its contact card.
+            named = exists().where(
+                ConversationContactModel.tenant_id == ConversationModel.tenant_id,
+                ConversationContactModel.channel_type == ConversationModel.channel_type,
+                ConversationContactModel.identifier == ConversationModel.contact,
+                ConversationContactModel.name.ilike(pattern, escape="\\"),
+            )
+            query = query.where(or_(ConversationModel.contact.ilike(pattern, escape="\\"), named))
+        if contact_identifier is not None:
+            query = query.where(ConversationModel.contact == contact_identifier)
         if before is not None:
             query = query.where(ConversationModel.last_message_at < before)
         query = query.order_by(ConversationModel.last_message_at.desc(), ConversationModel.id).limit(limit)

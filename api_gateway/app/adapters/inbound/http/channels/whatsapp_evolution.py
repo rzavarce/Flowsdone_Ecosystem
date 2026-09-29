@@ -10,12 +10,31 @@ from starlette.responses import JSONResponse
 
 from app.application.services.switchboard import ChannelMessageNotRoutable
 from app.core.config import settings
+from app.domain.models.conversation_contact import SenderProfile
 
 logger = logging.getLogger("channels.whatsapp_evolution")
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["channels:whatsapp"])
 
 CHANNEL_TYPE = "whatsapp_evolution"
+
+
+def _sender_profile(remote_jid: str, data: Dict[str, Any]) -> SenderProfile:
+    """What an Evolution API message says about its sender.
+
+    Args:
+        remote_jid (str): The sender's WhatsApp id ("34600111222@s.whatsapp.net").
+        data (Dict[str, Any]): The event's "data" object ("pushName" is the
+            name on the sender's WhatsApp account).
+
+    Returns:
+        SenderProfile: The number (only for a person's jid, not a group's or
+        a hidden "@lid" one) and the account name.
+    """
+    user, _, server = remote_jid.partition("@")
+    phone = f"+{user}" if server == "s.whatsapp.net" and user.isdigit() else None
+    push_name = data.get("pushName")
+    return SenderProfile(name=push_name.strip() if isinstance(push_name, str) and push_name.strip() else None, phone=phone)
 
 
 def _extract_text(message: Dict[str, Any]) -> Optional[str]:
@@ -83,7 +102,7 @@ async def receive_webhook(
 
     if instance and remote_jid and text:
         switchboard = request.app.state.switchboard
-        await _route_event(switchboard, instance, remote_jid, text, body)
+        await _route_event(switchboard, instance, remote_jid, text, body, _sender_profile(remote_jid, data))
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
@@ -94,6 +113,7 @@ async def _route_event(
     remote_jid: str,
     text: str,
     raw_event: Dict[str, Any],
+    sender_profile: Optional[SenderProfile] = None,
 ) -> None:
     """Route a single WhatsApp message to its currently assigned app.
 
@@ -105,6 +125,8 @@ async def _route_event(
         text (str): Message text.
         raw_event (Dict[str, Any]): The raw Evolution API event, kept
             in the payload for debugging.
+        sender_profile (Optional[SenderProfile]): Number and name of the
+            sender, for their contact card.
     """
     try:
         await switchboard.handle_inbound_turn(
@@ -114,6 +136,7 @@ async def _route_event(
             sender_id=remote_jid,
             message_text=text,
             raw_payload=raw_event,
+            sender_profile=sender_profile,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

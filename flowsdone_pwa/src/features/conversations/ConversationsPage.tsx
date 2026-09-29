@@ -3,7 +3,6 @@ import { useDeferredValue, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Alert } from '@/components/ui/Alert'
-import { Avatar } from '@/components/ui/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -15,9 +14,10 @@ import { useConversations } from '@/core/admin/billingHooks'
 import { describeError } from '@/core/http/describeError'
 import { currentLocale } from '@/core/i18n/i18n'
 import { useTenant } from '@/core/tenant/useTenant'
-import { channelLabel } from '@/features/billing/labels'
+import { channelLabel, contactLabel, DEMO_CHANNEL, identifierLabel } from '@/features/billing/labels'
 import { CHANNEL_TYPE_LIST } from '@/features/channels/channelTypes'
 import { cn } from '@/lib/cn'
+import { ContactAvatar } from '@/features/contacts/ContactAvatar'
 import { ConversationDetail } from './ConversationDetail'
 import { useTranslation } from 'react-i18next'
 
@@ -34,11 +34,12 @@ export function ConversationsPage() {
   const { current } = useTenant()
   const [status, setStatus] = useState<StatusFilter>('')
   const [channel, setChannel] = useState('')
-  const [contact, setContact] = useState('')
-  const deferredContact = useDeferredValue(contact.trim())
   // The open conversation lives in the URL (`?c=`), so the global search
-  // and shared links can open one directly.
+  // and shared links can open one directly; `?contact=` prefills the contact
+  // search (a contact's "see all").
   const [params, setParams] = useSearchParams()
+  const [contact, setContact] = useState(() => params.get('contact') ?? '')
+  const deferredContact = useDeferredValue(contact.trim())
   const selectedId = params.get('c')
   const setSelectedId = (id: string | null) =>
     setParams(
@@ -50,6 +51,12 @@ export function ConversationsPage() {
       },
       { replace: true },
     )
+  const openItem = (id: string) => {
+    setSelectedId(id)
+    // The detail is at the top of the page: bring it into view (on small
+    // screens it replaces the list, which may be scrolled far down).
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const list = useConversations({
     tenant_id: current?.id,
@@ -82,6 +89,7 @@ export function ConversationsPage() {
                   {c.label}
                 </option>
               ))}
+              <option value={DEMO_CHANNEL}>{t('conversations.filters.demo')}</option>
             </Select>
             <Input
               className="col-span-2"
@@ -111,16 +119,17 @@ export function ConversationsPage() {
                   <li key={c.id}>
                     <button
                       type="button"
-                      onClick={() => setSelectedId(c.id)}
+                      onClick={() => openItem(c.id)}
                       aria-current={c.id === selectedId ? 'true' : undefined}
                       className={cn(
                         'flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition hover:bg-surface-muted',
                         c.id === selectedId && 'bg-surface-muted',
                       )}
                     >
-                      <Avatar name={c.contact} />
+                      <ContactAvatar name={c.contact_name} channelType={c.channel_type} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{c.contact}</span>
+                        <span className="block truncate text-sm font-medium">{contactLabel(c)}</span>
+                        {c.contact_name && <span className="block truncate text-xs text-muted">{identifierLabel(c.contact)}</span>}
                         <span className="block truncate text-xs text-muted">
                           {channelLabel(c.channel_type)} · {t('conversations.messages', { count: c.inbound_count + c.outbound_count })}
                         </span>

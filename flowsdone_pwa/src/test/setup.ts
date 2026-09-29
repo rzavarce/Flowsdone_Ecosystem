@@ -36,6 +36,10 @@ if (typeof document.exitFullscreen !== 'function') {
   }
 }
 
+// jsdom no implementa scrollTo (solo avisa "Not implemented"): las listas
+// suben al detalle al abrir un elemento. Los tests lo espían si lo necesitan.
+window.scrollTo = (() => {}) as typeof window.scrollTo
+
 // jsdom no implementa matchMedia; los tests lo pisan cuando necesitan
 // simular prefers-color-scheme.
 if (!window.matchMedia) {

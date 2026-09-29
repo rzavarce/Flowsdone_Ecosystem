@@ -469,6 +469,32 @@ class LangflowAccountModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ConversationContactModel(Base):
+    """Row for a contact card (see domain/models/conversation_contact.py): the
+    person behind a channel identifier, within one tenant."""
+
+    __tablename__ = "contacts"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "channel_type", "identifier", name="uq_contacts_identity"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    channel_type: Mapped[str] = mapped_column(Text, nullable=False)
+    identifier: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+    username: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class WebchatShareLinkModel(Base):
     """Row for a public link to try an agent (see domain/models/webchat_share_link.py).
 

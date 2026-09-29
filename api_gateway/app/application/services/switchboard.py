@@ -15,21 +15,43 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID, uuid4
 
+from app.domain.models.channel_resolution import ChannelResolution
+from app.domain.models.conversation_contact import SenderProfile
 from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
 from app.domain.models.session import Session
 from app.domain.ports.outbound import (
     AppConnectorPort,
     ChannelConnectionRepositoryPort,
+    SenderProfileLookupPort,
     SessionHistoryRepositoryPort,
     SessionRepositoryPort,
 )
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 
 logger = logging.getLogger("switchboard")
 
 DEFAULT_APP = "langflow"
+# Session variable: the sender's channel profile is already on their card.
+_CONTACT_PROFILE_RECORDED = "contact_profile_recorded"
+
+
+def _last_agent_message(session: Session) -> Optional[str]:
+    """The agent's latest message before the current inbound one.
+
+    Args:
+        session (Session): The session (its rolling window ends with the
+            message being handled).
+
+    Returns:
+        Optional[str]: Its text, or None if the agent hasn't spoken yet.
+    """
+    for message in reversed(session.last_messages[:-1]):
+        if message.direction == "outbound":
+            return message.text
+    return None
 
 
 class ChannelMessageNotRoutable(Exception):
@@ -77,6 +99,8 @@ class Switchboard:
         default_app: str = DEFAULT_APP,
         conversation_tracker: Optional[ConversationTracker] = None,
         quota_gate: Optional[QuotaGate] = None,
+        contacts: Optional[ManageConversationContactsUseCase] = None,
+        profile_lookup: Optional[SenderProfileLookupPort] = None,
     ) -> None:
         """Build the switchboard.
 
@@ -103,6 +127,11 @@ class Switchboard:
             quota_gate (Optional[QuotaGate]): Checks the tenant's plan
                 before a message is handed to an app; a refused message
                 is recorded but never dispatched. Optional (no limits).
+            contacts (Optional[ManageConversationContactsUseCase]): Starts
+                and completes the sender's contact card. Optional.
+            profile_lookup (Optional[SenderProfileLookupPort]): Asks the
+                channel who the sender is, when its webhook only carries an
+                id (Facebook, Instagram). Optional.
         """
         self.channel_connection_repo = channel_connection_repo
         self.session_repo = session_repo
@@ -113,6 +142,8 @@ class Switchboard:
         self.default_app = default_app
         self.conversation_tracker = conversation_tracker
         self.quota_gate = quota_gate
+        self.contacts = contacts
+        self.profile_lookup = profile_lookup
 
     async def handle_inbound_turn(
         self,
@@ -123,6 +154,7 @@ class Switchboard:
         sender_id: Optional[str],
         message_text: str,
         raw_payload: Dict[str, Any],
+        sender_profile: Optional[SenderProfile] = None,
     ) -> None:
         """Resolve/create the session for one inbound turn and dispatch
         it to the app currently assigned to that conversation.
@@ -138,6 +170,9 @@ class Switchboard:
             message_text (str): The caller's message for this turn.
             raw_payload (Dict[str, Any]): The raw, channel-specific
                 payload, forwarded to the connector for debugging.
+            sender_profile (Optional[SenderProfile]): What the channel's
+                webhook says about the sender (number, name, @user), to
+                start their contact card.
 
         Raises:
             ChannelMessageNotRoutable: If no active channel_connection
@@ -208,6 +243,7 @@ class Switchboard:
         )
         admitted = await self._admit(session, now)
         await self._track_inbound(session, message_text, now, billable=admitted)
+        await self._record_contact(session, resolution, sender_profile, message_text)
 
         if not admitted:
             # Over the plan's limit: keep the conversation record, but the
@@ -333,6 +369,51 @@ class Switchboard:
                 extra={"session_id": session.id},
                 exc_info=True,
             )
+
+    async def _record_contact(
+        self,
+        session: Session,
+        resolution: ChannelResolution,
+        profile: Optional[SenderProfile],
+        text: str,
+    ) -> None:
+        """Best-effort: start or complete the sender's contact card.
+
+        The channel's profile (looked up in the channel when the webhook
+        doesn't carry it) is recorded once per session; every message is
+        also read for details the contact gives (an email, or the name or
+        phone the agent just asked for). Never raises.
+
+        Args:
+            session (Session): The contact's session (mutated in place:
+                remembers the profile was recorded).
+            resolution (ChannelResolution): The channel connection.
+            profile (Optional[SenderProfile]): What the webhook says.
+            text (str): The inbound message.
+        """
+        if self.contacts is None:
+            return
+        try:
+            first = not session.variables.get(_CONTACT_PROFILE_RECORDED)
+            if not first:
+                profile = None
+            elif self.profile_lookup is not None and session.user_identifier:
+                looked_up = await self.profile_lookup.lookup(
+                    channel_type=session.channel_type,
+                    sender_id=session.user_identifier,
+                    credentials=resolution.credentials,
+                )
+                if looked_up is not None:
+                    profile = looked_up.model_copy(update=(profile.fields() if profile else {}))
+            await self.contacts.record_from_channel(
+                (session.tenant_id, session.channel_type, session.user_identifier),
+                profile=profile,
+                text=text,
+                asked=_last_agent_message(session),
+            )
+            session.variables[_CONTACT_PROFILE_RECORDED] = True
+        except Exception:
+            logger.error("switchboard.contact_recording.failed", extra={"session_id": session.id}, exc_info=True)
 
     async def _deliver_immediately(self, session: Session, text: str) -> None:
         """Deliver a connector's synchronous result right away, reusing

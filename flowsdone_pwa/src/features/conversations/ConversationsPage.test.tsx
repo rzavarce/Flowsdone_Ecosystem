@@ -41,6 +41,74 @@ describe('ConversationsPage', { timeout: 20_000 }, () => {
     expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ contact: 'usuario11', channel_type: 'telegram' }))
   })
 
+  it('las conversaciones de los enlaces compartidos se ven y se filtran como "Demo"', async () => {
+    const admin = setup()
+    const list = vi.spyOn(admin, 'listConversations')
+    await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+
+    await userEvent.selectOptions(screen.getByLabelText('Canal'), 'demo')
+
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ channel_type: 'demo' }))
+    const [item] = within(await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })).getAllByRole('button')
+    expect(item).toHaveTextContent('Demo · visitante 1a2b3c4d')
+    expect(item).toHaveTextContent('Demo (enlaces compartidos)')
+  })
+
+  it('se pone nombre al contacto desde la conversación y se ve en la lista y en la búsqueda', async () => {
+    const admin = setup()
+    const update = vi.spyOn(admin, 'updateConversationContact')
+    const list = await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+    const [first] = within(list).getAllByRole('button')
+    const identifier = first!.querySelector('.font-medium')!.textContent!
+    await userEvent.click(first!)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir datos' }, { timeout: 5000 }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar contacto' })
+    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Ana Pérez')
+    await userEvent.type(within(dialog).getByLabelText('Email'), 'Ana@Example.com')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    expect(update).toHaveBeenCalledWith(expect.any(String), { name: 'Ana Pérez', email: 'Ana@Example.com' })
+    expect(await screen.findByRole('heading', { name: 'Ana Pérez' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument()
+    const named = within(screen.getByRole('list', { name: 'Conversaciones' })).getAllByRole('button')[0]!
+    expect(named).toHaveTextContent('Ana Pérez')
+    expect(named).toHaveTextContent(identifier)
+
+    await userEvent.type(screen.getByLabelText('Contacto'), 'pérez')
+    await vi.waitFor(() => expect(within(screen.getByRole('list', { name: 'Conversaciones' })).getAllByRole('button')).toHaveLength(1))
+  })
+
+  it('un email no válido se rechaza sin cerrar el diálogo', async () => {
+    setup()
+    const list = await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+    await userEvent.click(within(list).getAllByRole('button')[0]!)
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir datos' }, { timeout: 5000 }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar contacto' })
+
+    await userEvent.type(within(dialog).getByLabelText('Email'), 'ana(at)example')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Editar contacto' })).toBeInTheDocument()
+  })
+
+  it('muestra solo las 10 últimas y "Cargar más" trae las siguientes', async () => {
+    const admin = setup()
+    const list = vi.spyOn(admin, 'listConversations')
+    const items = () => within(screen.getByRole('list', { name: 'Conversaciones' })).getAllByRole('button')
+    await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+
+    expect(items()).toHaveLength(10)
+    expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10 }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cargar más' }))
+    // The next page: the 10 before the last one shown.
+    await vi.waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, before: expect.any(String) })),
+    )
+  })
+
   it('sin resultados muestra el estado vacío', async () => {
     setup()
     await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })

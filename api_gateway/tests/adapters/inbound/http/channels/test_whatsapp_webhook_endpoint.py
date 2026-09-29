@@ -122,3 +122,26 @@ async def test_own_outgoing_message_is_ignored():
 
     assert response.status_code == 200
     assert switchboard.calls == []
+
+
+@pytest.mark.parametrize(
+    "remote_jid, push_name, expected",
+    [
+        ("34600111222@s.whatsapp.net", "Ana Pérez", ("Ana Pérez", "+34600111222")),
+        ("34600111222@s.whatsapp.net", None, (None, "+34600111222")),
+        ("120363041234567890@g.us", "Grupo", ("Grupo", None)),
+        ("98765432101234@lid", "  ", (None, None)),
+    ],
+)
+async def test_the_sender_number_and_account_name_go_to_their_contact_card(remote_jid, push_name, expected):
+    switchboard = FakeSwitchboard()
+    event = _upsert_event()
+    event["data"]["key"]["remoteJid"] = remote_jid
+    if push_name is not None:
+        event["data"]["pushName"] = push_name
+
+    async with client_for_router(router, switchboard=switchboard) as client:
+        await client.post("/webhooks/whatsapp", headers={"apikey": "shared-evolution-key"}, json=event)
+
+    profile = switchboard.calls[0]["sender_profile"]
+    assert (profile.name, profile.phone) == expected

@@ -25,6 +25,7 @@ from app.domain.models.user import User, UserAvatar, UserCredentials
 from app.domain.ports.outbound import AlreadyExistsError, UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
 from app.domain.models.webchat_share_link import WebchatShareLink
+from app.domain.models.conversation_contact import Contact, ContactSummary
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -588,6 +589,7 @@ class FakeConversationRepository:
         channel_type=None,
         status=None,
         contact=None,
+        contact_identifier=None,
         before=None,
         limit: int = 50,
     ) -> List[Conversation]:
@@ -602,6 +604,7 @@ class FakeConversationRepository:
             and (channel_type is None or c.channel_type == channel_type)
             and (status is None or c.status == status)
             and (contact is None or contact.lower() in c.contact.lower())
+            and (contact_identifier is None or c.contact == contact_identifier)
             and (before is None or c.last_message_at < before)
         ]
         return sorted(items, key=lambda c: c.last_message_at, reverse=True)[:limit]
@@ -1245,3 +1248,42 @@ class FakeWebchatShareLinkRepo:
                 self.links[token_hash] = link.model_copy(update={"revoked_at": now})
                 return True
         return False
+
+
+class FakeContactRepo:
+    """In-memory ContactRepositoryPort, with the real one's "only_empty" rule."""
+
+    def __init__(self) -> None:
+        self.contacts: Dict[Any, Contact] = {}
+
+    async def get(self, key):
+        return self.contacts.get(key)
+
+    async def find_many(self, keys):
+        return {k: self.contacts[k] for k in keys if k in self.contacts}
+
+    async def get_by_id(self, contact_id):
+        return next((c for c in self.contacts.values() if c.id == contact_id), None)
+
+    async def search(self, *, tenant_ids, query=None, channel_type=None, limit=30, offset=0):
+        needle = (query or "").lower()
+        found = [
+            ContactSummary(contact=c)
+            for c in sorted(self.contacts.values(), key=lambda c: c.updated_at, reverse=True)
+            if (tenant_ids is None or c.tenant_id in tenant_ids)
+            and (channel_type is None or c.channel_type == channel_type)
+            and (not needle or any(needle in (v or "").lower() for v in (c.name, c.email, c.phone, c.username, c.identifier)))
+        ]
+        return found[offset:offset + limit]
+
+    async def upsert(self, key, fields, *, only_empty=False):
+        now = datetime.now(timezone.utc)
+        current = self.contacts.get(key) or Contact(
+            id=uuid4(), tenant_id=key[0], channel_type=key[1], identifier=key[2], created_at=now, updated_at=now
+        )
+        updates = {
+            name: value for name, value in fields.items()
+            if not (only_empty and getattr(current, name) is not None)
+        }
+        self.contacts[key] = current.model_copy(update={**updates, "updated_at": now})
+        return self.contacts[key]

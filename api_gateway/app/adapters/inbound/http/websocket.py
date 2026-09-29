@@ -10,8 +10,8 @@ Two ways in, chosen by the query string (see application/services/webchat.py):
   and are neither tracked nor billed.
 - `?share=...`: a **share link** (the console's "Share"), for anyone outside
   the team. The link is looked up in the database, so it can be revoked;
-  like the demo, messages go straight to the agent's current flow and are
-  neither tracked nor billed.
+  messages go straight to the agent's current flow and are not billed, but
+  are recorded as "demo" conversations so staff can see what was asked.
 
 A connection without either is refused before the handshake completes (the
 browser gets HTTP 403). Frames keep the widget's format: the first one
@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -31,6 +32,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.services.switchboard import ChannelMessageNotRoutable, build_conversation_id
 from app.application.use_cases.webchat_share import SharedAgent
+from app.domain.models.conversation_contact import SenderProfile, generic_contact_name
 from app.application.services.webchat import (
     WEBCHAT_SHARE_CHANNEL,
     WEBCHAT_TEST_CHANNEL,
@@ -259,6 +261,8 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
                 sender_id=visitor_id,
                 message_text=text,
                 raw_payload={"origin": ws.headers.get("origin")},
+                # A web visitor is anonymous: a generic name staff can change.
+                sender_profile=SenderProfile(name=generic_contact_name(WEBCHAT, visitor_id)),
             )
         except ChannelMessageNotRoutable:
             await _error(ws, "channel_unavailable")
@@ -273,6 +277,19 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
             # Ends the connection loop as a normal disconnect.
             raise WebSocketDisconnect(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+        demo_conversation_id = None
+        if shared.project_id is not None:
+            # Staff see what prospects asked, in Conversations ("Demo"),
+            # without it counting for the plan's quota.
+            demo_conversation_id = await ws.app.state.demo_conversation_recorder.record_inbound(
+                session_id=registry_id,
+                share_id=shared.share_id,
+                agent_id=shared.agent_id,
+                project_id=shared.project_id,
+                visitor_id=visitor_id,
+                text=text,
+                now=datetime.now(timezone.utc),
+            )
         await ws.app.state.ingest_message_use_case.execute(
             workflow_id=shared.workflow_id,
             conversation_id=registry_id,
@@ -280,6 +297,9 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             transport=frame.get("transport") or "rabbitmq",
             payload={"message": text, "conversation_id": registry_id},
             channel=WEBCHAT_SHARE_CHANNEL,
+            # Like every channel, Langflow's session is the conversation: its
+            # memory follows it.
+            llm_session_id=str(demo_conversation_id) if demo_conversation_id else None,
         )
     else:
         # Re-checked on every message: a demo tab left open must stop

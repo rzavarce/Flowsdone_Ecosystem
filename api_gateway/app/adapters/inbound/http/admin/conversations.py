@@ -1,5 +1,6 @@
 """Admin endpoints for the conversation inbox: list conversations of the
-caller's tenants and open one with its transcript and usage.
+caller's tenants and open one with its transcript and usage, and edit the
+card (name, email, phone, notes) of the person behind a conversation.
 
 Costs are Flowsdone's own figures: only unrestricted callers (admin, API
 key) see them; everyone else gets quantities only.
@@ -15,11 +16,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.billing_schemas import (
+    ContactCardIn,
+    ContactCardOut,
     ConversationDetailOut,
     ConversationMessageOut,
     ConversationOut,
     UsageLineOut,
 )
+from app.application.use_cases.conversation_contacts import InvalidContactError
+from app.domain.models.conversation import Conversation
+from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact
 from app.domain.models.usage import RatedUsage
 
 router = APIRouter(prefix="/conversations", tags=["admin:conversations"])
@@ -98,7 +104,8 @@ async def list_conversations(
         before=before,
         limit=limit,
     )
-    return [ConversationOut(**c.model_dump()) for c in conversations]
+    cards = await request.app.state.conversation_contacts_use_case.for_conversations(conversations)
+    return [_conversation_out(c, cards.get(c.id)) for c in conversations]
 
 
 @router.get("/{conversation_id}", response_model=ConversationDetailOut)
@@ -125,8 +132,11 @@ async def get_conversation(
         raise HTTPException(status_code=404, detail="conversation not found")
     access.tenant(detail.conversation.tenant_id, resource="conversation")
     with_costs = access.unrestricted
+    cards = await request.app.state.conversation_contacts_use_case.for_conversations([detail.conversation])
+    card = cards.get(detail.conversation.id)
     return ConversationDetailOut(
-        conversation=ConversationOut(**detail.conversation.model_dump()),
+        conversation=_conversation_out(detail.conversation, card),
+        contact_card=_card_out(card),
         messages=[ConversationMessageOut(**m.model_dump()) for m in detail.messages],
         usage=usage_lines(detail.usage, with_costs=with_costs),
         cost_micros=detail.cost_micros if with_costs else None,
@@ -134,3 +144,87 @@ async def get_conversation(
         llm_output_tokens=detail.llm_output_tokens,
         llm_cached_input_tokens=detail.llm_cached_input_tokens,
     )
+
+
+def _conversation_out(conversation: Conversation, card: Optional[Contact]) -> ConversationOut:
+    """Shape a conversation, with its contact's name if it has a card.
+
+    Args:
+        conversation (Conversation): The conversation.
+        card (Optional[Contact]): Its contact's card.
+
+    Returns:
+        ConversationOut: The response item.
+    """
+    return ConversationOut(**conversation.model_dump(), contact_name=card.name if card else None)
+
+
+def _card_out(card: Optional[Contact]) -> Optional[ContactCardOut]:
+    """Shape a contact card.
+
+    Args:
+        card (Optional[Contact]): The card.
+
+    Returns:
+        Optional[ContactCardOut]: The response, or None without a card.
+    """
+    if card is None:
+        return None
+    return ContactCardOut(**card.model_dump(include={*CONTACT_FIELDS, "updated_at"}))
+
+
+async def _scoped_conversation(request: Request, access: AdminAccess, conversation_id: UUID) -> Conversation:
+    """Load a conversation inside the caller's tenants.
+
+    Args:
+        request (Request): Used to reach `request.app.state.conversation_repo`.
+        access (AdminAccess): The authenticated caller.
+        conversation_id (UUID): The conversation.
+
+    Returns:
+        Conversation: The conversation.
+
+    Raises:
+        HTTPException: 404 if it does not exist or is out of scope.
+    """
+    conversation = await request.app.state.conversation_repo.get(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="conversation not found")
+    access.tenant(conversation.tenant_id, resource="conversation")
+    return conversation
+
+
+@router.patch("/{conversation_id}/contact", response_model=ContactCardOut)
+async def update_contact(
+    conversation_id: UUID,
+    body: ContactCardIn,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("contacts", "write")),
+) -> ContactCardOut:
+    """Edit the card of the person behind a conversation.
+
+    The card is shared by every conversation with the same person (same
+    tenant, channel and identifier). Fields left out are not touched; an
+    empty one is cleared.
+
+    Args:
+        conversation_id (UUID): Any conversation with that person.
+        body (ContactCardIn): Fields to set.
+        request (Request): Used to reach `request.app.state.conversation_contacts_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Returns:
+        ContactCardOut: The card as stored.
+
+    Raises:
+        HTTPException: 404 if the conversation does not exist or is out of
+            scope; 422 on an invalid value (e.g. a malformed email).
+    """
+    conversation = await _scoped_conversation(request, access, conversation_id)
+    try:
+        card = await request.app.state.conversation_contacts_use_case.update(
+            conversation, body.model_dump(exclude_unset=True)
+        )
+    except InvalidContactError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return _card_out(card)  # type: ignore[return-value]

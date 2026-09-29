@@ -308,12 +308,18 @@ export interface LangflowSession {
 // ---------------------------------------------------------------- conversations
 
 /** A conversation: one bounded exchange with a contact (closes after 24 h without messages from them or 7 days in total). */
+/**
+ * Channel of a conversation: a configurable channel, or "demo" for chats from
+ * a share link (the agents' "Share"), which is not a channel you can create.
+ */
+export type ConversationChannelType = ChannelType | 'demo'
+
 export interface Conversation {
   id: string
   tenant_id: string
   project_id: string
   agent_id: string
-  channel_type: ChannelType
+  channel_type: ConversationChannelType
   channel_connection_id: string
   contact: string
   status: 'open' | 'closed'
@@ -324,7 +330,53 @@ export interface Conversation {
   outbound_count: number
   closed_at: string | null
   close_reason: 'inactivity' | 'max_duration' | 'manual' | null
+  /** Name on the contact's card, if staff (or the agent) gave it one. */
+  contact_name?: string | null
 }
+
+/**
+ * The card of the person behind a conversation, shared by every conversation
+ * with the same identifier on the same channel.
+ */
+export interface ContactCard {
+  name: string | null
+  email: string | null
+  phone: string | null
+  /** The person's account on the channel (an Instagram or Telegram @user). */
+  username: string | null
+  notes: string | null
+  updated_at: string
+}
+
+/** A contact in the contact list: their card plus a summary of their conversations. */
+export interface ContactRecord extends ContactCard {
+  id: string
+  tenant_id: string
+  channel_type: ConversationChannelType
+  /** The channel's identifier (the `contact` of their conversations). */
+  identifier: string
+  created_at: string
+  last_message_at: string | null
+  conversation_count: number
+}
+
+/** Filters for listing contacts; `offset` paginates. */
+export interface ContactFilters {
+  tenant_id?: string
+  q?: string
+  channel_type?: string
+  limit?: number
+  offset?: number
+}
+
+/** A contact with their latest conversations (a few; the inbox has them all). */
+export interface ContactDetail {
+  contact: ContactRecord
+  conversations: Conversation[]
+}
+
+/** Fields to change on a contact card; an empty string clears one. */
+export type ContactCardInput = Partial<Record<'name' | 'email' | 'phone' | 'username' | 'notes', string>>
 
 /** Filters for listing conversations. `before` paginates (last_message_at of the previous page's last item). */
 export interface ConversationFilters {
@@ -374,6 +426,8 @@ export interface ConversationDetail {
   llm_input_tokens: number
   llm_output_tokens: number
   llm_cached_input_tokens: number
+  /** The contact's card, if it has one. */
+  contact_card?: ContactCard | null
 }
 
 // ---------------------------------------------------------------------- billing

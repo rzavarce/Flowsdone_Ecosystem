@@ -53,7 +53,8 @@ for sku, inp, cached, out in OPENAI_MODELS:
 # Canales: Evolution (WhatsApp no oficial), Telegram y Messenger/Instagram no
 # cobran por mensaje. Voz: se mide por turno (aún no por minuto); se estima un
 # turno ~20 s de llamada = (0,0178 + 0,07) USD/min x 20/60.
-for channel in ("whatsapp_evolution", "telegram", "facebook", "instagram"):
+# Webchat (canal propio) y "demo" (chats de los enlaces de Compartir) tampoco.
+for channel in ("whatsapp_evolution", "telegram", "facebook", "instagram", "webchat", "demo"):
     RATES.append(dict(kind="channel", provider=channel, sku="*", unit="message", price_micros=0, per_quantity=1,
                       note="Sin coste por mensaje"))
 RATES.append(dict(kind="channel", provider="voice", sku="message.inbound", unit="message",

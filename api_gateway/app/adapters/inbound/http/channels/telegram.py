@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, Request
 from starlette.responses import JSONResponse
 
 from app.application.services.switchboard import ChannelMessageNotRoutable
+from app.domain.models.conversation_contact import SenderProfile
 
 logger = logging.getLogger("channels.telegram")
 
@@ -59,10 +60,28 @@ async def receive_webhook(
     sender_id = (message.get("from") or {}).get("id")
 
     if text and chat_id is not None and sender_id is not None:
-        await _route_event(switchboard, bot_token, str(chat_id), str(sender_id), text, update)
+        await _route_event(
+            switchboard, bot_token, str(chat_id), str(sender_id), text, update, _sender_profile(message.get("from") or {})
+        )
 
     return JSONResponse(status_code=200, content={"ok": True})
 
+
+def _sender_profile(sender: Dict[str, Any]) -> SenderProfile:
+    """What a Telegram message says about its sender.
+
+    Telegram never shares the phone number (only if the person sends it as
+    a contact), so the card gets the name and the @user.
+
+    Args:
+        sender (Dict[str, Any]): The message's "from" object.
+
+    Returns:
+        SenderProfile: Name ("first_name last_name") and @username.
+    """
+    name = " ".join(str(sender[k]).strip() for k in ("first_name", "last_name") if sender.get(k))
+    username = sender.get("username")
+    return SenderProfile(name=name or None, username=f"@{username}" if username else None)
 
 async def _route_event(
     switchboard: Any,
@@ -71,6 +90,7 @@ async def _route_event(
     sender_id: str,
     text: str,
     raw_update: Dict[str, Any],
+    sender_profile: Optional[SenderProfile] = None,
 ) -> None:
     """Route a single Telegram message to its currently assigned app.
 
@@ -82,6 +102,8 @@ async def _route_event(
         text (str): Message text.
         raw_update (Dict[str, Any]): The raw Telegram update, kept in
             the payload for debugging.
+        sender_profile (Optional[SenderProfile]): Name and @user of the
+            sender, for their contact card.
     """
     try:
         await switchboard.handle_inbound_turn(
@@ -91,6 +113,7 @@ async def _route_event(
             sender_id=sender_id,
             message_text=text,
             raw_payload=raw_update,
+            sender_profile=sender_profile,
         )
     except ChannelMessageNotRoutable:
         logger.warning(

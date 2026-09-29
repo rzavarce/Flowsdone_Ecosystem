@@ -47,6 +47,7 @@
           <button class="btn btn-ghost" type="button" id="reset-conversation-btn">Nueva conversación</button>
         </div>
         <p class="test-badge" id="test-badge" hidden>Modo prueba · estas conversaciones no se registran ni se facturan</p>
+        <p class="privacy-note" id="privacy-note" hidden>El equipo de Flowsdone puede revisar esta conversación para mejorar el asistente.</p>
       </section>
 
       <div class="stage" id="stage" hidden>
@@ -121,6 +122,8 @@
     if (shareToken || testToken) {
       document.getElementById("stage").hidden = false;
       document.getElementById("test-badge").hidden = !testToken;
+      // Las conversaciones de los enlaces compartidos se guardan (canal "Demo"): se avisa.
+      document.getElementById("privacy-note").hidden = !shareToken;
       document.getElementById("call-name").textContent = agentName;
       document.getElementById("call-initial").textContent = agentName.trim().charAt(0).toUpperCase() || "A";
       document.getElementById("tab-chat").addEventListener("click", function () { selectTab("chat"); });

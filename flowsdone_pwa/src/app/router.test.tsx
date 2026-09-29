@@ -23,9 +23,9 @@ describe('sin sesión', () => {
 
 describe('menú y acceso por perfil', () => {
   it.each<[Role, string[]]>([
-    ['admin', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Usuarios', 'Planes', 'Ajustes']],
-    ['tenant_manager', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
-    ['botmaster', ['Dashboard', 'Conversaciones', 'Agentes', 'Canales', 'Ajustes']],
+    ['admin', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Contactos', 'Agentes', 'Canales', 'Usuarios', 'Planes', 'Ajustes']],
+    ['tenant_manager', ['Dashboard', 'Reportes', 'Tenants', 'Conversaciones', 'Contactos', 'Agentes', 'Canales', 'Ajustes']],
+    ['botmaster', ['Dashboard', 'Conversaciones', 'Contactos', 'Agentes', 'Canales', 'Ajustes']],
     ['client', ['Dashboard', 'Reportes', 'Mi empresa', 'Ajustes']],
     ['consultant', ['Dashboard', 'Reportes', 'Ajustes']],
   ])('%s ve el menú esperado', async (role, expected) => {

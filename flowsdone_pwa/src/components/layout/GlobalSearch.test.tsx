@@ -62,10 +62,21 @@ describe('GlobalSearch', { timeout: 20_000 }, () => {
   it('una conversación se abre directamente con su transcripción', async () => {
     setup()
     await userEvent.type(await searchBox(), '@usuario1')
-    const [first] = await within(results()).findAllByRole('option', undefined, { timeout: 5000 })
-    await userEvent.click(first!)
+    const options = await within(results()).findAllByRole('option', undefined, { timeout: 5000 })
+    // Contacts come first, then their conversations.
+    await userEvent.click(options.at(-1)!)
 
     expect(await screen.findByRole('list', { name: 'Transcripción' }, { timeout: 5000 })).toBeInTheDocument()
+  })
+
+  it('un contacto se busca por su nombre y abre su ficha', async () => {
+    setup()
+    await userEvent.type(await searchBox(), '@usuario11')
+    const [contact] = await within(results()).findAllByRole('option', undefined, { timeout: 5000 })
+    await userEvent.click(contact!)
+
+    expect(await screen.findByText('Identificador del canal', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Últimas conversaciones' })).toBeInTheDocument()
   })
 
   it('Escape cierra los resultados', async () => {

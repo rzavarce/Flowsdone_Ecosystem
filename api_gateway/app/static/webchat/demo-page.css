@@ -114,6 +114,8 @@ p { margin: 0; }
   background: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.1);
 }
 
+.privacy-note { margin-top: 22px; font-size: 13px; color: var(--on-dark-muted); max-width: 520px; }
+
 /* The chat, framed like the landing's phone mockup. */
 .stage { justify-self: center; width: min(440px, 100%); display: grid; gap: 14px; }
 
