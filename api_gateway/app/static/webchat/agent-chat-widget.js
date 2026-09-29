@@ -22,7 +22,10 @@
         modelName: options.modelName || 'chatgpt',
         n8nWebhookUrl: options.n8nWebhookUrl || null,
         n8nWebhookPath: options.n8nWebhookPath || null,
+        // 'widget' (floating launcher + popup), 'fullscreen', or 'inline':
+        // rendered inside `mountTarget` (element or CSS selector), always open.
         mode: options.mode || 'widget',
+        mountTarget: options.mountTarget || null,
         title: options.title || 'AI Assistant',
         initialMessage: options.initialMessage || 'Hi! How can I help you today?',
         inputPlaceholder: options.inputPlaceholder || 'Type your message...',
@@ -136,6 +139,11 @@
         this.createChatWindow();
         return;
       }
+      if (this.config.mode === 'inline') {
+        this.createChatWindow();
+        setTimeout(() => this.open(), 0);
+        return;
+      }
       if (this.config.showLauncher) {
         this.createLauncher();
       }
@@ -145,7 +153,7 @@
     bindGlobalEvents() {
       if (!this.config.closeOnEsc) return;
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && this.isOpen && this.config.mode !== 'fullscreen') {
+        if (event.key === 'Escape' && this.isOpen && this.config.mode === 'widget') {
           this.close(true);
         }
       });
@@ -346,7 +354,8 @@
         'agent-chat-widget',
         `agent-chat-position-${this.config.position}`,
         `agent-chat-animation-${this.config.animation}`,
-        this.config.mode === 'fullscreen' ? 'agent-chat-widget-fullscreen' : ''
+        this.config.mode === 'fullscreen' ? 'agent-chat-widget-fullscreen' : '',
+        this.config.mode === 'inline' ? 'agent-chat-widget-inline' : ''
       ].filter(Boolean).join(' ');
 
       this.container.innerHTML = `
@@ -358,7 +367,7 @@
               <span class="agent-chat-status-text">${this.escapeHtml(this.config.messages.socketDisconnected)}</span>
             </div>
           </div>
-          ${this.config.mode === 'fullscreen' ? '' : `<button class="agent-chat-close-btn" type="button" aria-label="${this.escapeAttr(this.config.closeLabel)}">x</button>`}
+          ${this.config.mode !== 'widget' ? '' : `<button class="agent-chat-close-btn" type="button" aria-label="${this.escapeAttr(this.config.closeLabel)}">x</button>`}
         </header>
         <main class="agent-chat-messages" aria-live="polite"></main>
         <form class="agent-chat-input-area">
@@ -368,7 +377,7 @@
         <div class="agent-chat-toast-container"></div>
       `;
 
-      document.body.appendChild(this.container);
+      this.mountPoint().appendChild(this.container);
 
       this.messageList = this.container.querySelector('.agent-chat-messages');
       this.input = this.container.querySelector('input');
@@ -384,6 +393,15 @@
       });
 
       this.addMessage(this.config.initialMessage, 'bot');
+    }
+
+    mountPoint() {
+      // Inline mode lives inside the host page's element; the others float over it.
+      if (this.config.mode !== 'inline') return document.body;
+      const target = typeof this.config.mountTarget === 'string'
+        ? document.querySelector(this.config.mountTarget)
+        : this.config.mountTarget;
+      return target || document.body;
     }
 
     async open() {

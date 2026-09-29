@@ -440,6 +440,8 @@ El webchat es un canal más (`channel_type: webchat`), uno por proyecto:
 - Como la demo, los mensajes van directos al flujo (canal `webchat-share`) y **no se registran ni se facturan**; si el agente falla, quien escribe ve el aviso genérico sin el detalle técnico (que solo se muestra en *Probar en webchat*).
 - Un enlace revocado o caducado abre el chat con el aviso «Este enlace ya no está disponible» y el campo de texto desactivado (el WebSocket cierra con el código 4001, que el widget no reintenta).
 
+**Página de demo** (`static/webchat/index.html`, lo que ve quien abre el enlace): mismo estilo que la landing (Outfit, navy, degradado cian→verde, logo en `static/webchat/brand/`), con el chat **integrado en la página** (modo `inline` del widget: `mode: "inline", mountTarget: "#…"`, sin botón flotante) y botones *Quiero uno para mi negocio* y *Nueva conversación*. Sin enlace válido explica que el enlace no es válido. La guía técnica para integrar el widget (snippets y todas las opciones de `AgentChatConfig`) está aparte, en `integracion.html`.
+
 | Conexión a `/ws` | Uso |
 |---|---|
 | `?key=wc_…` | Web del cliente (canal del tenant) |
@@ -578,7 +580,7 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 | Servicio | URL |
 |---|---|
 | API Gateway | http://localhost:8000 |
-| Webchat (demo) | http://localhost:8000/static/webchat/ — se abre desde la consola (Agentes → *Probar en webchat*), ver sección 8 |
+| Webchat (demo) | http://localhost:8000/static/webchat/ — se abre desde la consola (Agentes → *Probar en webchat* o *Compartir*), ver sección 8. Guía técnica de integración: `…/static/webchat/integracion.html` |
 | Admin API (tenants/proyectos/agentes/canales) | http://localhost:8000/internal/admin/* (sección 8) |
 | Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
 | Webhook de voz (Twilio) | http://localhost:8000/webhooks/voice — sin el nombre del proveedor en la ruta, a propósito (sección 18) |
