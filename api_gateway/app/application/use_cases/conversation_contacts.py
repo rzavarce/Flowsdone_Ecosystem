@@ -3,10 +3,11 @@ person behind a conversation's identifier.
 
 A card belongs to a tenant, a channel and the identifier that channel gives
 the person (the conversation's `contact`), so every conversation with the
-same person shows the same name. Staff edit it from a conversation; an
-agent can fill it in as it learns the details (see the "Guardar contacto"
-Langflow component), but only where the card is still empty: what staff
-typed always wins.
+same person shows the same name. The gateway starts it with the first
+message, from what the channel says about the sender (number, name,
+@user) and the details the person gives in the chat (email, or a name or
+phone the agent asked for), only where the card is still empty; staff
+edit it from a conversation, and what they type always wins.
 """
 
 from __future__ import annotations
@@ -16,11 +17,12 @@ from typing import Dict, Iterable, List, Optional
 from uuid import UUID
 
 from app.domain.models.conversation import Conversation
-from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact
-from app.domain.ports.outbound import ContactKey, ContactRepositoryPort, ConversationRepositoryPort
+from app.application.services.contact_extraction import extract_contact_details
+from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact, SenderProfile
+from app.domain.ports.outbound import ContactKey, ContactRepositoryPort
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-_MAX_LENGTH = {"name": 120, "email": 254, "phone": 40, "notes": 2000}
+_MAX_LENGTH = {"name": 120, "email": 254, "phone": 40, "username": 120, "notes": 2000}
 
 
 class InvalidContactError(ValueError):
@@ -77,16 +79,13 @@ def _clean(fields: Dict[str, Optional[str]], *, drop_empty: bool) -> Dict[str, O
 class ManageConversationContactsUseCase:
     """Reads and updates the contact cards of conversations."""
 
-    def __init__(self, *, contacts: ContactRepositoryPort, conversations: ConversationRepositoryPort) -> None:
+    def __init__(self, *, contacts: ContactRepositoryPort) -> None:
         """Build the use case.
 
         Args:
             contacts (ContactRepositoryPort): Contact cards.
-            conversations (ConversationRepositoryPort): To find a conversation
-                an agent is talking in.
         """
         self._contacts = contacts
-        self._conversations = conversations
 
     async def for_conversations(self, conversations: Iterable[Conversation]) -> Dict[UUID, Contact]:
         """The cards of a page of conversations.
@@ -117,26 +116,44 @@ class ManageConversationContactsUseCase:
         """
         return await self._contacts.upsert(contact_key(conversation), _clean(fields, drop_empty=False))
 
-    async def capture(self, conversation_id: UUID, fields: Dict[str, Optional[str]]) -> Optional[Contact]:
-        """An agent tells what it learned about the contact of its conversation.
+    async def record_from_channel(
+        self,
+        key: ContactKey,
+        *,
+        profile: Optional[SenderProfile] = None,
+        text: str = "",
+        asked: Optional[str] = None,
+    ) -> Optional[Contact]:
+        """Start or complete a contact's card from an inbound message.
 
-        Only fills what the card doesn't have yet, so a name staff typed is
-        never replaced by a (maybe misheard) one.
+        Uses what the channel says about the sender (`profile`) and the
+        details found in the message itself (an email, or a name/phone the
+        agent had just asked for). Only fills fields the card doesn't have
+        yet: what staff typed, or what was found before, always stays.
 
         Args:
-            conversation_id (UUID): The conversation the agent is in.
-            fields (Dict[str, Optional[str]]): What it learned.
+            key (ContactKey): The conversation's contact identity.
+            profile (Optional[SenderProfile]): What the channel says.
+            text (str): The message.
+            asked (Optional[str]): The agent's previous message.
 
         Returns:
-            Optional[Contact]: The card, or None if the conversation doesn't exist.
-
-        Raises:
-            InvalidContactError: If a value is invalid.
+            Optional[Contact]: The card, or None if there was nothing to
+            record (no call to the store then).
         """
-        conversation = await self._conversations.get(conversation_id)
-        if conversation is None:
-            return None
-        cleaned = _clean(fields, drop_empty=True)
+        fields: Dict[str, Optional[str]] = dict(profile.fields()) if profile else {}
+        for name, value in extract_contact_details(text, asked).items():
+            fields.setdefault(name, value)
+        try:
+            cleaned = _clean(fields, drop_empty=True)
+        except InvalidContactError:
+            # A channel value out of bounds (a huge display name): keep the rest.
+            cleaned = {}
+            for name, value in fields.items():
+                try:
+                    cleaned.update(_clean({name: value}, drop_empty=True))
+                except InvalidContactError:
+                    continue
         if not cleaned:
-            return await self._contacts.get(contact_key(conversation))
-        return await self._contacts.upsert(contact_key(conversation), cleaned, only_empty=True)
+            return None
+        return await self._contacts.upsert(key, cleaned, only_empty=True)

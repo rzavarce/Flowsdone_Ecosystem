@@ -30,6 +30,7 @@ def _to_domain(model: ConversationContactModel) -> Contact:
         name=model.name,
         email=model.email,
         phone=model.phone,
+        username=model.username,
         notes=model.notes,
         created_at=model.created_at,
         updated_at=model.updated_at,

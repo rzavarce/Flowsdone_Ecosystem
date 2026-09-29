@@ -125,6 +125,7 @@ def test_a_channel_message_goes_through_the_switchboard_as_a_webchat_turn():
     [turn] = state["switchboard"].turns
     assert (turn["channel_type"], turn["external_id"], turn["external_conversation_key"], turn["message_text"]) == (
         "webchat", KEY, "visitor-1", "Hola")
+    assert turn["sender_profile"].name == "client:webchat-visitor1"  # anonymous: a generic, renameable name
     assert state["ingest_message_use_case"].calls == []
 
 

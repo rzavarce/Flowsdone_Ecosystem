@@ -23,6 +23,8 @@ from typing import Optional
 from uuid import UUID
 
 from app.application.services.conversation_tracker import ConversationTracker
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
+from app.domain.models.conversation_contact import SenderProfile, generic_contact_name
 from app.domain.models.session import Session
 from app.domain.ports.outbound import (
     ProjectRepositoryPort,
@@ -48,6 +50,7 @@ class DemoConversationRecorder:
         tracker: ConversationTracker,
         projects: ProjectRepositoryPort,
         session_ttl_seconds: int,
+        contacts: Optional[ManageConversationContactsUseCase] = None,
     ) -> None:
         """Build the recorder.
 
@@ -58,12 +61,16 @@ class DemoConversationRecorder:
                 publishes each message to the archive.
             projects (ProjectRepositoryPort): To find the agent's tenant.
             session_ttl_seconds (int): Session TTL, like the Switchboard's.
+            contacts (Optional[ManageConversationContactsUseCase]): Starts
+                the visitor's contact card (a generic name) and completes it
+                with what they write. Optional.
         """
         self._sessions = sessions
         self._history = history
         self._tracker = tracker
         self._projects = projects
         self._ttl = session_ttl_seconds
+        self._contacts = contacts
 
     async def record_inbound(
         self,
@@ -96,6 +103,7 @@ class DemoConversationRecorder:
         """
         try:
             session = await self._sessions.get(session_id)
+            new = session is None
             if session is None:
                 session = await self._new_session(session_id, share_id, agent_id, project_id, visitor_id, now)
                 if session is None:
@@ -108,11 +116,35 @@ class DemoConversationRecorder:
             )
             session.record_message(direction="inbound", text=text, app=_APP, timestamp=now)
             conversation = await self._tracker.record_inbound(session=session, text=text, now=now, billable=False)
+            await self._record_contact(session, visitor_id, text, new)
             await self._sessions.save(session, ttl_seconds=self._ttl)
             return conversation.id
         except Exception:
             logger.error("conversations.demo.record_failed", extra={"session_id": session_id}, exc_info=True)
             return None
+
+    async def _record_contact(self, session: Session, visitor_id: str, text: str, new: bool) -> None:
+        """Best-effort: start the visitor's card and add what they wrote.
+
+        Args:
+            session (Session): The visitor's session.
+            visitor_id (str): The visitor's browser id.
+            text (str): Their message.
+            new (bool): First message of the session (the generic name is
+                only sent then).
+        """
+        if self._contacts is None:
+            return
+        asked = next((m.text for m in reversed(session.last_messages[:-1]) if m.direction == "outbound"), None)
+        try:
+            await self._contacts.record_from_channel(
+                (session.tenant_id, session.channel_type, session.user_identifier),
+                profile=SenderProfile(name=generic_contact_name(DEMO_CHANNEL, visitor_id)) if new else None,
+                text=text,
+                asked=asked,
+            )
+        except Exception:
+            logger.error("conversations.demo.contact_failed", extra={"session_id": session.id}, exc_info=True)
 
     async def _new_session(
         self,

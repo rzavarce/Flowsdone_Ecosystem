@@ -115,6 +115,6 @@ from app.domain.ports.outbound.usage import (  # noqa: F401
     UsageStorePort,
 )
 from app.domain.ports.outbound.voice_provider import VoiceProviderPort  # noqa: F401
-from app.domain.ports.outbound.contacts import ContactKey, ContactRepositoryPort  # noqa: F401
+from app.domain.ports.outbound.contacts import ContactKey, ContactRepositoryPort, SenderProfileLookupPort  # noqa: F401
 from app.domain.ports.outbound.webchat_share import WebchatShareLinkRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.webhook_registrar import WebhookRegistrarPort  # noqa: F401

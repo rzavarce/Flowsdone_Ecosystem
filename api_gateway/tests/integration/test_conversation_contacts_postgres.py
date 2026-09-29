@@ -47,12 +47,14 @@ async def test_upsert_creates_updates_and_only_fills_empty_fields_when_asked(ctx
     key = (ctx["tenant_id"], "voice", "+34600111222")
 
     created = await repo.upsert(key, {"name": "Ana Pérez"})
-    captured = await repo.upsert(key, {"name": "Ana Peres", "email": "ana@example.com"}, only_empty=True)
+    captured = await repo.upsert(
+        key, {"name": "Ana Peres", "email": "ana@example.com", "username": "@ana"}, only_empty=True
+    )
     edited = await repo.upsert(key, {"name": "Ana P.", "email": None})
 
     assert created.name == "Ana Pérez" and created.email is None
     assert captured.id == created.id
-    assert captured.name == "Ana Pérez" and captured.email == "ana@example.com"
+    assert captured.name == "Ana Pérez" and captured.email == "ana@example.com" and captured.username == "@ana"
     assert edited.name == "Ana P." and edited.email is None
     assert (await repo.get(key)).name == "Ana P."
 

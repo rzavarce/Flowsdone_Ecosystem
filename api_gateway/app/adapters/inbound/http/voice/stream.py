@@ -15,6 +15,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.services.switchboard import ChannelMessageNotRoutable
 from app.domain.models.call_session import CallSession
+from app.domain.models.conversation_contact import SenderProfile
 from app.adapters.inbound.http.voice.webhook import CHANNEL_TYPE
 
 logger = logging.getLogger("channels.voice.stream")
@@ -130,6 +131,22 @@ async def stream_endpoint(ws: WebSocket, call_sid: str) -> None:
         await call_session_repo.delete(call_sid)
 
 
+def _sender_profile(from_number: str) -> SenderProfile:
+    """What a call says about its caller.
+
+    Args:
+        from_number (str): Twilio's "From": a phone number, or
+            "client:<identity>" for a browser call (the demo page's softphone).
+
+    Returns:
+        SenderProfile: The phone number; a browser call has none, so its
+        identity is its (generic, renameable) name.
+    """
+    if from_number.startswith("client:"):
+        return SenderProfile(name=from_number)
+    return SenderProfile(phone=from_number or None)
+
+
 async def _route_turn(
     switchboard: Any,
     session: CallSession,
@@ -158,6 +175,7 @@ async def _route_turn(
             sender_id=session.from_number,
             message_text=text,
             raw_payload=raw_frame,
+            sender_profile=_sender_profile(session.from_number),
         )
     except ChannelMessageNotRoutable:
         logger.warning(

@@ -48,6 +48,24 @@ async def test_valid_secret_routes_the_message():
     assert call["message_text"] == "hola"
 
 
+async def test_the_senders_name_and_username_go_to_their_contact_card():
+    conn_repo = FakeChannelConnectionRepo(
+        resolution=make_channel_resolution(channel_type="telegram", credentials={"telegram_webhook_secret": "S3CR3T"})
+    )
+    switchboard = FakeSwitchboard()
+
+    async with client_for_router(router, channel_connection_repo=conn_repo, switchboard=switchboard) as client:
+        await client.post(
+            f"/webhooks/telegram/{BOT_TOKEN}",
+            headers={"X-Telegram-Bot-Api-Secret-Token": "S3CR3T"},
+            json={"message": {"text": "hola", "chat": {"id": 42},
+                              "from": {"id": 7, "first_name": "Ana", "last_name": "Pérez", "username": "anaperez"}}},
+        )
+
+    profile = switchboard.calls[0]["sender_profile"]
+    assert (profile.name, profile.username, profile.phone) == ("Ana Pérez", "@anaperez", None)
+
+
 async def test_wrong_secret_is_rejected_and_does_not_route():
     conn_repo = FakeChannelConnectionRepo(
         resolution=make_channel_resolution(channel_type="telegram", credentials={"telegram_webhook_secret": "S3CR3T"})

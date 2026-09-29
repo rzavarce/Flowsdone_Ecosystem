@@ -135,6 +135,7 @@ class ContactCardOut(BaseModel):
         name (Optional[str]): Name.
         email (Optional[str]): Email.
         phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
         notes (Optional[str]): Notes.
         updated_at (datetime): Last change.
     """
@@ -142,24 +143,27 @@ class ContactCardOut(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    username: Optional[str] = None
     notes: Optional[str] = None
     updated_at: datetime
 
 
 class ContactCardIn(BaseModel):
     """Fields to set on a contact's card; the ones left out are not touched,
-    an empty one is cleared (for staff) or ignored (for an agent).
+    an empty one is cleared.
 
     Attributes:
         name (Optional[str]): Name.
         email (Optional[str]): Email.
         phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
         notes (Optional[str]): Notes.
     """
 
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    username: Optional[str] = None
     notes: Optional[str] = None
 
 

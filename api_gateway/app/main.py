@@ -29,6 +29,7 @@ from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
 from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
 from app.adapters.outbound.db.conversation_contact_repository import SqlAlchemyContactRepository
+from app.adapters.outbound.channels.meta_profile_lookup import MetaSenderProfileLookup
 from app.adapters.outbound.db.webchat_share_link_repository import SqlAlchemyWebchatShareLinkRepository
 from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
@@ -334,9 +335,8 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.conversation_tracker = conversation_tracker
-    app.state.conversation_contacts_use_case = ManageConversationContactsUseCase(
-        contacts=SqlAlchemyContactRepository(db_sessionmaker), conversations=conversation_repo
-    )
+    conversation_contacts = ManageConversationContactsUseCase(contacts=SqlAlchemyContactRepository(db_sessionmaker))
+    app.state.conversation_contacts_use_case = conversation_contacts
     # Share link ("Share") chats, recorded as "demo" conversations, not billed.
     app.state.demo_conversation_recorder = DemoConversationRecorder(
         sessions=session_repo,
@@ -344,6 +344,7 @@ async def lifespan(app: FastAPI):
         tracker=conversation_tracker,
         projects=app.state.project_repo,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
+        contacts=conversation_contacts,
     )
     logger.info("conversations.tracker.ready")
 
@@ -670,6 +671,9 @@ async def lifespan(app: FastAPI):
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
         conversation_tracker=conversation_tracker,
         quota_gate=quota_gate,
+        # Each contact's card starts with their first message (see README).
+        contacts=conversation_contacts,
+        profile_lookup=MetaSenderProfileLookup(),
     )
 
     logger.info("switchboard.initialized")

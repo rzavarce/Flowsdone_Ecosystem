@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, Optional, Protocol, Tuple
+from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
 from uuid import UUID
 
-from app.domain.models.conversation_contact import Contact
+from app.domain.models.conversation_contact import Contact, SenderProfile
 
 # (tenant_id, channel_type, identifier): what identifies a contact.
 ContactKey = Tuple[UUID, str, str]
@@ -48,5 +48,26 @@ class ContactRepositoryPort(Protocol):
 
         Returns:
             Contact: The contact as stored.
+        """
+        ...
+
+
+class SenderProfileLookupPort(Protocol):
+    """Asks a channel who sent a message, for channels whose webhook only
+    carries an opaque id (Facebook's PSID, Instagram's IGSID)."""
+
+    async def lookup(
+        self, *, channel_type: str, sender_id: str, credentials: Dict[str, Any]
+    ) -> Optional[SenderProfile]:
+        """The sender's profile, best-effort.
+
+        Args:
+            channel_type (str): The channel.
+            sender_id (str): The channel's id of the sender.
+            credentials (Dict[str, Any]): The channel connection's credentials.
+
+        Returns:
+            Optional[SenderProfile]: What the channel told, or None if the
+            channel has no lookup or it failed (never raises).
         """
         ...

@@ -32,6 +32,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.services.switchboard import ChannelMessageNotRoutable, build_conversation_id
 from app.application.use_cases.webchat_share import SharedAgent
+from app.domain.models.conversation_contact import SenderProfile, generic_contact_name
 from app.application.services.webchat import (
     WEBCHAT_SHARE_CHANNEL,
     WEBCHAT_TEST_CHANNEL,
@@ -260,6 +261,8 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
                 sender_id=visitor_id,
                 message_text=text,
                 raw_payload={"origin": ws.headers.get("origin")},
+                # A web visitor is anonymous: a generic name staff can change.
+                sender_profile=SenderProfile(name=generic_contact_name(WEBCHAT, visitor_id)),
             )
         except ChannelMessageNotRoutable:
             await _error(ws, "channel_unavailable")
@@ -295,7 +298,7 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             payload={"message": text, "conversation_id": registry_id},
             channel=WEBCHAT_SHARE_CHANNEL,
             # Like every channel, Langflow's session is the conversation: its
-            # memory follows it, and tools (e.g. "Guardar contacto") know it.
+            # memory follows it.
             llm_session_id=str(demo_conversation_id) if demo_conversation_id else None,
         )
     else:

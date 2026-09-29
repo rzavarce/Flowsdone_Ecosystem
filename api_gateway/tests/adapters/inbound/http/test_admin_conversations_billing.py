@@ -12,7 +12,6 @@ import pytest
 
 from app.adapters.inbound.http import me as me_module
 from app.adapters.inbound.http.admin import billing as billing_module
-from app.core.config import settings
 from app.domain.models.conversation_message import ConversationMessageRecorded
 from app.domain.models.usage import UsageEvent
 from api_gateway.tests.support.admin_world import CSRF, World, cookie
@@ -97,36 +96,6 @@ async def test_contacts_of_other_tenants_cannot_be_edited_and_bad_emails_are_ref
     assert bad.status_code == 422
     assert client_role.status_code == 403
     assert world.contacts.contacts == {}
-
-
-async def test_an_agent_capture_fills_only_empty_fields(world):
-    token = await world.token("admin")
-    path = f"/conversations/{world.conversation_a.id}/contact"
-    async with world.client() as c:
-        await _call(c, "PATCH", path, token=token, json={"name": "Ana Pérez"})
-        captured = await _call(c, "POST", f"{path}/capture", token=token,
-                               json={"name": "Ana Peres", "phone": "600111222", "email": ""})
-
-    assert captured.status_code == 200
-    assert captured.json()["name"] == "Ana Pérez" and captured.json()["phone"] == "600111222"
-    assert captured.json()["email"] is None
-
-
-async def test_the_langflow_component_captures_with_the_admin_api_key(world):
-    async with world.client() as c:
-        captured = await c.post(
-            f"{BASE}/conversations/{world.conversation_a.id}/contact/capture",
-            headers={"X-Admin-Api-Key": settings.ADMIN_API_KEY},
-            json={"name": "Ana Pérez"},
-        )
-        unknown = await c.post(
-            f"{BASE}/conversations/{uuid4()}/contact/capture",
-            headers={"X-Admin-Api-Key": settings.ADMIN_API_KEY},
-            json={"name": "Ana"},
-        )
-
-    assert captured.status_code == 200 and captured.json()["name"] == "Ana Pérez"
-    assert unknown.status_code == 404
 
 
 async def test_conversation_detail_shows_costs_only_to_admins(world):

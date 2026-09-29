@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.adapters.inbound.http.voice import stream as stream_module
 from app.adapters.inbound.http.voice.stream import (
     _matches_human_transfer_phrase,
     router,
@@ -70,6 +71,7 @@ def test_prompt_frame_routes_the_transcribed_turn_to_the_voice_channel():
     assert call["external_conversation_key"] == "CA123"
     assert call["sender_id"] == "+15550001111"
     assert call["message_text"] == "hola, quiero soporte"
+    assert (call["sender_profile"].phone, call["sender_profile"].name) == ("+15550001111", None)
     # The connection is unregistered and the session cleaned up once the
     # call ends, so a stray outbound response can no longer reach it.
     assert call_session_repo.deleted == ["CA123"]
@@ -164,3 +166,9 @@ def test_unknown_call_sid_closes_the_connection_immediately():
             ws.receive_text()
 
     assert switchboard.calls == []
+
+
+def test_a_browser_call_gets_its_identity_as_a_generic_name():
+    assert stream_module._sender_profile("client:demo-1890on91").model_dump() == {
+        "name": "client:demo-1890on91", "phone": None, "username": None}
+    assert stream_module._sender_profile("+34600111222").phone == "+34600111222"

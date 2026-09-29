@@ -10,11 +10,13 @@ import pytest
 
 from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.demo_conversations import DEMO_CHANNEL, DemoConversationRecorder
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
 from app.domain.models.project import Project
 from api_gateway.tests.support.fakes import (
+    FakeContactRepo,
     FakeConversationEventPublisher,
     FakeConversationRepository,
     FakeSessionHistoryRepository,
@@ -44,6 +46,7 @@ class World:
         self.history = FakeSessionHistoryRepository()
         self.conversations = FakeConversationRepository()
         self.events = FakeConversationEventPublisher()
+        self.contacts = FakeContactRepo()
         self.tracker = ConversationTracker(
             conversation_repo=self.conversations,
             event_publisher=self.events,
@@ -56,6 +59,7 @@ class World:
             tracker=self.tracker,
             projects=FakeProjects(*([self.project] if project_exists else [])),
             session_ttl_seconds=3600,
+            contacts=ManageConversationContactsUseCase(contacts=self.contacts),
         )
         self.session_id = f"share:{self.share_id}:visitor-12345678-abcd"
 
@@ -121,6 +125,20 @@ async def test_the_agents_reply_is_recorded_in_the_visitors_conversation():
         ("outbound", "¡Hola! Tenemos tres planes."),
     ]
     assert len({e.conversation_id for e in world.events.events}) == 1
+
+
+async def test_the_visitor_gets_a_generic_card_completed_with_what_they_write():
+    world = World()
+    await world.visitor_says("Hola")
+    world.sessions.sessions[world.session_id].record_message(
+        direction="outbound", text="¿Me dejas tu email?", app="langflow", timestamp=NOW
+    )
+
+    await world.visitor_says("claro: ana@example.com", now=NOW + timedelta(minutes=1))
+
+    [card] = world.contacts.contacts.values()
+    assert card.channel_type == "demo" and card.identifier == "Demo · visitante visitor-"
+    assert (card.name, card.email) == ("client:demo-visitor1", "ana@example.com")
 
 
 async def test_console_test_replies_are_not_recorded():

@@ -11,17 +11,15 @@ from app.application.use_cases.conversation_contacts import (
     ManageConversationContactsUseCase,
     contact_key,
 )
-from api_gateway.tests.support.fakes import FakeContactRepo, FakeConversationRepository, make_conversation
+from app.domain.models.conversation_contact import SenderProfile
+from api_gateway.tests.support.fakes import FakeContactRepo, make_conversation
 
 pytestmark = pytest.mark.anyio
 
 
 def _world(*conversations):
     contacts = FakeContactRepo()
-    use_case = ManageConversationContactsUseCase(
-        contacts=contacts, conversations=FakeConversationRepository(*conversations)
-    )
-    return use_case, contacts
+    return ManageConversationContactsUseCase(contacts=contacts), contacts
 
 
 async def test_staff_name_a_contact_and_every_conversation_with_them_shows_it():
@@ -74,29 +72,61 @@ async def test_invalid_values_are_refused(fields):
     assert contacts.contacts == {}
 
 
-async def test_an_agent_fills_only_what_the_card_does_not_have():
-    conversation = make_conversation(channel_type="voice", contact="client:demo-abc")
+async def test_the_channel_starts_the_card_and_the_chat_completes_it():
+    conversation = make_conversation(channel_type="whatsapp_evolution", contact="34600111222@s.whatsapp.net")
+    use_case, _ = _world(conversation)
+    key = contact_key(conversation)
+
+    card = await use_case.record_from_channel(
+        key, profile=SenderProfile(name="Ana", phone="+34600111222"), text="Hola"
+    )
+    assert (card.name, card.phone, card.email) == ("Ana", "+34600111222", None)
+
+    card = await use_case.record_from_channel(key, text="Mi correo es Ana@Example.com")
+    assert card.email == "ana@example.com" and card.name == "Ana"
+
+
+async def test_what_staff_typed_is_never_replaced_by_the_channel_or_the_chat():
+    conversation = make_conversation(channel_type="telegram", contact="12345")
+    use_case, _ = _world(conversation)
+    await use_case.update(conversation, {"name": "Ana Pérez (clienta VIP)"})
+
+    card = await use_case.record_from_channel(
+        contact_key(conversation), profile=SenderProfile(name="ana", username="@ana"),
+        text="Ana Peres", asked="¿Cómo te llamas?",
+    )
+
+    assert card.name == "Ana Pérez (clienta VIP)" and card.username == "@ana"
+
+
+async def test_a_name_or_phone_is_taken_only_when_the_agent_asked_for_it():
+    conversation = make_conversation(channel_type="webchat", contact="visitor-1")
     use_case, contacts = _world(conversation)
-    await use_case.update(conversation, {"name": "Ana Pérez"})
+    key = contact_key(conversation)
 
-    card = await use_case.capture(conversation.id, {"name": "Ana Peres", "email": "ana@example.com", "phone": ""})
+    assert await use_case.record_from_channel(key, text="Roger", asked="¿En qué te ayudo?") is None
+    assert await use_case.record_from_channel(key, text="mi pedido es 600112233") is None
+    card = await use_case.record_from_channel(
+        key, text="Roger Zavarce, 600 11 22 33", asked="Para la cita necesito tu nombre y teléfono"
+    )
 
-    assert card.name == "Ana Pérez"  # staff typed it: the (maybe misheard) one doesn't replace it
-    assert card.email == "ana@example.com" and card.phone is None
-
-
-async def test_an_agent_on_an_unknown_conversation_changes_nothing():
-    use_case, contacts = _world()
-
-    assert await use_case.capture(uuid4(), {"name": "Ana"}) is None
-    assert contacts.contacts == {}
+    assert (card.name, card.phone) == ("Roger Zavarce", "600112233")
 
 
-async def test_an_agent_with_nothing_to_say_returns_the_current_card():
+async def test_nothing_to_record_does_not_touch_the_store():
     conversation = make_conversation()
     use_case, contacts = _world(conversation)
 
-    assert await use_case.capture(conversation.id, {"name": "", "email": None}) is None
-    await use_case.update(conversation, {"name": "Ana"})
-    assert (await use_case.capture(conversation.id, {})).name == "Ana"
-    assert contact_key(conversation) in contacts.contacts
+    assert await use_case.record_from_channel(contact_key(conversation), profile=SenderProfile(), text="hola") is None
+    assert contacts.contacts == {}
+
+
+async def test_an_out_of_bounds_channel_value_is_dropped_and_the_rest_kept():
+    conversation = make_conversation()
+    use_case, _ = _world(conversation)
+
+    card = await use_case.record_from_channel(
+        contact_key(conversation), profile=SenderProfile(name="x" * 500, phone="+34600111222")
+    )
+
+    assert card.name is None and card.phone == "+34600111222"

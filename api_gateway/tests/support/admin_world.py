@@ -335,9 +335,7 @@ class World:
         )
         return dict(
             conversation_repo=self.conversations,
-            conversation_contacts_use_case=ManageConversationContactsUseCase(
-                contacts=self.contacts, conversations=self.conversations
-            ),
+            conversation_contacts_use_case=ManageConversationContactsUseCase(contacts=self.contacts),
             cost_rate_repo=self.cost_rates,
             plan_repo=self.plans,
             subscription_repo=self.subscriptions,

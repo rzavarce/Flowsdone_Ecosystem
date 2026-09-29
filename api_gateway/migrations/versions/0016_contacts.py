@@ -1,4 +1,4 @@
-"""contacts: ficha del contacto de las conversaciones (nombre, email, teléfono, notas)
+"""contacts: ficha del contacto de las conversaciones (nombre, email, teléfono, usuario, notas)
 
 Revision ID: 0016_contacts
 Revises: 0015_webchat_share_links
@@ -33,6 +33,7 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=True),
         sa.Column("email", sa.Text(), nullable=True),
         sa.Column("phone", sa.Text(), nullable=True),
+        sa.Column("username", sa.Text(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

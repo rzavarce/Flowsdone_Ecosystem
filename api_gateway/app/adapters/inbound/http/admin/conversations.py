@@ -25,7 +25,7 @@ from app.adapters.inbound.http.admin.billing_schemas import (
 )
 from app.application.use_cases.conversation_contacts import InvalidContactError
 from app.domain.models.conversation import Conversation
-from app.domain.models.conversation_contact import Contact
+from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact
 from app.domain.models.usage import RatedUsage
 
 router = APIRouter(prefix="/conversations", tags=["admin:conversations"])
@@ -170,7 +170,7 @@ def _card_out(card: Optional[Contact]) -> Optional[ContactCardOut]:
     """
     if card is None:
         return None
-    return ContactCardOut(name=card.name, email=card.email, phone=card.phone, notes=card.notes, updated_at=card.updated_at)
+    return ContactCardOut(**card.model_dump(include={*CONTACT_FIELDS, "updated_at"}))
 
 
 async def _scoped_conversation(request: Request, access: AdminAccess, conversation_id: UUID) -> Conversation:
@@ -228,40 +228,3 @@ async def update_contact(
     except InvalidContactError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _card_out(card)  # type: ignore[return-value]
-
-
-@router.post("/{conversation_id}/contact/capture", response_model=Optional[ContactCardOut])
-async def capture_contact(
-    conversation_id: UUID,
-    body: ContactCardIn,
-    request: Request,
-    access: AdminAccess = Depends(admin_access("contacts", "write")),
-) -> Optional[ContactCardOut]:
-    """What an agent learned about the person it is talking to.
-
-    Called from Langflow (the "Guardar contacto" component) with the
-    conversation it runs in. Unlike PATCH it only fills fields that are
-    still empty, so what staff typed is never replaced, and empty values
-    are ignored.
-
-    Args:
-        conversation_id (UUID): The conversation the agent is in.
-        body (ContactCardIn): What it learned.
-        request (Request): Used to reach `request.app.state.conversation_contacts_use_case`.
-        access (AdminAccess): The authenticated caller.
-
-    Returns:
-        Optional[ContactCardOut]: The card as stored.
-
-    Raises:
-        HTTPException: 404 if the conversation does not exist or is out of
-            scope; 422 on an invalid value.
-    """
-    await _scoped_conversation(request, access, conversation_id)
-    try:
-        card = await request.app.state.conversation_contacts_use_case.capture(
-            conversation_id, body.model_dump(exclude_unset=True)
-        )
-    except InvalidContactError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _card_out(card)

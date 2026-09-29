@@ -1491,15 +1491,26 @@ El id de la Conversation viaja en el envelope como `meta.llm_session_id`, y `Exe
 
 ### Ficha del contacto
 
-Cada conversación muestra al contacto por el identificador que da su canal (un teléfono, `@usuario`, `client:demo-…`, «Demo · visitante …»). Para verlo con su nombre, se le pone una **ficha**:
+Cada conversación tiene un contacto, identificado por lo que da su canal (el `remoteJid` de WhatsApp, el PSID de Facebook, un visitante del webchat…). La **API** le crea una **ficha** con su primer mensaje y la va completando; el equipo la puede editar.
 
-- La ficha es de un tenant, un canal y ese identificador (`uq_contacts_identity`). Todas las conversaciones de la misma persona por ese canal muestran el mismo nombre; el mismo número por otro canal (o en otro tenant) es otra ficha.
-- **El equipo la edita** en el detalle de la conversación (*Añadir datos* / *Editar contacto*): `PATCH /internal/admin/conversations/{id}/contact`, recurso `contacts`, todo el staff. Un campo vacío lo borra; un email no válido o un valor demasiado largo devuelve 422.
-- **El agente la rellena** con el componente de Langflow *Guardar contacto (Flowsdone)*: cuando el cliente dice su nombre, email o teléfono, llama a `POST /internal/admin/conversations/{id}/contact/capture` con la `X-Admin-Api-Key` del entorno del contenedor (`GATEWAY_INTERNAL_URL`, `GATEWAY_ADMIN_API_KEY`). El id de la conversación no lo elige el modelo: es el `session_id` con el que el gateway ejecuta el flujo (ver arriba). La captura **solo rellena campos vacíos**, así que lo que escribió el equipo nunca se sobrescribe con un nombre mal entendido por voz. En el playground de Langflow o en *Probar en webchat* no hay conversación registrada y el componente no llama al gateway.
-- En el prompt del agente basta con una línea: «Cuando el cliente te diga su nombre, email o teléfono, guárdalo con la herramienta Guardar contacto».
-- La lista, el detalle y la búsqueda muestran el nombre de la ficha, con el identificador debajo; el filtro *Contacto* busca también por ese nombre.
-- Las llamadas desde la página de demo (softphone) llegan como `client:demo-xxxxxxxx`: la consola las muestra como «Llamada desde el navegador · demo-…», y el navegador guarda esa identidad (`localStorage`, `fd-voice-demo-identity`), así que las llamadas de una misma persona son el mismo contacto.
-- Las conversaciones de los enlaces de *Compartir* también pasan su id a Langflow como `session_id`, así que el componente funciona igual en el canal Demo.
+- La ficha es de un tenant, un canal y ese identificador (`uq_contacts_identity`, tabla `contacts`, migración `0016`). Todas las conversaciones de la misma persona por ese canal comparten ficha; el mismo número por otro canal (o en otro tenant) es otra ficha.
+- **Lo que da el canal**, en el primer mensaje de cada sesión (`Switchboard._record_contact`; cada adaptador de entrada construye un `SenderProfile`):
+
+  | Canal | Qué se guarda |
+  |---|---|
+  | WhatsApp (Evolution) | Teléfono (del `remoteJid`, solo de personas: ni grupos `@g.us` ni ids ocultos `@lid`) y el nombre de su cuenta (`pushName`) |
+  | Telegram | Nombre (`first_name last_name`) y `@usuario`. Telegram no comparte el teléfono |
+  | Facebook Messenger | Nombre, pedido a la Graph API (`GET /{psid}?fields=first_name,last_name`, con el `page_access_token` del canal; `MetaSenderProfileLookup`) |
+  | Instagram | Nombre y cuenta `@usuario` (`GET /{igsid}?fields=name,username`) |
+  | Voz | El número que llama. Una llamada desde el navegador (softphone de la demo) no tiene número: su identidad es el nombre genérico (`client:demo-1890on91`) |
+  | Webchat / Demo (*Compartir*) | Un nombre genérico: `client:webchat-xxxxxxxx` / `client:demo-xxxxxxxx` (el id del visitante) |
+
+- **Lo que el cliente dice en la conversación**, en cada mensaje (`contact_extraction.py`, reglas, sin LLM ni coste): un **email** siempre; un **teléfono** o un **nombre** solo si el mensaje anterior del agente los pidió («¿me das tu teléfono?», «¿cómo te llamas?»), porque un número suelto puede ser un pedido y una respuesta corta cualquier cosa. «Me llamo Ana» / «mi nombre es Ana Pérez» se toman sin preguntar.
+- Todo eso **solo rellena campos vacíos**: lo que escribió el equipo (o lo que ya se sabía) no se sobrescribe. Es best-effort: si falla, el mensaje sigue su curso. Si la Graph API no da el nombre (falta el permiso de perfil de usuario en la app de Meta), la ficha se queda sin él.
+- **El equipo la edita** en el detalle de la conversación (*Añadir datos* / *Editar contacto*): `PATCH /internal/admin/conversations/{id}/contact`, recurso `contacts`, todo el staff. Un campo vacío lo borra; un email no válido o un valor demasiado largo devuelve 422. Para cambiar un nombre genérico, se edita.
+- La lista, el detalle y la búsqueda muestran el nombre de la ficha, con el identificador debajo (un `…@s.whatsapp.net` se muestra como `+número`, una llamada del navegador como «Llamada desde el navegador · demo-…»); el filtro *Contacto* busca también por ese nombre.
+- El navegador guarda la identidad del softphone de la demo (`localStorage`, `fd-voice-demo-identity`), así que las llamadas de una misma persona son el mismo contacto.
+- Las conversaciones de los enlaces de *Compartir* pasan su id a Langflow como `session_id`, como el resto de canales (la memoria del agente sigue a la conversación).
 
 ### Flujo
 
