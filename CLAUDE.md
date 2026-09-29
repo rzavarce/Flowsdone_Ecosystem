@@ -82,12 +82,12 @@ Hexagonal (Ports & Adapters). Separación estricta entre dominio, aplicación e 
 
 ## Flujo de trabajo (obligatorio para cada tarea)
 
-Cada vez que se aborde una nueva tarea, seguir GitFlow sin excepción:
+Por ahora solo existe **un ambiente** (producción, VPS), así que no hay rama `develop`: todo se ramifica desde `main` y vuelve a `main`. Cada vez que se aborde una nueva tarea:
 
-1. **Crear rama desde `develop`** (nunca trabajar directo sobre `main` ni `develop`):
+1. **Crear rama desde `main`** (nunca trabajar directo sobre `main`):
    - `feature/<nombre-tarea>` → nuevas funcionalidades
    - `fix/<nombre-tarea>` → corrección de bugs
-   - `hotfix/<nombre-tarea>` → parches urgentes sobre `main`
+   - `hotfix/<nombre-tarea>` → parches urgentes
    - `release/<version>` → preparación de release
 2. **Antes de subir cualquier commit final de la tarea**:
    - Generar/actualizar **docstrings** en todas las funciones, clases y métodos públicos tocados (formato Google o NumPy, consistente con el resto del módulo)
@@ -96,7 +96,7 @@ Cada vez que se aborde una nueva tarea, seguir GitFlow sin excepción:
 3. **Al terminar la tarea**:
    - Hacer push de la rama al remoto
    - **Antes de generar el link de la PR, preguntar siempre si hay algún otro requerimiento pendiente** (cambios adicionales, ajustes, algo que revisar) y esperar confirmación antes de continuar
-   - Una vez confirmado que no hay más requerimientos, preparar y generar el **link de la Pull Request** (rama origen → `develop`, o → `main` si es `hotfix`), con:
+   - Una vez confirmado que no hay más requerimientos, preparar y generar el **link de la Pull Request** (rama origen → `main`; ojo: el merge dispara el despliegue a producción), con:
      - Título descriptivo de la tarea
      - Resumen de los cambios
      - Referencia al issue/tarea si existe
