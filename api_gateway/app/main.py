@@ -80,6 +80,7 @@ from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.demo_conversations import DemoConversationRecorder
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.billing_catalog import ManageBillingCatalogUseCase
 from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
 from app.application.use_cases.billing import (
     CloseBillingPeriodUseCase,
@@ -603,6 +604,14 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.quota_gate = quota_gate
+    app.state.billing_catalog_use_case = ManageBillingCatalogUseCase(
+        plans=app.state.plan_repo,
+        subscriptions=app.state.subscription_repo,
+        cost_rates=app.state.cost_rate_repo,
+        statements=app.state.statement_repo,
+        tenants=app.state.tenant_repo,
+        quota_gate=quota_gate,
+    )
     app.state.get_conversation_detail_use_case = GetConversationDetailUseCase(
         conversations=conversation_repo,
         archive=ClickHouseMessageArchive(clickhouse),

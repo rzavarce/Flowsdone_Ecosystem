@@ -32,6 +32,11 @@ from app.adapters.inbound.http.admin.billing_schemas import (
     UsageLineOut,
 )
 from app.application.use_cases.billing import PlanNotFoundError
+from app.application.use_cases.billing_catalog import (
+    InactivePlanError,
+    ManageBillingCatalogUseCase,
+    PlanWithSubscribers,
+)
 from app.domain.models.billing import BillingStatement, Plan, TenantSubscription, month_bounds, period_of
 from app.domain.models.usage import CostRate
 from app.domain.ports.outbound import PlanInUseError
@@ -50,30 +55,28 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def _plan_out(request: Request, plan: Plan) -> PlanOut:
-    """Build a PlanOut with its subscription count.
+def _catalog(request: Request) -> ManageBillingCatalogUseCase:
+    """The billing catalog use case.
 
     Args:
-        request (Request): Used to reach the subscription repository.
-        plan (Plan): The plan.
+        request (Request): Used to reach `request.app.state`.
+
+    Returns:
+        ManageBillingCatalogUseCase: The use case.
+    """
+    return request.app.state.billing_catalog_use_case
+
+
+def _plan_out(item: PlanWithSubscribers) -> PlanOut:
+    """Shape a plan with its subscription count.
+
+    Args:
+        item (PlanWithSubscribers): The plan and its subscribers.
 
     Returns:
         PlanOut: The response.
     """
-    subscriptions = await request.app.state.subscription_repo.list_all()
-    return PlanOut(**plan.model_dump(), subscriptions=sum(1 for s in subscriptions if s.plan_id == plan.id))
-
-
-def _invalidate_quota_cache(request: Request, tenant_id: Optional[UUID] = None) -> None:
-    """Make the quota gate re-read subscriptions/plans in this process.
-
-    Args:
-        request (Request): Used to reach `request.app.state.quota_gate`.
-        tenant_id (Optional[UUID]): Tenant changed; None = everything.
-    """
-    gate = getattr(request.app.state, "quota_gate", None)
-    if gate is not None:
-        gate.invalidate(tenant_id)
+    return PlanOut(**item.plan.model_dump(), subscriptions=item.subscribers)
 
 
 def statement_out(statement: BillingStatement, *, with_costs: bool) -> StatementOut:
@@ -112,7 +115,7 @@ async def _existing_tenant(request: Request, access: AdminAccess, tenant_id: UUI
         HTTPException: 404.
     """
     access.tenant(tenant_id)
-    if not await request.app.state.tenant_repo.get_by_id(tenant_id):
+    if not await _catalog(request).tenant_exists(tenant_id):
         raise HTTPException(status_code=404, detail="tenant not found")
 
 
@@ -130,11 +133,7 @@ async def list_plans(request: Request, _: AdminAccess = Depends(admin_access("pl
     Returns:
         list[PlanOut]: The plans, with how many tenants use each.
     """
-    subscriptions = await request.app.state.subscription_repo.list_all()
-    return [
-        PlanOut(**plan.model_dump(), subscriptions=sum(1 for s in subscriptions if s.plan_id == plan.id))
-        for plan in await request.app.state.plan_repo.list_all()
-    ]
+    return [_plan_out(item) for item in await _catalog(request).list_plans()]
 
 
 @router.post("/plans", response_model=PlanOut, status_code=201)
@@ -154,9 +153,7 @@ async def create_plan(
     Raises:
         AlreadyExistsError: If the code is taken (409).
     """
-    fields = body.model_dump(exclude_none=True)
-    plan = await request.app.state.plan_repo.create(Plan(id=uuid4(), **fields))
-    return await _plan_out(request, plan)
+    return _plan_out(await _catalog(request).create_plan(body.model_dump(exclude_none=True)))
 
 
 @router.patch("/plans/{plan_id}", response_model=PlanOut)
@@ -178,11 +175,10 @@ async def update_plan(
     Raises:
         HTTPException: 404 if it does not exist.
     """
-    plan = await request.app.state.plan_repo.update(plan_id, **body.model_dump(exclude_unset=True))
-    if plan is None:
+    item = await _catalog(request).update_plan(plan_id, body.model_dump(exclude_unset=True))
+    if item is None:
         raise HTTPException(status_code=404, detail="plan not found")
-    _invalidate_quota_cache(request)
-    return await _plan_out(request, plan)
+    return _plan_out(item)
 
 
 @router.delete("/plans/{plan_id}", status_code=204)
@@ -201,7 +197,7 @@ async def delete_plan(plan_id: UUID, request: Request, _: AdminAccess = Depends(
         HTTPException: 404 if it does not exist, 409 if in use (deactivate it instead).
     """
     try:
-        deleted = await request.app.state.plan_repo.delete(plan_id)
+        deleted = await _catalog(request).delete_plan(plan_id)
     except PlanInUseError as exc:
         raise HTTPException(status_code=409, detail="plan in use") from exc
     if not deleted:
@@ -260,7 +256,7 @@ async def list_cost_rates(
     Returns:
         list[CostRateOut]: The rates.
     """
-    return [CostRateOut(**r.model_dump()) for r in await request.app.state.cost_rate_repo.list_all()]
+    return [CostRateOut(**r.model_dump()) for r in await _catalog(request).list_cost_rates()]
 
 
 @router.post("/cost-rates", response_model=CostRateOut, status_code=201)
@@ -278,7 +274,7 @@ async def create_cost_rate(
         CostRateOut: The stored rate.
     """
     rate = CostRate(id=uuid4(), **{**body.model_dump(), "valid_from": body.valid_from or _now()})
-    return CostRateOut(**(await request.app.state.cost_rate_repo.create(rate)).model_dump())
+    return CostRateOut(**(await _catalog(request).create_cost_rate(rate)).model_dump())
 
 
 @router.delete("/cost-rates/{rate_id}", status_code=204)
@@ -299,7 +295,7 @@ async def delete_cost_rate(
     Raises:
         HTTPException: 404 if it does not exist.
     """
-    if not await request.app.state.cost_rate_repo.delete(rate_id):
+    if not await _catalog(request).delete_cost_rate(rate_id):
         raise HTTPException(status_code=404, detail="cost rate not found")
     return Response(status_code=204)
 
@@ -345,11 +341,10 @@ async def get_subscription(
         HTTPException: 404 if the tenant is unknown/out of scope or has none.
     """
     await _existing_tenant(request, access, tenant_id)
-    subscription = await request.app.state.subscription_repo.get(tenant_id)
-    if subscription is None:
+    found = await _catalog(request).get_subscription(tenant_id)
+    if found is None:
         raise HTTPException(status_code=404, detail="no subscription")
-    plan = await request.app.state.plan_repo.get(subscription.plan_id)
-    return _subscription_out(subscription, plan)
+    return _subscription_out(*found)
 
 
 def _subscription_out(subscription: TenantSubscription, plan: Plan) -> SubscriptionOut:
@@ -395,20 +390,16 @@ async def put_subscription(
             not exist or is inactive.
     """
     await _existing_tenant(request, access, tenant_id)
-    plan = await request.app.state.plan_repo.get(body.plan_id)
-    if plan is None or not plan.active:
-        raise HTTPException(status_code=400, detail="plan not found or inactive")
-    current = await request.app.state.subscription_repo.get(tenant_id)
-    subscription = await request.app.state.subscription_repo.upsert(
-        TenantSubscription(
-            tenant_id=tenant_id,
+    try:
+        subscription, plan = await _catalog(request).subscribe(
+            tenant_id,
             plan_id=body.plan_id,
             overage_mode=body.overage_mode,
             spending_cap_micros=body.spending_cap_micros,
-            started_at=current.started_at if current else _now(),
+            now=_now(),
         )
-    )
-    _invalidate_quota_cache(request, tenant_id)
+    except InactivePlanError as exc:
+        raise HTTPException(status_code=400, detail="plan not found or inactive") from exc
     return _subscription_out(subscription, plan)
 
 
@@ -431,9 +422,8 @@ async def delete_subscription(
         HTTPException: 404 if the tenant is unknown or has no subscription.
     """
     await _existing_tenant(request, access, tenant_id)
-    if not await request.app.state.subscription_repo.delete(tenant_id):
+    if not await _catalog(request).unsubscribe(tenant_id):
         raise HTTPException(status_code=404, detail="no subscription")
-    _invalidate_quota_cache(request, tenant_id)
     return Response(status_code=204)
 
 
@@ -484,7 +474,7 @@ async def list_statements(
         list[StatementOut]: The statements (costs only for admins).
     """
     await _existing_tenant(request, access, tenant_id)
-    statements = await request.app.state.statement_repo.list_by_tenant(tenant_id)
+    statements = await _catalog(request).closed_statements(tenant_id)
     return [statement_out(s, with_costs=access.unrestricted) for s in statements]
 
 
