@@ -12,7 +12,6 @@ from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
 from app.domain.models.message_envelope import MessageEnvelope, MessageMeta
-from api_gateway.tests.support.fake_httpx import FakeAsyncClient, FakeResponse
 from api_gateway.tests.support.fakes import (
     FakeChannelConnectionRepo,
     FakeChannelSender,
@@ -163,33 +162,45 @@ async def test_execute_never_raises_even_if_websocket_send_fails():
     await use_case.execute(envelope, {"message": "hola"})
 
 
-async def test_execute_posts_to_callback_url_when_present(monkeypatch):
-    fake_client = FakeAsyncClient(lambda call: FakeResponse(200))
-    monkeypatch.setattr(hor_module.httpx, "AsyncClient", fake_client.as_constructor())
+class FakeCallbackSender:
+    """Records callbacks; can pretend to fail."""
 
-    use_case = HandleOutboundResponseUseCase()
+    def __init__(self, ok=True):
+        self.ok = ok
+        self.calls = []
+
+    async def send(self, url, body):
+        self.calls.append((url, body))
+        return self.ok
+
+
+async def test_execute_sends_the_callback_through_the_port():
+    sender = FakeCallbackSender()
+    use_case = HandleOutboundResponseUseCase(callback_sender=sender)
     envelope = _envelope()
     envelope.payload["callback_url"] = "https://example.com/callback"
 
     await use_case.execute(envelope, {"message": "hola"})
 
-    assert len(fake_client.calls) == 1
-    assert fake_client.calls[0].url == "https://example.com/callback"
-    assert fake_client.calls[0].kwargs["json"]["message"] == "hola"
+    [(url, body)] = sender.calls
+    assert url == "https://example.com/callback"
+    assert body == {"conversation_id": "conv-1", "message": "hola"}
 
 
-async def test_execute_never_raises_even_if_callback_fails(monkeypatch):
-    def _raise(_call):
-        raise ConnectionError("network down")
-
-    fake_client = FakeAsyncClient(_raise)
-    monkeypatch.setattr(hor_module.httpx, "AsyncClient", fake_client.as_constructor())
-
+async def test_without_a_callback_sender_no_callback_is_made():
     use_case = HandleOutboundResponseUseCase()
+    envelope = _envelope()
+    envelope.payload["callback_url"] = "http://api:8000/internal/admin/tenants"
+
+    # Skipped (and logged), never raised.
+    await use_case.execute(envelope, {"message": "hola"})
+
+
+async def test_execute_never_raises_even_if_callback_fails():
+    use_case = HandleOutboundResponseUseCase(callback_sender=FakeCallbackSender(ok=False))
     envelope = _envelope()
     envelope.payload["callback_url"] = "https://example.com/callback"
 
-    # Should not raise, even though the callback POST always fails.
     await use_case.execute(envelope, {"message": "hola"})
 
 

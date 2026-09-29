@@ -805,7 +805,11 @@ n8n **no** tiene el nodo AI Agent en el flujo recomendado de este proyecto. La o
 
 ### Gateway → n8n (el gateway dispara una automatización)
 
-El gateway publica en RabbitMQ (`/webhooks/generic` con `transport: "rabbitmq"`, o cualquier caller que use `IngestMessageUseCase`). Un workflow de n8n lo recibe con un nodo **RabbitMQ Trigger** apuntando a la misma cola/exchange, y responde publicando en la cola de salida que el gateway ya escucha (`rabbitmq_outbound_worker`):
+El gateway publica en RabbitMQ (`/webhooks/generic` con `transport: "rabbitmq"`, o cualquier caller que use `IngestMessageUseCase`).
+
+> **`/webhooks/generic` es interno:** exige la cabecera `X-Admin-Api-Key` (401 sin ella), porque ejecuta cualquier flujo por su id. Si el caller pide el resultado en `payload.callback_url`, el gateway lo envía firmado (`X-Flowsdone-Signature`, HMAC-SHA256 del cuerpo con `CALLBACK_HMAC_SECRET`, verificable con `hmac_signing.verify`) y solo a destinos permitidos: hosts de `CALLBACK_ALLOWED_HOSTS` (ahí se admite `http`, p. ej. `n8n`) o, si la lista está vacía, `https` hacia hosts que resuelvan solo a IPs públicas. No sigue redirecciones. Así un callback no puede usarse para llegar a servicios internos (SSRF).
+
+Un workflow de n8n lo recibe con un nodo **RabbitMQ Trigger** apuntando a la misma cola/exchange, y responde publicando en la cola de salida que el gateway ya escucha (`rabbitmq_outbound_worker`):
 
 1. **Credencial RabbitMQ** en n8n: host `rabbitmq`, puerto `5672`, user/pass = `RABBITMQ_USER`/`RABBITMQ_PASS`, vhost `/`.
 2. **RabbitMQ Trigger**: `Queue/Topic` = una cola propia (ej. `n8n_workflow_queue`) — **tiene que existir de antemano** (el nodo hace `checkQueue`, no la crea), bindeada al exchange `inbound.messages` con routing key `inbound.message`. Opción `JSON Parse Body` = true.

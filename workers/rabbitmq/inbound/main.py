@@ -14,6 +14,7 @@ from app.adapters.outbound.db.idempotency_repository import (
 from app.adapters.outbound.langflow.executor import LangflowExecutor
 from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
 from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from app.adapters.outbound.http.callback_sender import build_callback_sender
 from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
@@ -74,7 +75,9 @@ async def main() -> None:
     await publisher.start()
 
     outbound_use_case = HandleOutboundResponseUseCase(
-        publisher=publisher, failure_message=settings.WORKFLOW_FAILURE_MESSAGE
+        publisher=publisher,
+        failure_message=settings.WORKFLOW_FAILURE_MESSAGE,
+        callback_sender=build_callback_sender(settings),
     )
 
     async def handler(body: bytes) -> None:

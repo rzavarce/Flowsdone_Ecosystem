@@ -24,6 +24,7 @@ from app.adapters.inbound.http.voice import router as voice_router
 from app.adapters.inbound.http.voice_demo import router as voice_demo_router
 from app.adapters.inbound.http.webhooks import router as webhooks_router
 from app.adapters.inbound.http.websocket import router as ws_router
+from app.adapters.outbound.http.callback_sender import build_callback_sender
 from app.adapters.outbound.apps.factory import AppConnectorFactory
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
@@ -654,6 +655,7 @@ async def lifespan(app: FastAPI):
         session_history_repo=session_history_repo,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
         conversation_tracker=conversation_tracker,
+        callback_sender=build_callback_sender(settings),
     )
     app.state.outbound_handler = outbound_handler
 
