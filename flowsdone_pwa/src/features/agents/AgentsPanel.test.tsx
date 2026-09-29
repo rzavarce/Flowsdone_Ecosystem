@@ -108,6 +108,8 @@ describe('Agentes: registro y gestión', { timeout: 20_000 }, () => {
     const dialog = within(screen.getByRole('dialog', { name: 'Compartir Recepción' }))
     expect(dialog.getByRole('radio', { name: 'Sin vencimiento' })).toHaveAttribute('aria-checked', 'true')
     expect(await dialog.findByText('Este agente todavía no tiene enlaces compartidos.')).toBeInTheDocument()
+    // Shared-link chats are recorded (Demo channel), just not billed.
+    expect(dialog.getByText(/aparecen en Conversaciones con el canal Demo y no se facturan/)).toBeInTheDocument()
 
     await userEvent.click(dialog.getByRole('button', { name: 'Crear enlace' }))
 

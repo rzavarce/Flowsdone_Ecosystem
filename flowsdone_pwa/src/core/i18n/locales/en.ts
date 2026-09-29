@@ -529,7 +529,7 @@ export const en: Messages<typeof es> = {
       revoke: 'Revoke',
       revokeConfirm: 'Revoke? It will stop working at once.',
       revokeError: 'Could not revoke the link: {{error}}',
-      notice: 'Anyone with the link can use the agent until it expires or you revoke it. These conversations are neither tracked nor billed.',
+      notice: 'Anyone with the link can use the agent until it expires or you revoke it. Its conversations show up in Conversations under the Demo channel and are neither billed nor counted towards the plan.',
     },
     dialog: {
       registerTitle: 'Register agent',

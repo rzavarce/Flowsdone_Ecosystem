@@ -529,7 +529,7 @@ export const ca: Messages<typeof es> = {
       revoke: 'Revocar',
       revokeConfirm: 'Revocar? Deixarà de funcionar a l\'instant.',
       revokeError: "No s'ha pogut revocar l'enllaç: {{error}}",
-      notice: "Qui tingui l'enllaç podrà fer servir l'agent fins que caduqui o el revoquis. Aquestes converses no es registren ni es facturen.",
+      notice: "Qui tingui l'enllaç podrà fer servir l'agent fins que caduqui o el revoquis. Les seves converses apareixen a Converses amb el canal Demo i no es facturen ni compten per al pla.",
     },
     dialog: {
       registerTitle: 'Registrar agent',

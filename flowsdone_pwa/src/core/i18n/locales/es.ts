@@ -530,7 +530,7 @@ export const es = {
       revoke: 'Revocar',
       revokeConfirm: '¿Revocar? Dejará de funcionar al instante.',
       revokeError: 'No se pudo revocar el enlace: {{error}}',
-      notice: 'Quien tenga el enlace podrá usar el agente hasta que caduque o lo revoques. Estas conversaciones no se registran ni se facturan.',
+      notice: 'Quien tenga el enlace podrá usar el agente hasta que caduque o lo revoques. Sus conversaciones aparecen en Conversaciones con el canal Demo y no se facturan ni cuentan para el plan.',
     },
     dialog: {
       registerTitle: 'Registrar agente',
