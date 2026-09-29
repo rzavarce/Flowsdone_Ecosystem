@@ -224,14 +224,19 @@
   </div>
 
   <script>
-    // La demo solo funciona con el permiso de prueba que da la consola
-    // (Agentes -> Probar en webchat): ?test_token=...&agent=<nombre>.
+    // El chat se abre con uno de los dos permisos que da la consola:
+    //  - ?test_token=...&agent=<nombre>: "Probar en webchat" (equipo, caduca en minutos).
+    //  - ?share=...&agent=<nombre>: "Compartir" (cualquiera con el enlace, hasta que se revoque o venza).
     const params = new URLSearchParams(location.search);
     const testToken = params.get("test_token");
+    const shareToken = params.get("share");
     const agentName = params.get("agent") || "el agente";
 
     const status = document.getElementById("demo-status");
-    if (testToken) {
+    if (shareToken) {
+      status.textContent = "Estás hablando con " + agentName + ", un asistente creado con Flowsdone.";
+      document.getElementById("demo-open-note").hidden = false;
+    } else if (testToken) {
       status.textContent = "Probando: " + agentName + ". Las conversaciones de prueba no se registran ni se facturan.";
       document.getElementById("demo-open-note").hidden = false;
     }
@@ -262,14 +267,17 @@
       });
     });
 
-    if (testToken) {
+    if (shareToken || testToken) {
       window.AgentChatConfig = {
         wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
-        testToken: testToken,
+        shareToken: shareToken,
+        testToken: shareToken ? null : testToken,
         transport: 'kafka',
 
         title: agentName,
-        initialMessage: '¡Hola! Estás probando ' + agentName + '. ¿En qué te ayudo?',
+        initialMessage: shareToken
+          ? '¡Hola! Soy ' + agentName + '. ¿En qué te puedo ayudar?'
+          : '¡Hola! Estás probando ' + agentName + '. ¿En qué te ayudo?',
         inputPlaceholder: 'Escribe tu mensaje...',
         messages: {
           socketConnecting: 'Conectando...',
@@ -278,7 +286,8 @@
           genericError: 'Algo salió mal. Inténtalo de nuevo.',
           rateLimited: 'Demasiados mensajes seguidos. Espera un momento.',
           messageTooLong: 'El mensaje es demasiado largo.',
-          testExpired: 'Este enlace de prueba ha caducado. Pide uno nuevo desde la consola.'
+          testExpired: 'Este enlace de prueba ha caducado. Pide uno nuevo desde la consola.',
+          shareUnavailable: 'Este enlace ya no está disponible. Pide uno nuevo a quien te lo envió.'
         },
 
         launcherColor: '#4F46E5',

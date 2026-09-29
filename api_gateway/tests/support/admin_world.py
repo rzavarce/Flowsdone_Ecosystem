@@ -36,7 +36,9 @@ from app.application.use_cases.billing import (
 )
 from app.application.use_cases.conversation_queries import GetConversationDetailUseCase
 from app.application.use_cases.manage_agents import ManageAgentsUseCase, ProjectFlow
+from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from api_gateway.tests.support.fakes import (
+    FakeWebchatShareLinkRepo,
     FakeAccountTokenStore,
     FakeConversationRepository,
     FakeCostRateRepo,
@@ -304,7 +306,11 @@ class World:
         self.deleted_langflow_folders: List[Any] = []
         self.langflow_delete_error: Optional[Exception] = None
         self.base_agent = _BaseAgent()
+        self.share_links = FakeWebchatShareLinkRepo()
         return dict(
+            webchat_share_use_case=ManageWebchatShareLinksUseCase(
+                links=self.share_links, agents=self.agents, demo_url="https://chat.flowsdone.test/"
+            ),
             delete_project_use_case=_DeleteProject(),
             create_base_agent_use_case=self.base_agent,
             get_onboarding_status_use_case=_Onboarding(),

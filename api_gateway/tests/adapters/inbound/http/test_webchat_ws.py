@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict, List
+from urllib.parse import parse_qs, urlsplit
+from uuid import uuid4
+
+import anyio
 
 import pytest
 from fastapi import FastAPI
@@ -15,7 +20,9 @@ from app.application.services.switchboard import ChannelMessageNotRoutable, buil
 from app.application.services.webchat import TestTokenClaims, sign_test_token
 from app.application.services.ws_registry import WSRegistry
 from app.core.config import settings
-from api_gateway.tests.support.fakes import FakeLoginThrottle, make_channel_resolution
+from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
+from app.domain.models.agent import Agent
+from api_gateway.tests.support.fakes import FakeLoginThrottle, FakeWebchatShareLinkRepo, make_channel_resolution
 
 KEY = "wc_" + "a" * 32
 
@@ -49,14 +56,29 @@ class FakeIngest:
         self.calls.append(kwargs)
 
 
+class FakeAgents:
+    def __init__(self):
+        now = datetime.now(timezone.utc)
+        self.agent = Agent(id=uuid4(), project_id=uuid4(), name="Asistente", langflow_flow_id="flow-share",
+                           created_at=now, updated_at=now)
+
+    async def get_by_id(self, agent_id):
+        return self.agent if agent_id == self.agent.id else None
+
+
 def _world(origins=None, switchboard=None):
     resolution = make_channel_resolution(channel_type="webchat", config={"allowed_origins": origins or []})
     app = FastAPI()
     app.include_router(router)
+    agents = FakeAgents()
     state = dict(
         channel_connection_repo=FakeChannels(resolution), ws_registry=WSRegistry(),
         switchboard=switchboard or FakeSwitchboard(), ingest_message_use_case=FakeIngest(),
         login_throttle=FakeLoginThrottle(),
+        webchat_share_use_case=ManageWebchatShareLinksUseCase(
+            links=FakeWebchatShareLinkRepo(), agents=agents, demo_url="https://chat.test/"
+        ),
+        agents=agents,
     )
     for name, value in state.items():
         setattr(app.state, name, value)
@@ -170,3 +192,63 @@ def test_a_forged_token_is_refused_silently_even_if_it_looks_expired():
         with client.websocket_connect(f"/ws?test_token={payload}.forgedsignature") as ws:
             ws.receive_json()
     assert refused.value.code == 1008
+
+
+
+def _share(state, **create):
+    """Create a share link for the world's agent; returns (token, link id)."""
+    use_case = state["webchat_share_use_case"]
+    shared = anyio.run(lambda: use_case.create(state["agents"].agent, created_by=None, expires_in_days=None, **create))
+    return parse_qs(urlsplit(shared.url).query)["share"][0], shared.link.id
+
+
+def test_a_share_link_goes_straight_to_the_agents_flow_on_its_own_channel():
+    client, state, _ = _world()
+    token, share_id = _share(state)
+    with client.websocket_connect(f"/ws?share={token}") as ws:
+        ws.send_json(_message("Hola"))
+        assert ws.receive_json()["type"] == "connected"
+        assert ws.receive_json()["type"] == "accepted"
+    [call] = state["ingest_message_use_case"].calls
+    assert call["workflow_id"] == "flow-share"
+    assert call["conversation_id"] == f"share:{share_id}:visitor-1"
+    assert call["channel"] == "webchat-share" and call["sender_id"] == "share:visitor-1"
+    assert state["switchboard"].turns == []
+
+
+def test_a_revoked_share_link_is_told_so_and_closed_with_the_no_retry_code():
+    client, state, _ = _world()
+    token, share_id = _share(state)
+    use_case = state["webchat_share_use_case"]
+    anyio.run(lambda: use_case.revoke(state["agents"].agent, share_id))
+    with client.websocket_connect(f"/ws?share={token}") as ws:
+        assert ws.receive_json() == {"type": "chat.error", "error": "share_link_unavailable"}
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_json()
+    assert closed.value.code == TEST_TOKEN_EXPIRED_CLOSE_CODE
+    assert state["ingest_message_use_case"].calls == []
+
+
+def test_an_unknown_share_token_is_refused_silently():
+    client, _, _ = _world()
+    with pytest.raises(WebSocketDisconnect) as refused:
+        with client.websocket_connect("/ws?share=made-up-token") as ws:
+            ws.receive_json()
+    assert refused.value.code == 1008
+
+
+def test_revoking_a_share_link_cuts_a_chat_already_open():
+    client, state, _ = _world()
+    token, share_id = _share(state)
+    use_case = state["webchat_share_use_case"]
+    with client.websocket_connect(f"/ws?share={token}") as ws:
+        ws.send_json(_message("Hola"))
+        assert ws.receive_json()["type"] == "connected"
+        assert ws.receive_json()["type"] == "accepted"
+        anyio.run(lambda: use_case.revoke(state["agents"].agent, share_id))
+        ws.send_json(_message("¿Sigues ahí?"))
+        assert ws.receive_json() == {"type": "chat.error", "error": "share_link_unavailable"}
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws.receive_json()
+    assert closed.value.code == TEST_TOKEN_EXPIRED_CLOSE_CODE
+    assert len(state["ingest_message_use_case"].calls) == 1

@@ -433,10 +433,19 @@ El webchat es un canal más (`channel_type: webchat`), uno por proyecto:
 
 **Demo genérica (probar cualquier agente):** en *Agentes*, el botón *Probar en webchat* pide `POST /internal/admin/agents/{id}/webchat-test` y abre `WEBCHAT_PUBLIC_URL?test_token=…`. El token va firmado (HMAC derivado de `CALLBACK_HMAC_SECRET`), nombra el flujo del agente y caduca a los `WEBCHAT_TEST_TOKEN_TTL_SECONDS` (30 min por defecto). Esas conversaciones van directas al flujo: **no se registran ni se facturan**. Ya no se acepta un `workflow_id` arbitrario en el WebSocket.
 
+**Enlaces compartidos (botón *Compartir*):** para enseñar un agente a alguien de fuera (un cliente potencial). En *Agentes*, *Compartir* abre un diálogo que crea enlaces `WEBCHAT_PUBLIC_URL?share=…&agent=…` con validez de **7 días, 30 días o sin vencimiento** (por defecto), los lista para copiarlos y permite **revocarlos**.
+- Endpoints: `POST|GET /internal/admin/agents/{id}/webchat-shares` y `DELETE …/webchat-shares/{share_id}`. Crear y revocar piden permiso de escritura sobre agentes (quien tenga el enlace podrá usar el agente); listar, de lectura.
+- Se guardan en `webchat_share_links` (migración `0015`): el token va **cifrado** (para poder volver a copiarlo) y se busca por su **hash**. Al ser una fila de base de datos, un enlace sin vencimiento se puede revocar.
+- El enlace apunta al **agente**, no a un flujo: si el agente pasa a otro flujo, el enlace sigue funcionando con el nuevo. Se vuelve a comprobar en cada mensaje: revocarlo, que caduque o suspender el agente corta también los chats abiertos.
+- Como la demo, los mensajes van directos al flujo (canal `webchat-share`) y **no se registran ni se facturan**; si el agente falla, quien escribe ve el aviso genérico sin el detalle técnico (que solo se muestra en *Probar en webchat*).
+- Un enlace revocado o caducado abre el chat con el aviso «Este enlace ya no está disponible» y el campo de texto desactivado (el WebSocket cierra con el código 4001, que el widget no reintenta).
+
 | Conexión a `/ws` | Uso |
 |---|---|
 | `?key=wc_…` | Web del cliente (canal del tenant) |
-| `?test_token=…` | Demo desde la consola |
+| `?test_token=…` | Demo desde la consola (*Probar en webchat*) |
+| `?share=…` | Enlace compartido (*Compartir*) |
+| Enlace de prueba caducado, o compartido revocado/caducado | Se acepta, avisa (`chat.error`) y cierra con 4001 |
 | Ninguno / inválido / origen no permitido | Rechazada antes del handshake (código 1008) |
 
 

@@ -14,6 +14,9 @@
         //    opened from the console, Agents -> Try in web chat).
         channelKey: options.channelKey || null,
         testToken: options.testToken || null,
+        //  - shareToken: a share link's token (the console's "Share"): lets
+        //    anyone chat with one agent until the link is revoked or expires.
+        shareToken: options.shareToken || null,
         transport: options.transport || 'rabbitmq',
         userId: options.userId || null,
         modelName: options.modelName || 'chatgpt',
@@ -65,6 +68,7 @@
           messageTooLong: 'The message is too long.',
           channelUnavailable: 'This chat is not available right now.',
           testExpired: 'This test link has expired. Open it again from the console.',
+          shareUnavailable: 'This link is no longer available.',
           ...(options.messages || {})
         }
       };
@@ -83,6 +87,7 @@
       // Set when the gateway says the demo link expired: from then on the
       // widget stops reconnecting (it would be refused forever).
       this.linkExpired = false;
+      this.linkExpiredMessage = '';
 
       this.injectCssVariables();
       this.init();
@@ -167,7 +172,7 @@
 
     ensureSocket() {
       if (this.linkExpired) {
-        return Promise.reject(new Error(this.config.messages.testExpired));
+        return Promise.reject(new Error(this.linkExpiredMessage));
       }
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         return Promise.resolve(this.socket);
@@ -177,9 +182,11 @@
       }
       this.setConnectionState(false, this.config.messages.socketConnecting);
       const base = this.config.wsUrl.replace(/\/$/, '');
-      const query = this.config.testToken
-        ? `test_token=${encodeURIComponent(this.config.testToken)}`
-        : `key=${encodeURIComponent(this.config.channelKey || '')}`;
+      const query = this.config.shareToken
+        ? `share=${encodeURIComponent(this.config.shareToken)}`
+        : this.config.testToken
+          ? `test_token=${encodeURIComponent(this.config.testToken)}`
+          : `key=${encodeURIComponent(this.config.channelKey || '')}`;
       this.socket = new WebSocket(`${base}${base.includes('?') ? '&' : '?'}${query}`);
 
       this.socketReadyPromise = new Promise((resolve, reject) => {
@@ -211,9 +218,9 @@
       this.socket.addEventListener('close', (event) => {
         this.setConnectionState(false, this.config.messages.socketDisconnected);
         this.socketReadyPromise = null;
-        // 4001: the gateway closed because the demo link expired.
+        // 4001: the gateway closed because the demo or share link no longer works.
         if (event.code === 4001) {
-          this.expireLink();
+          this.expireLink(this.config.shareToken ? this.config.messages.shareUnavailable : this.config.messages.testExpired);
           return;
         }
         if (!this.linkExpired && (this.isOpen || this.isLoading)) {
@@ -265,7 +272,11 @@
 
       if (data.type === 'chat.error') {
         if (data.error === 'test_token_expired') {
-          this.expireLink();
+          this.expireLink(this.config.messages.testExpired);
+          return;
+        }
+        if (data.error === 'share_link_unavailable') {
+          this.expireLink(this.config.messages.shareUnavailable);
           return;
         }
         const known = {
@@ -279,12 +290,13 @@
       }
     }
 
-    expireLink() {
+    expireLink(message) {
       // Once per page: say it in the conversation (a toast is easy to
       // miss), drop pending "typing" bubbles and lock the input, since
       // nothing can be sent with this link any more.
       if (this.linkExpired) return;
       this.linkExpired = true;
+      this.linkExpiredMessage = message;
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -294,10 +306,10 @@
       });
       this.pendingBubbles.clear();
       this.setLoading(false);
-      this.addMessage(this.config.messages.testExpired, 'bot');
+      this.addMessage(message, 'bot');
       if (this.input) {
         this.input.disabled = true;
-        this.input.placeholder = this.config.messages.testExpired;
+        this.input.placeholder = message;
       }
       this.setConnectionState(false, this.config.messages.socketDisconnected);
     }
@@ -411,8 +423,8 @@
       const text = this.input.value.trim();
       if (!text || this.isLoading) return;
 
-      if (!(this.config.channelKey || this.config.testToken) || !this.config.conversationId) {
-        this.showToast('Missing channelKey (or testToken) in AgentChatConfig', 'error');
+      if (!(this.config.channelKey || this.config.testToken || this.config.shareToken) || !this.config.conversationId) {
+        this.showToast('Missing channelKey (or testToken / shareToken) in AgentChatConfig', 'error');
         return;
       }
 

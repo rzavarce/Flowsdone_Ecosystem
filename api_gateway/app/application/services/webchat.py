@@ -21,6 +21,9 @@ from urllib.parse import urlsplit
 
 # Channel name of the messages sent from the console's "try in web chat" demo.
 WEBCHAT_TEST_CHANNEL = "webchat-test"
+# Channel name of the messages sent through a share link (the console's
+# "Share"): people outside the team, so failures don't show technical detail.
+WEBCHAT_SHARE_CHANNEL = "webchat-share"
 
 
 class InvalidOriginError(ValueError):

@@ -469,6 +469,27 @@ class LangflowAccountModel(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class WebchatShareLinkModel(Base):
+    """Row for a public link to try an agent (see domain/models/webchat_share_link.py).
+
+    The token is kept encrypted (so the console can show the link again)
+    and hashed (so a visitor's link is found without decrypting every row).
+    """
+
+    __tablename__ = "webchat_share_links"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    credentials: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class LangflowFolderModel(Base):
     """Row linking a gateway project to its folder in the tenant's Langflow."""
 
