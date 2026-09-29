@@ -186,6 +186,7 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
         channel_type: Optional[str] = None,
         status: Optional[str] = None,
         contact: Optional[str] = None,
+        contact_identifier: Optional[str] = None,
         before: Optional[datetime] = None,
         limit: int = 50,
     ) -> List[Conversation]:
@@ -198,6 +199,8 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
             status (Optional[str]): "open" or "closed".
             contact (Optional[str]): The contact, or the name on its contact
                 card, contains this text (case-insensitive).
+            contact_identifier (Optional[str]): Only this exact contact
+                identifier (one person's conversations).
             before (Optional[datetime]): Only last_message_at before this.
             limit (int): Page size.
 
@@ -226,6 +229,8 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
                 ConversationContactModel.name.ilike(pattern, escape="\\"),
             )
             query = query.where(or_(ConversationModel.contact.ilike(pattern, escape="\\"), named))
+        if contact_identifier is not None:
+            query = query.where(ConversationModel.contact == contact_identifier)
         if before is not None:
             query = query.where(ConversationModel.last_message_at < before)
         query = query.order_by(ConversationModel.last_message_at.desc(), ConversationModel.id).limit(limit)

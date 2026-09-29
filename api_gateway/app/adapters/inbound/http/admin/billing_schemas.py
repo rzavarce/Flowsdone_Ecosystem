@@ -167,6 +167,53 @@ class ContactCardIn(BaseModel):
     notes: Optional[str] = None
 
 
+class ContactOut(BaseModel):
+    """A contact in the contact list.
+
+    Attributes:
+        id (UUID): Contact id.
+        tenant_id (UUID): Tenant.
+        channel_type (str): Channel the identifier is from.
+        identifier (str): The channel's identifier (conversations' `contact`).
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        username (Optional[str]): Account on the channel (@user).
+        notes (Optional[str]): Notes.
+        created_at (datetime): When the card was created.
+        updated_at (datetime): Last change.
+        last_message_at (Optional[datetime]): Last activity in their conversations.
+        conversation_count (int): How many conversations they have had.
+    """
+
+    id: UUID
+    tenant_id: UUID
+    channel_type: str
+    identifier: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    username: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: Optional[datetime] = None
+    conversation_count: int = 0
+
+
+class ContactDetailOut(BaseModel):
+    """A contact with their latest conversations.
+
+    Attributes:
+        contact (ContactOut): The contact.
+        conversations (List[ConversationOut]): Their latest conversations
+            (a few; the inbox has them all).
+    """
+
+    contact: ContactOut
+    conversations: List[ConversationOut]
+
+
 ConversationDetailOut.model_rebuild()
 
 

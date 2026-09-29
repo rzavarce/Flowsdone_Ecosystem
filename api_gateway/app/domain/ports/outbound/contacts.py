@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Optional, Protocol, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Optional, Protocol, Tuple
 from uuid import UUID
 
-from app.domain.models.conversation_contact import Contact, SenderProfile
+from app.domain.models.conversation_contact import Contact, ContactSummary, SenderProfile
 
 # (tenant_id, channel_type, identifier): what identifies a contact.
 ContactKey = Tuple[UUID, str, str]
@@ -48,6 +48,42 @@ class ContactRepositoryPort(Protocol):
 
         Returns:
             Contact: The contact as stored.
+        """
+        ...
+
+
+    async def get_by_id(self, contact_id: UUID) -> Optional[Contact]:
+        """One contact by its id.
+
+        Args:
+            contact_id (UUID): Contact id.
+
+        Returns:
+            Optional[Contact]: The contact, or None.
+        """
+        ...
+
+    async def search(
+        self,
+        *,
+        tenant_ids: Optional[Collection[UUID]],
+        query: Optional[str] = None,
+        channel_type: Optional[str] = None,
+        limit: int = 30,
+        offset: int = 0,
+    ) -> List[ContactSummary]:
+        """Contacts for the contact list, most recent activity first.
+
+        Args:
+            tenant_ids (Optional[Collection[UUID]]): Only these tenants; None = all.
+            query (Optional[str]): Name, email, phone, @user or identifier
+                contains this text (case-insensitive).
+            channel_type (Optional[str]): Only this channel.
+            limit (int): Page size.
+            offset (int): Items to skip.
+
+        Returns:
+            List[ContactSummary]: The page.
         """
         ...
 

@@ -90,3 +90,18 @@ def generic_contact_name(kind: str, visitor_id: str) -> str:
         str: "client:<kind>-<first 8 letters/digits of the id>".
     """
     return f"client:{kind}-{re.sub(r'[^a-z0-9]', '', visitor_id.lower())[:8]}"
+
+
+class ContactSummary(BaseModel):
+    """A contact with a summary of their conversations, for the contact list.
+
+    Attributes:
+        contact (Contact): The card.
+        last_message_at (Optional[datetime]): Last activity in any of their
+            conversations, if they have any.
+        conversation_count (int): How many conversations they have had.
+    """
+
+    contact: Contact
+    last_message_at: Optional[datetime] = None
+    conversation_count: int = 0

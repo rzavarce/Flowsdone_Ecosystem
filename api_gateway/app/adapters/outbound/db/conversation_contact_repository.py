@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, Optional
+from typing import Collection, Dict, Iterable, List, Optional
+from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.adapters.outbound.db.models import ConversationContactModel
-from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact
+from app.adapters.outbound.db.models import ConversationContactModel, ConversationModel
+from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact, ContactSummary
 from app.domain.ports.outbound import ContactKey, ContactRepositoryPort
 
 
@@ -114,3 +115,88 @@ class SqlAlchemyContactRepository(ContactRepositoryPort):
             row = (await session.execute(stmt)).scalar_one()
             await session.commit()
             return _to_domain(row)
+
+    async def get_by_id(self, contact_id: UUID) -> Optional[Contact]:
+        """One contact by its id.
+
+        Args:
+            contact_id (UUID): Contact id.
+
+        Returns:
+            Optional[Contact]: The contact, or None.
+        """
+        async with self._sessionmaker() as session:
+            row = await session.get(ConversationContactModel, contact_id)
+            return _to_domain(row) if row is not None else None
+
+    async def search(
+        self,
+        *,
+        tenant_ids: Optional[Collection[UUID]],
+        query: Optional[str] = None,
+        channel_type: Optional[str] = None,
+        limit: int = 30,
+        offset: int = 0,
+    ) -> List[ContactSummary]:
+        """Contacts for the contact list, most recent activity first.
+
+        Each one comes with the last activity and number of its conversations
+        (same tenant, channel and identifier); those without conversations go
+        last, newest card first.
+
+        Args:
+            tenant_ids (Optional[Collection[UUID]]): Only these tenants; None = all.
+            query (Optional[str]): Name, email, phone, @user or identifier
+                contains this text (case-insensitive).
+            channel_type (Optional[str]): Only this channel.
+            limit (int): Page size.
+            offset (int): Items to skip.
+
+        Returns:
+            List[ContactSummary]: The page.
+        """
+        contact = ConversationContactModel
+        activity = (
+            select(
+                ConversationModel.tenant_id,
+                ConversationModel.channel_type,
+                ConversationModel.contact,
+                func.max(ConversationModel.last_message_at).label("last_message_at"),
+                func.count().label("conversation_count"),
+            )
+            .group_by(ConversationModel.tenant_id, ConversationModel.channel_type, ConversationModel.contact)
+            .subquery()
+        )
+        stmt = select(contact, activity.c.last_message_at, activity.c.conversation_count).outerjoin(
+            activity,
+            and_(
+                activity.c.tenant_id == contact.tenant_id,
+                activity.c.channel_type == contact.channel_type,
+                activity.c.contact == contact.identifier,
+            ),
+        )
+        if tenant_ids is not None:
+            if not tenant_ids:
+                return []
+            stmt = stmt.where(contact.tenant_id.in_(list(tenant_ids)))
+        if channel_type:
+            stmt = stmt.where(contact.channel_type == channel_type)
+        if query:
+            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            stmt = stmt.where(
+                or_(*(column.ilike(pattern, escape="\\") for column in (
+                    contact.name, contact.email, contact.phone, contact.username, contact.identifier
+                )))
+            )
+        stmt = (
+            stmt.order_by(activity.c.last_message_at.desc().nulls_last(), contact.updated_at.desc(), contact.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        async with self._sessionmaker() as session:
+            rows = (await session.execute(stmt)).all()
+        return [
+            ContactSummary(contact=_to_domain(row[0]), last_message_at=row[1], conversation_count=row[2] or 0)
+            for row in rows
+        ]

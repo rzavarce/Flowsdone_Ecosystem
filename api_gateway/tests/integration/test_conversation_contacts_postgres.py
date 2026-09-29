@@ -90,3 +90,29 @@ async def test_conversations_can_be_searched_by_the_name_on_their_card(ctx):
     assert [c.id for c in by_name] == [named.id]
     assert [c.id for c in by_identifier] == [unnamed.id]
     assert nobody == []
+
+
+async def test_the_contact_list_comes_with_activity_and_can_be_searched(ctx):
+    contacts = SqlAlchemyContactRepository(ctx["sessionmaker"])
+    conversations = SqlAlchemyConversationRepository(ctx["sessionmaker"])
+    for _ in range(2):
+        await conversations.open(make_conversation(
+            tenant_id=ctx["tenant_id"], project_id=ctx["project_id"], channel_type="voice",
+            contact="+34600111222", session_id=f"s-{uuid.uuid4()}",
+        ))
+    ana = await contacts.upsert((ctx["tenant_id"], "voice", "+34600111222"), {"name": "Ana", "email": "ana@example.com"})
+    quiet = await contacts.upsert((ctx["tenant_id"], "telegram", "7"), {"username": "@luis_50%"})
+
+    page = await contacts.search(tenant_ids=[ctx["tenant_id"]])
+    by_email = await contacts.search(tenant_ids=[ctx["tenant_id"]], query="EXAMPLE.COM")
+    literal = await contacts.search(tenant_ids=[ctx["tenant_id"]], query="50%")
+    voice_only = await contacts.search(tenant_ids=[ctx["tenant_id"]], channel_type="telegram")
+
+    assert [s.contact.id for s in page] == [ana.id, quiet.id]  # with activity first
+    assert page[0].conversation_count == 2 and page[0].last_message_at is not None
+    assert page[1].conversation_count == 0 and page[1].last_message_at is None
+    assert [s.contact.id for s in by_email] == [ana.id]
+    assert [s.contact.id for s in literal] == [quiet.id]
+    assert [s.contact.id for s in voice_only] == [quiet.id]
+    assert (await contacts.get_by_id(ana.id)).name == "Ana"
+    assert await contacts.search(tenant_ids=[]) == []

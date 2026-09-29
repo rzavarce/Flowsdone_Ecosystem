@@ -39,6 +39,26 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("tenant_id", "channel_type", "identifier", name="uq_contacts_identity"),
     )
+    # A card for every contact that already has conversations, so the contact
+    # list isn't empty until they write again. What the identifier tells:
+    # a WhatsApp jid or a caller's number is a phone; a browser call's
+    # identity is its (generic, renameable) name.
+    op.execute(
+        r"""
+        INSERT INTO contacts (id, tenant_id, channel_type, identifier, name, phone, created_at, updated_at)
+        SELECT gen_random_uuid(), tenant_id, channel_type, contact,
+               CASE WHEN contact LIKE 'client:%' THEN contact END,
+               CASE
+                   WHEN channel_type = 'whatsapp_evolution' AND contact ~ '^[0-9]+@s\.whatsapp\.net$'
+                       THEN '+' || split_part(contact, '@', 1)
+                   WHEN channel_type = 'voice' AND contact ~ '^\+[0-9]+$' THEN contact
+               END,
+               min(started_at), now()
+        FROM conversations
+        GROUP BY tenant_id, channel_type, contact
+        ON CONFLICT ON CONSTRAINT uq_contacts_identity DO NOTHING
+        """
+    )
 
 
 def downgrade() -> None:

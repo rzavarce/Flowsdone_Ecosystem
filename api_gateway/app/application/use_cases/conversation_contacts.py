@@ -13,12 +13,12 @@ edit it from a conversation, and what they type always wins.
 from __future__ import annotations
 
 import re
-from typing import Dict, Iterable, List, Optional
+from typing import Collection, Dict, Iterable, List, Optional
 from uuid import UUID
 
 from app.domain.models.conversation import Conversation
 from app.application.services.contact_extraction import extract_contact_details
-from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact, SenderProfile
+from app.domain.models.conversation_contact import CONTACT_FIELDS, Contact, ContactSummary, SenderProfile
 from app.domain.ports.outbound import ContactKey, ContactRepositoryPort
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -115,6 +115,59 @@ class ManageConversationContactsUseCase:
             InvalidContactError: If a value is invalid.
         """
         return await self._contacts.upsert(contact_key(conversation), _clean(fields, drop_empty=False))
+
+    async def update_contact(self, contact: Contact, fields: Dict[str, Optional[str]]) -> Contact:
+        """Staff edit a contact's card from the contact list (overwrites).
+
+        Args:
+            contact (Contact): The contact.
+            fields (Dict[str, Optional[str]]): Fields to set; empty clears one.
+
+        Returns:
+            Contact: The card as stored.
+
+        Raises:
+            InvalidContactError: If a value is invalid.
+        """
+        key = (contact.tenant_id, contact.channel_type, contact.identifier)
+        return await self._contacts.upsert(key, _clean(fields, drop_empty=False))
+
+    async def get(self, contact_id: UUID) -> Optional[Contact]:
+        """One contact by its id.
+
+        Args:
+            contact_id (UUID): Contact id.
+
+        Returns:
+            Optional[Contact]: The contact, or None.
+        """
+        return await self._contacts.get_by_id(contact_id)
+
+    async def search(
+        self,
+        *,
+        tenant_ids: Optional[Collection[UUID]],
+        query: Optional[str] = None,
+        channel_type: Optional[str] = None,
+        limit: int = 30,
+        offset: int = 0,
+    ) -> List[ContactSummary]:
+        """The contact list, most recent activity first.
+
+        Args:
+            tenant_ids (Optional[Collection[UUID]]): Only these tenants; None = all.
+            query (Optional[str]): Text to look for (name, email, phone,
+                @user or identifier).
+            channel_type (Optional[str]): Only this channel.
+            limit (int): Page size.
+            offset (int): Items to skip.
+
+        Returns:
+            List[ContactSummary]: The page.
+        """
+        return await self._contacts.search(
+            tenant_ids=tenant_ids, query=(query or "").strip() or None, channel_type=channel_type, limit=limit, offset=offset
+        )
 
     async def record_from_channel(
         self,

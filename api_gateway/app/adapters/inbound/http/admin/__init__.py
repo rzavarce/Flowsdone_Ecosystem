@@ -14,6 +14,7 @@ from app.adapters.inbound.http.admin.agents import router as agents_router
 from app.adapters.inbound.http.admin.billing import router as billing_router
 from app.adapters.inbound.http.admin.channel_apps import router as channel_apps_router
 from app.adapters.inbound.http.admin.channel_connections import router as channel_connections_router
+from app.adapters.inbound.http.admin.contacts import router as contacts_router
 from app.adapters.inbound.http.admin.conversations import router as conversations_router
 from app.adapters.inbound.http.admin.langflow import router as langflow_router
 from app.adapters.inbound.http.admin.onboarding import router as onboarding_router
@@ -36,6 +37,7 @@ for _sub_router in (
     users_router,
     langflow_router,
     conversations_router,
+    contacts_router,
     billing_router,
     onboarding_router,
 ):
