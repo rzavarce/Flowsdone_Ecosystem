@@ -19,6 +19,7 @@ import type {
   UnratedMeter,
   UserRecord,
   WebchatTestLink,
+  WebchatShareLink,
 } from './types'
 
 /**
@@ -53,6 +54,10 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     updateAgent: (id, patch) => call<Agent>(`/agents/${id}`, 'PATCH', patch),
     deleteAgent: (id) => call<void>(`/agents/${id}`, 'DELETE'),
     webchatTestLink: (agentId) => call<WebchatTestLink>(`/agents/${agentId}/webchat-test`, 'POST'),
+    listWebchatShares: (agentId) => call<WebchatShareLink[]>(`/agents/${agentId}/webchat-shares`),
+    createWebchatShare: (agentId, expiresInDays) =>
+      call<WebchatShareLink>(`/agents/${agentId}/webchat-shares`, 'POST', { expires_in_days: expiresInDays }),
+    revokeWebchatShare: (agentId, shareId) => call<void>(`/agents/${agentId}/webchat-shares/${shareId}`, 'DELETE'),
     createBaseAgent: (input) => call<Agent>('/agents/base', 'POST', input),
     getOnboarding: (tenantId) => call<OnboardingStatus>(`/tenants/${tenantId}/onboarding`),
     listLangflowFlows: (projectId) => call<LangflowFlow[]>(`/langflow/flows${query({ project_id: projectId })}`),

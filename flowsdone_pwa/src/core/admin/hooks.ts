@@ -8,6 +8,7 @@ import type {
   CreateChannelConnectionInput,
   CreateProjectInput,
   CreateTenantInput,
+  ShareLinkDays,
   CreateUserInput,
   UpdateChannelConnectionInput,
   UpdateProjectInput,
@@ -29,6 +30,7 @@ export const adminKeys = {
   langflowSession: ['langflow-session'] as const,
   langflowFlows: ['langflow-flows'] as const,
   onboarding: ['onboarding'] as const,
+  webchatShares: ['webchat-shares'] as const,
 }
 
 /** Visible tenants with all of their data (slug, status…). */
@@ -208,6 +210,37 @@ export function useDeleteProject() {
 export function useWebchatTestLink() {
   const api = useAdminApi()
   return useMutation({ mutationFn: (agentId: string) => api.webchatTestLink(agentId) })
+}
+
+/** An agent's share links (public links to chat with it), newest first. */
+export function useWebchatShares(agentId?: string) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.webchatShares, agentId],
+    queryFn: () => api.listWebchatShares(agentId as string),
+    enabled: Boolean(agentId),
+  })
+}
+
+/** Creates a share link for an agent (7 or 30 days, or never expiring). */
+export function useCreateWebchatShare() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ agentId, expiresInDays }: { agentId: string; expiresInDays: ShareLinkDays }) =>
+      api.createWebchatShare(agentId, expiresInDays),
+    onSuccess: (_link, { agentId }) => void qc.invalidateQueries({ queryKey: [...adminKeys.webchatShares, agentId] }),
+  })
+}
+
+/** Revokes a share link: it stops working at once. */
+export function useRevokeWebchatShare() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ agentId, shareId }: { agentId: string; shareId: string }) => api.revokeWebchatShare(agentId, shareId),
+    onSuccess: (_void, { agentId }) => void qc.invalidateQueries({ queryKey: [...adminKeys.webchatShares, agentId] }),
+  })
 }
 
 /** Agents visible to the current profile. */

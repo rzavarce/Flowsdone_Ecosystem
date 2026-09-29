@@ -85,15 +85,17 @@ http:
     # El dominio sale de WEBCHAT_PUBLIC_URL (la misma variable que usa el
     # gateway para el código del widget y el link de prueba): el file
     # provider admite plantillas Go, y urlParse extrae el host de la URL.
+    # /voice-demo (token del softphone de la pestaña "Llamar" de la demo)
+    # tampoco es un estático: va al gateway tal cual, igual que /ws.
     webchat-ws:
-      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && Path(`/ws`)'
+      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && (Path(`/ws`) || PathPrefix(`/voice-demo`))'
       entrypoints: [websecure]
       tls:
         certresolver: myresolver
       service: webchat-svc
 
     webchat:
-      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && !Path(`/ws`)'
+      rule: 'Host(`{{ (urlParse (env "WEBCHAT_PUBLIC_URL")).hostname }}`) && !Path(`/ws`) && !PathPrefix(`/voice-demo`)'
       entrypoints: [websecure]
       tls:
         certresolver: myresolver

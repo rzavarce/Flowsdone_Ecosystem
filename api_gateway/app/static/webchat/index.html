@@ -1,299 +1,187 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>Flowsdone Webchat — demo e integración</title>
-  <link rel="stylesheet" href="demo.css?v=20260901" />
-  <link rel="stylesheet" href="agent-chat-widget.css?v=20260901" />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#04141F" />
+  <title>Demo · Flowsdone</title>
+  <meta name="description" content="Habla con un asistente virtual creado con Flowsdone." />
+  <link rel="icon" type="image/svg+xml" href="brand/flowsdone-mark.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="agent-chat-widget.css?v=20260929" />
+  <link rel="stylesheet" href="demo-page.css?v=20260929" />
 </head>
 <body>
-
-  <header class="demo-hero">
-    <div class="demo-hero-inner">
-      <span class="demo-eyebrow">Flowsdone · Webchat widget</span>
-      <h1>Un chat con IA, embebible en cualquier página</h1>
-      <p>Un solo <code>&lt;script&gt;</code>, un objeto de configuración y listo. Este mismo widget que ves flotando abajo a la derecha es el que podés integrar en tu sitio en minutos.</p>
-      <div class="demo-hero-actions">
-        <a class="btn btn-light" href="#demo">Probar el chat en vivo</a>
-        <a class="btn btn-ghost" href="#integracion">Ver guía de integración</a>
-      </div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="https://flowsdone.com/" aria-label="Flowsdone">
+        <img src="brand/flowsdone-mark.svg" alt="" width="36" height="36" />
+        <span class="brand-name">Flows<span>done</span></span>
+      </a>
+      <a class="header-link" href="https://flowsdone.com/" target="_blank" rel="noopener">Conoce Flowsdone ↗</a>
     </div>
   </header>
 
-  <div class="demo-shell">
-
-    <section class="demo-section" id="demo">
-      <div class="demo-section-head">
-        <span class="demo-kicker">Demo en vivo</span>
-        <h2>Probá un agente en el chat web</h2>
-        <p>Esta demo sirve para probar cualquier agente, pero solo se abre desde la consola de Flowsdone: en <strong>Agentes</strong>, botón <strong>Probar en webchat</strong>. El enlace lleva un permiso de prueba para ese agente que caduca en unos minutos; estas conversaciones no se registran ni se facturan.</p>
-      </div>
-      <div class="demo-card">
-        <p class="demo-hint" id="demo-status">Abrí esta página desde la consola para elegir el agente a probar.</p>
-        <p class="demo-live-note" id="demo-open-note" hidden>Hacé click en el botón flotante (abajo a la derecha) para abrir el chat.</p>
-        <p class="demo-live-note">
-          <button class="case-btn" id="reset-conversation-btn" type="button">Nueva conversación</button>
-          — el id de la conversación se guarda en <code>localStorage</code> y sobrevive a un refresh (como en el widget embebido). Usá este botón para empezar una conversación limpia.
+  <main class="demo">
+    <div class="container demo-grid">
+      <section>
+        <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Demo en vivo</p>
+        <h1>Habla con <span class="grad" id="agent-name">nuestro asistente</span></h1>
+        <p class="lead" id="lead">
+          Un asistente virtual creado con Flowsdone. Escríbele como lo haría uno de tus clientes: responde al momento,
+          con la información real del negocio.
         </p>
-      </div>
-    </section>
+        <ul class="points">
+          <li>Responde al instante, las 24 horas</li>
+          <li>Entrenado con la información del negocio</li>
+          <li>Pasa la conversación a una persona cuando hace falta</li>
+        </ul>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://flowsdone.com/#contacto" target="_blank" rel="noopener">Quiero uno para mi negocio</a>
+          <button class="btn btn-ghost" type="button" id="reset-conversation-btn">Nueva conversación</button>
+        </div>
+        <p class="test-badge" id="test-badge" hidden>Modo prueba · estas conversaciones no se registran ni se facturan</p>
+      </section>
 
-    <section class="demo-section" id="integracion">
-      <div class="demo-section-head">
-        <span class="demo-kicker">Integración</span>
-        <h2>Cómo agregarlo a tu página</h2>
-        <p>Cada cliente tiene su canal <strong>Chat web</strong> en la consola (sección <strong>Canales</strong>), con su clave pública (<code>wc_…</code>) y el fragmento listo para copiar. Tres pasos: cargar el CSS y el JS del widget, definir la configuración antes de que el script corra, y listo — se auto-inicializa solo.</p>
-      </div>
-      <div class="demo-card">
+      <div class="stage" id="stage" hidden>
+        <div class="tabs" role="tablist" aria-label="Cómo hablar con el asistente" id="tabs" hidden>
+          <button class="tab" type="button" role="tab" id="tab-chat" aria-controls="chat-frame" aria-selected="true">Chatear</button>
+          <button class="tab" type="button" role="tab" id="tab-call" aria-controls="call-panel" aria-selected="false">Llamar</button>
+        </div>
 
-        <div class="step">
-          <span class="step-num">1</span>
-          <div class="step-body">
-            <h3>Cargá el CSS y el script del widget</h3>
-            <p>Van en cualquier parte de tu <code>&lt;head&gt;</code> o antes de cerrar <code>&lt;/body&gt;</code>. Se sirven desde nuestro dominio, no hace falta alojarlos vos.</p>
-            <div class="code-block">
-              <button class="copy-btn" data-copy-target="snippet-1">Copiar</button>
-              <pre id="snippet-1"><code>&lt;link rel="stylesheet" href="https://chat.flowsdone.com/agent-chat-widget.css" /&gt;
-&lt;script src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;</code></pre>
+        <div class="chat-frame" id="chat-frame" role="tabpanel" aria-labelledby="tab-chat"></div>
+
+        <div class="chat-frame call-panel" id="call-panel" role="tabpanel" aria-labelledby="tab-call" data-state="ready" hidden>
+          <div class="call-card">
+            <div class="call-avatar" aria-hidden="true"><span id="call-initial">A</span></div>
+            <p class="call-name" id="call-name">Asistente</p>
+            <p class="call-status" id="call-status" role="status" aria-live="polite">Listo para llamar</p>
+            <p class="call-timer" id="call-timer" hidden>00:00</p>
+            <div class="call-controls">
+              <button class="call-btn call-start" type="button" id="call-start"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span>Llamar</span></button>
+              <button class="call-btn call-mute" type="button" id="call-mute" aria-pressed="false" hidden><span>Silenciar</span></button>
+              <button class="call-btn call-hangup" type="button" id="call-hangup" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg><span>Colgar</span></button>
             </div>
+            <p class="call-hint">Hablarás desde el navegador, con el micrófono y el altavoz de tu dispositivo. La primera vez te pedirá permiso para usar el micrófono.</p>
+            <p class="call-alt">¿Prefieres tu teléfono? Llama al <a id="call-alt-number" href="#"></a></p>
           </div>
         </div>
-
-        <div class="step">
-          <span class="step-num">2</span>
-          <div class="step-body">
-            <h3>Definí <code>window.AgentChatConfig</code> antes del script</h3>
-            <p>El widget busca esta variable global apenas carga y se auto-inicializa. El único campo obligatorio es <code>channelKey</code>, la clave del canal Chat web del cliente. Si el canal tiene dominios permitidos, el chat solo funciona en esas webs.</p>
-            <div class="code-block">
-              <button class="copy-btn" data-copy-target="snippet-2">Copiar</button>
-              <pre id="snippet-2"><code>&lt;script&gt;
-  window.AgentChatConfig = {
-    wsUrl: "wss://chat.flowsdone.com/ws",
-    channelKey: "wc_TU_CLAVE",      // obligatorio: la clave del canal Chat web
-    title: "Mi Asistente",
-    initialMessage: "¡Hola! ¿En qué te puedo ayudar?",
-    launcherColor: "#4F46E5",
-    sendButtonColor: "#10B981"
-  };
-&lt;/script&gt;
-&lt;link rel="stylesheet" href="https://chat.flowsdone.com/agent-chat-widget.css" /&gt;
-&lt;script src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;</code></pre>
-            </div>
-          </div>
-        </div>
-
-        <div class="step">
-          <span class="step-num">3</span>
-          <div class="step-body">
-            <h3>(Opcional) Inicializá manualmente</h3>
-            <p>Si preferís no usar <code>window.AgentChatConfig</code> — por ejemplo, para crear el widget después de una acción del usuario — llamá a <code>init()</code> a mano con el script cargado con <code>defer</code>.</p>
-            <div class="code-block">
-              <button class="copy-btn" data-copy-target="snippet-3">Copiar</button>
-              <pre id="snippet-3"><code>&lt;script defer src="https://chat.flowsdone.com/agent-chat-widget.js"&gt;&lt;/script&gt;
-&lt;script&gt;
-  window.addEventListener("load", function () {
-    window.AgentChat.init({ wsUrl: "wss://chat.flowsdone.com/ws", channelKey: "wc_TU_CLAVE" });
-  });
-&lt;/script&gt;</code></pre>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </section>
-
-    <section class="demo-section" id="configuracion">
-      <div class="demo-section-head">
-        <span class="demo-kicker">Referencia</span>
-        <h2>Variables de configuración disponibles</h2>
-        <p>Todo lo que acepta <code>AgentChatConfig</code> / <code>AgentChat.init(options)</code>, agrupado por para qué sirve. Ninguna es obligatoria salvo <code>channelKey</code>.</p>
       </div>
 
-      <div class="demo-card">
-
-        <div class="config-group">
-          <h3>Conexión</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>channelKey</code></td><td class="col-default">—</td><td class="col-desc"><strong>Obligatorio.</strong> Clave pública del canal Chat web del cliente (<code>wc_…</code>), en la consola → Canales. Decide qué agente responde; las conversaciones cuentan como las de cualquier canal.</td></tr>
-              <tr><td class="col-name"><code>wsUrl</code></td><td class="col-default">auto</td><td class="col-desc">Endpoint del WebSocket. Por defecto se arma a partir del dominio de la página (<code>wss://tu-dominio/ws</code>), así que en la web del cliente hay que indicarlo: <code>wss://chat.flowsdone.com/ws</code> (el fragmento de la consola ya lo incluye).</td></tr>
-              <tr><td class="col-name"><code>sessionId</code></td><td class="col-default">auto</td><td class="col-desc">Id de sesión del visitante. Se genera y persiste en <code>localStorage</code> si no lo pasás.</td></tr>
-              <tr><td class="col-name"><code>conversationId</code></td><td class="col-default">auto</td><td class="col-desc">Id de conversación, también persistido en <code>localStorage</code>. Pasalo vos si necesitás controlar cuándo empieza una conversación nueva.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Textos y contenido</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>title</code></td><td class="col-default"><code>AI Assistant</code></td><td class="col-desc">Título en el header del chat.</td></tr>
-              <tr><td class="col-name"><code>initialMessage</code></td><td class="col-default">"Hi! How can I help you today?"</td><td class="col-desc">Primer mensaje que muestra el bot al abrir.</td></tr>
-              <tr><td class="col-name"><code>inputPlaceholder</code></td><td class="col-default">"Type your message..."</td><td class="col-desc">Placeholder del campo de texto.</td></tr>
-              <tr><td class="col-name"><code>sendLabel</code></td><td class="col-default"><code>Send</code></td><td class="col-desc">Texto accesible (aria-label) del botón de enviar.</td></tr>
-              <tr><td class="col-name"><code>openLabel</code> / <code>closeLabel</code></td><td class="col-default"><code>Open chat</code> / <code>Close chat</code></td><td class="col-desc">Textos accesibles del botón flotante y del botón de cerrar.</td></tr>
-              <tr><td class="col-name"><code>messages</code></td><td class="col-default">objeto con defaults en inglés</td><td class="col-desc">Sobrescribí <code>socketConnecting</code>, <code>socketConnected</code>, <code>socketDisconnected</code>, <code>genericError</code> y/o <code>queuedError</code> para traducir los mensajes de estado.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Tamaño y posición</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>width</code></td><td class="col-default"><code>420px</code></td><td class="col-desc">Ancho de la ventana del chat abierta.</td></tr>
-              <tr><td class="col-name"><code>height</code></td><td class="col-default"><code>680px</code></td><td class="col-desc">Alto de la ventana del chat abierta.</td></tr>
-              <tr><td class="col-name"><code>maxHeight</code></td><td class="col-default"><code>80vh</code></td><td class="col-desc">Tope de alto relativo al viewport, para pantallas chicas.</td></tr>
-              <tr><td class="col-name"><code>position</code></td><td class="col-default"><code>bottom-right</code></td><td class="col-desc"><code>bottom-right</code> o <code>bottom-left</code>.</td></tr>
-              <tr><td class="col-name"><code>bottom</code></td><td class="col-default"><code>20px</code></td><td class="col-desc">Separación desde el borde inferior de la pantalla.</td></tr>
-              <tr><td class="col-name"><code>sideOffset</code></td><td class="col-default"><code>20px</code></td><td class="col-desc">Separación desde el borde lateral (derecho o izquierdo según <code>position</code>).</td></tr>
-              <tr><td class="col-name"><code>launcherSize</code></td><td class="col-default"><code>60px</code></td><td class="col-desc">Diámetro del botón flotante.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Colores y tema</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>launcherColor</code></td><td class="col-default"><code>#4F46E5</code></td><td class="col-desc">Color de fondo del botón flotante.</td></tr>
-              <tr><td class="col-name"><code>launcherIconColor</code></td><td class="col-default"><code>#ffffff</code></td><td class="col-desc">Color del ícono dentro del botón flotante.</td></tr>
-              <tr><td class="col-name"><code>launcherIconAccentColor</code></td><td class="col-default"><code>#111827</code></td><td class="col-desc">Color de acento secundario del ícono por defecto.</td></tr>
-              <tr><td class="col-name"><code>launcherIconUrl</code></td><td class="col-default">—</td><td class="col-desc">URL de una imagen propia para reemplazar el ícono SVG por defecto del botón flotante.</td></tr>
-              <tr><td class="col-name"><code>headerColor</code></td><td class="col-default"><code>#111827</code></td><td class="col-desc">Color de fondo del header del chat.</td></tr>
-              <tr><td class="col-name"><code>headerTextColor</code></td><td class="col-default"><code>#ffffff</code></td><td class="col-desc">Color del texto del header.</td></tr>
-              <tr><td class="col-name"><code>userMessageColor</code> / <code>userMessageTextColor</code></td><td class="col-default"><code>#4F46E5</code> / <code>#ffffff</code></td><td class="col-desc">Fondo y texto de las burbujas del usuario.</td></tr>
-              <tr><td class="col-name"><code>botMessageColor</code> / <code>botMessageTextColor</code></td><td class="col-default"><code>#E5E7EB</code> / <code>#111827</code></td><td class="col-desc">Fondo y texto de las burbujas del bot.</td></tr>
-              <tr><td class="col-name"><code>sendButtonColor</code></td><td class="col-default"><code>#10B981</code></td><td class="col-desc">Color del botón de enviar.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Comportamiento</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>mode</code></td><td class="col-default"><code>widget</code></td><td class="col-desc"><code>widget</code> (botón flotante + ventana popup) o <code>fullscreen</code> (el chat ocupa toda la pantalla, sin botón flotante).</td></tr>
-              <tr><td class="col-name"><code>autoOpen</code></td><td class="col-default"><code>false</code></td><td class="col-desc">Si es <code>true</code>, el chat se abre solo 100ms después de cargar la página.</td></tr>
-              <tr><td class="col-name"><code>showLauncher</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Ponelo en <code>false</code> para ocultar el botón flotante por completo (útil si vos disparás la apertura desde otro elemento).</td></tr>
-              <tr><td class="col-name"><code>closeOnEsc</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Cierra el chat con la tecla Esc (no aplica en modo <code>fullscreen</code>).</td></tr>
-              <tr><td class="col-name"><code>focusInputOnOpen</code></td><td class="col-default"><code>true</code></td><td class="col-desc">Enfoca el campo de texto automáticamente al abrir el chat.</td></tr>
-              <tr><td class="col-name"><code>toastDuration</code></td><td class="col-default"><code>4500</code> (ms)</td><td class="col-desc">Cuánto tiempo queda visible un mensaje de error tipo toast.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Animación</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>animation</code></td><td class="col-default"><code>slide-up</code></td><td class="col-desc"><code>slide-up</code>, <code>scale</code>, <code>fade</code> o <code>none</code>. Efecto al abrir/cerrar la ventana del chat.</td></tr>
-              <tr><td class="col-name"><code>animationDuration</code></td><td class="col-default"><code>280ms</code></td><td class="col-desc">Duración de esa transición.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="config-group">
-          <h3>Reconexión del WebSocket</h3>
-          <table class="config-table">
-            <thead><tr><th class="col-name">Variable</th><th class="col-default">Default</th><th class="col-desc">Qué hace</th></tr></thead>
-            <tbody>
-              <tr><td class="col-name"><code>reconnectInterval</code></td><td class="col-default"><code>1500</code> (ms)</td><td class="col-desc">Espera inicial antes de reintentar la conexión si el WebSocket se corta.</td></tr>
-              <tr><td class="col-name"><code>maxReconnectInterval</code></td><td class="col-default"><code>15000</code> (ms)</td><td class="col-desc">Tope del backoff exponencial entre reintentos.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
+      <div class="notice-card" id="no-link" hidden>
+        <h2>Este enlace no es válido</h2>
+        <p>La demo se abre con el enlace que te han enviado. Si lo copiaste a mano, comprueba que esté completo.</p>
+        <a class="btn btn-primary" href="https://flowsdone.com/#contacto">Pide una demo</a>
       </div>
-    </section>
+    </div>
+  </main>
 
-    <p class="demo-footer">
-      ¿Dudas sobre cómo conectar el chat a la web de un cliente? Revisá el <a href="/">README del proyecto</a> o el equipo de Flowsdone.
-    </p>
-
-  </div>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© Flowsdone · Agentes de IA para atender a tus clientes</span>
+      <a href="integracion.html">Integra el chat en tu web</a>
+    </div>
+  </footer>
 
   <script>
-    // La demo solo funciona con el permiso de prueba que da la consola
-    // (Agentes -> Probar en webchat): ?test_token=...&agent=<nombre>.
+    // El chat se abre con uno de los dos permisos que da la consola:
+    //  - ?share=...&agent=<nombre>: "Compartir" (cualquiera con el enlace, hasta que se revoque o venza).
+    //  - ?test_token=...&agent=<nombre>: "Probar en webchat" (equipo, caduca en minutos).
     const params = new URLSearchParams(location.search);
-    const testToken = params.get("test_token");
-    const agentName = params.get("agent") || "el agente";
+    const shareToken = params.get("share");
+    const testToken = shareToken ? null : params.get("test_token");
+    const agentName = params.get("agent") || "nuestro asistente";
 
-    const status = document.getElementById("demo-status");
-    if (testToken) {
-      status.textContent = "Probando: " + agentName + ". Las conversaciones de prueba no se registran ni se facturan.";
-      document.getElementById("demo-open-note").hidden = false;
-    }
+    document.getElementById("agent-name").textContent = agentName;
+    document.title = agentName + " · Demo · Flowsdone";
 
     document.getElementById("reset-conversation-btn").addEventListener("click", function () {
-      // El widget guarda sus ids en localStorage (agent-chat-session-id /
-      // agent-chat-conversation-id): se borran para que el agente no
-      // arrastre historial de una conversación anterior.
+      // El widget guarda sus ids en localStorage: se borran para empezar de cero,
+      // sin que el agente arrastre el historial de la conversación anterior.
       ["agent-chat-session-id", "agent-chat-conversation-id"].forEach(function (key) {
-        localStorage.removeItem(key);
+        try { localStorage.removeItem(key); } catch (e) { /* sin almacenamiento: nada que borrar */ }
       });
       location.reload();
     });
 
-    document.querySelectorAll(".copy-btn").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        const target = document.getElementById(btn.dataset.copyTarget);
-        const text = target ? target.textContent : "";
-        navigator.clipboard.writeText(text).then(function () {
-          const original = btn.textContent;
-          btn.textContent = "¡Copiado!";
-          btn.classList.add("copied");
-          setTimeout(function () {
-            btn.textContent = original;
-            btn.classList.remove("copied");
-          }, 1800);
+    function selectTab(name) {
+      const call = name === "call";
+      document.getElementById("tab-chat").setAttribute("aria-selected", String(!call));
+      document.getElementById("tab-call").setAttribute("aria-selected", String(call));
+      document.getElementById("chat-frame").hidden = call;
+      document.getElementById("call-panel").hidden = !call;
+    }
+
+    if (shareToken || testToken) {
+      document.getElementById("stage").hidden = false;
+      document.getElementById("test-badge").hidden = !testToken;
+      document.getElementById("call-name").textContent = agentName;
+      document.getElementById("call-initial").textContent = agentName.trim().charAt(0).toUpperCase() || "A";
+      document.getElementById("tab-chat").addEventListener("click", function () { selectTab("chat"); });
+      document.getElementById("tab-call").addEventListener("click", function () { selectTab("call"); });
+
+      // Si el agente tiene un canal de voz, aparece la pestaña "Llamar".
+      window.addEventListener("load", function () {
+        window.FlowsdoneVoiceDemo.init({
+          shareToken: shareToken,
+          testToken: testToken,
+          onAvailable: function () {
+            document.getElementById("tabs").hidden = false;
+            document.getElementById("lead").textContent =
+              "Un asistente virtual creado con Flowsdone. Escríbele o llámale como lo haría uno de tus clientes: " +
+              "responde al momento, con la información real del negocio.";
+            if (location.hash === "#llamar") selectTab("call");
+          }
         });
       });
-    });
 
-    if (testToken) {
       window.AgentChatConfig = {
-        wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
+        wsUrl: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws",
+        shareToken: shareToken,
         testToken: testToken,
-        transport: 'kafka',
+        transport: "kafka",
 
+        mode: "inline",
+        mountTarget: "#chat-frame",
         title: agentName,
-        initialMessage: '¡Hola! Estás probando ' + agentName + '. ¿En qué te ayudo?',
-        inputPlaceholder: 'Escribe tu mensaje...',
+        initialMessage: "¡Hola! Soy " + agentName + ". ¿En qué te puedo ayudar?",
+        inputPlaceholder: "Escribe tu mensaje...",
+        waitingMessage: "Escribiendo",
+        sendLabel: "Enviar",
+
+        headerColor: "#0a2231",
+        headerTextColor: "#ffffff",
+        userMessageColor: "#19b4e6",
+        userMessageTextColor: "#04141f",
+        botMessageColor: "#ffffff",
+        botMessageTextColor: "#0b1b2b",
+        sendButtonColor: "#24e5a3",
+
         messages: {
-          socketConnecting: 'Conectando...',
-          socketConnected: 'Conectado',
-          socketDisconnected: 'Desconectado',
-          genericError: 'Algo salió mal. Inténtalo de nuevo.',
-          rateLimited: 'Demasiados mensajes seguidos. Espera un momento.',
-          messageTooLong: 'El mensaje es demasiado largo.',
-          testExpired: 'Este enlace de prueba ha caducado. Pide uno nuevo desde la consola.'
-        },
-
-        launcherColor: '#4F46E5',
-        launcherIconColor: '#ffffff',
-        launcherIconAccentColor: '#111827',
-        sendButtonColor: '#10B981',
-
-        width: '420px',
-        height: '680px',
-        autoOpen: true
+          socketConnecting: "Conectando...",
+          socketConnected: "En línea",
+          socketDisconnected: "Desconectado",
+          genericError: "Algo salió mal. Inténtalo de nuevo.",
+          rateLimited: "Demasiados mensajes seguidos. Espera un momento.",
+          messageTooLong: "El mensaje es demasiado largo.",
+          testExpired: "Este enlace de prueba ha caducado. Pide uno nuevo desde la consola.",
+          shareUnavailable: "Este enlace ya no está disponible. Pide uno nuevo a quien te lo envió."
+        }
       };
+    } else {
+      document.getElementById("no-link").hidden = false;
+      document.getElementById("reset-conversation-btn").hidden = true;
     }
   </script>
 
   <!-- El widget DESPUÉS del config, sin defer -->
-  <script src="agent-chat-widget.js"></script>
+  <script src="agent-chat-widget.js?v=20260929"></script>
+  <script src="voice-call.js?v=20260929"></script>
 </body>
 </html>

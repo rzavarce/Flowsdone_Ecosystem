@@ -11,7 +11,8 @@ per project; an agent with channels cannot be deleted (409).
 
 from __future__ import annotations
 
-from typing import Optional
+from datetime import datetime, timezone
+from typing import List, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -21,6 +22,7 @@ from app.adapters.inbound.http.admin.access import AdminAccess, admin_access
 from app.adapters.inbound.http.admin.schemas import AgentCreate, AgentOut, AgentUpdate, BaseAgentCreate
 from app.application.use_cases.langflow_sso import LangflowTargetNotFoundError
 from app.application.use_cases.manage_agents import AgentInUseError, FlowNotInProjectError
+from app.application.use_cases.webchat_share import SharedLink
 from app.domain.ports.outbound import LangflowSessionError
 
 router = APIRouter(prefix="/agents", tags=["admin:agents"])
@@ -275,6 +277,129 @@ async def webchat_test_link(
     agent = await _load_scoped(request, access, agent_id)
     link = request.app.state.webchat_test_link_use_case.execute(agent)
     return WebchatTestOut(url=link.url, expires_in=link.expires_in)
+
+
+class WebchatShareIn(BaseModel):
+    """Body of POST /agents/{agent_id}/webchat-shares.
+
+    Attributes:
+        expires_in_days (Optional[Literal[7, 30]]): Validity; None (the
+            default) = the link never expires.
+    """
+
+    expires_in_days: Optional[Literal[7, 30]] = None
+
+
+class WebchatShareOut(BaseModel):
+    """A share link as the console lists it.
+
+    Attributes:
+        id (UUID): The link.
+        url (str): The demo page URL that opens it.
+        created_at (datetime): Creation time.
+        expires_at (Optional[datetime]): Expiry; None = never.
+        expired (bool): Whether it has already expired.
+    """
+
+    id: UUID
+    url: str
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    expired: bool = False
+
+
+def _share_out(shared: SharedLink) -> WebchatShareOut:
+    """Shape a share link for the console.
+
+    Args:
+        shared (SharedLink): The link and its URL.
+
+    Returns:
+        WebchatShareOut: The response item.
+    """
+    link = shared.link
+    expired = link.expires_at is not None and link.expires_at <= datetime.now(timezone.utc)
+    return WebchatShareOut(
+        id=link.id, url=shared.url, created_at=link.created_at, expires_at=link.expires_at, expired=expired
+    )
+
+
+@router.post("/{agent_id}/webchat-shares", response_model=WebchatShareOut, status_code=201)
+async def create_webchat_share(
+    agent_id: UUID,
+    body: WebchatShareIn,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("agents", "write")),
+) -> WebchatShareOut:
+    """Create a public link to chat with an agent (the console's "Share").
+
+    Unlike "try in web chat", it is meant for people outside the team, may
+    never expire and needs write access: whoever gets it can use the agent.
+
+    Args:
+        agent_id (UUID): The agent.
+        body (WebchatShareIn): Validity of the link.
+        request (Request): Used to reach `request.app.state.webchat_share_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Returns:
+        WebchatShareOut: The new link.
+
+    Raises:
+        HTTPException: 404 if the agent does not exist or is outside the caller's tenants.
+    """
+    agent = await _load_scoped(request, access, agent_id)
+    shared = await request.app.state.webchat_share_use_case.create(
+        agent, created_by=access.principal.user_id, expires_in_days=body.expires_in_days
+    )
+    return _share_out(shared)
+
+
+@router.get("/{agent_id}/webchat-shares", response_model=List[WebchatShareOut])
+async def list_webchat_shares(
+    agent_id: UUID,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("agents", "read")),
+) -> List[WebchatShareOut]:
+    """An agent's share links that were not revoked, newest first.
+
+    Args:
+        agent_id (UUID): The agent.
+        request (Request): Used to reach `request.app.state.webchat_share_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Returns:
+        List[WebchatShareOut]: Its links (expired ones flagged).
+
+    Raises:
+        HTTPException: 404 if the agent does not exist or is outside the caller's tenants.
+    """
+    agent = await _load_scoped(request, access, agent_id)
+    return [_share_out(shared) for shared in await request.app.state.webchat_share_use_case.list(agent)]
+
+
+@router.delete("/{agent_id}/webchat-shares/{share_id}", status_code=204)
+async def revoke_webchat_share(
+    agent_id: UUID,
+    share_id: UUID,
+    request: Request,
+    access: AdminAccess = Depends(admin_access("agents", "write")),
+) -> None:
+    """Revoke a share link: it stops working at once, open chats included.
+
+    Args:
+        agent_id (UUID): The agent.
+        share_id (UUID): The link.
+        request (Request): Used to reach `request.app.state.webchat_share_use_case`.
+        access (AdminAccess): The authenticated caller.
+
+    Raises:
+        HTTPException: 404 if the agent or the link does not exist (or is
+            outside the caller's tenants).
+    """
+    agent = await _load_scoped(request, access, agent_id)
+    if not await request.app.state.webchat_share_use_case.revoke(agent, share_id):
+        raise HTTPException(status_code=404, detail="share link not found")
 
 
 @router.delete("/{agent_id}", status_code=204)

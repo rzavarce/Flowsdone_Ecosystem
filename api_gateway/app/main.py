@@ -28,6 +28,7 @@ from app.adapters.outbound.apps.factory import AppConnectorFactory
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
 from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from app.adapters.outbound.db.webchat_share_link_repository import SqlAlchemyWebchatShareLinkRepository
 from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
 from app.adapters.outbound.db.langflow_account_repository import SqlAlchemyLangflowAccountRepository
@@ -112,6 +113,8 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.send_contact_request import SendContactRequestUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.application.use_cases.voice_demo import ResolveVoiceDemoTargetUseCase
+from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
 from app.core.config import settings
 from app.domain.models.conversation import ConversationLifecyclePolicy
@@ -397,6 +400,17 @@ async def lifespan(app: FastAPI):
     app.state.dashboard_embeds = dashboard_embeds
     app.state.overview_dashboard_use_case = GetOverviewDashboardUseCase(
         embeds=dashboard_embeds, ttl_seconds=settings.METABASE_EMBED_TTL_SECONDS
+    )
+    app.state.webchat_share_use_case = ManageWebchatShareLinksUseCase(
+        links=SqlAlchemyWebchatShareLinkRepository(db_sessionmaker),
+        agents=app.state.agent_repo,
+        demo_url=settings.WEBCHAT_PUBLIC_URL,
+    )
+    app.state.voice_demo_target_use_case = ResolveVoiceDemoTargetUseCase(
+        shares=app.state.webchat_share_use_case,
+        agents=app.state.agent_repo,
+        connections=app.state.channel_connection_repo,
+        secret=settings.CALLBACK_HMAC_SECRET,
     )
     app.state.webchat_test_link_use_case = IssueWebchatTestLinkUseCase(
         secret=settings.CALLBACK_HMAC_SECRET,

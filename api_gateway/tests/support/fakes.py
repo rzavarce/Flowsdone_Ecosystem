@@ -24,6 +24,7 @@ from app.domain.models.tenant import Tenant
 from app.domain.models.user import User, UserAvatar, UserCredentials
 from app.domain.ports.outbound import AlreadyExistsError, UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
+from app.domain.models.webchat_share_link import WebchatShareLink
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -1215,3 +1216,32 @@ class FakeTenantBillingProfileRepo:
             profile = current.model_copy(update={**changes, "updated_at": now})
         self.profiles[tenant_id] = profile
         return profile
+
+
+class FakeWebchatShareLinkRepo:
+    """In-memory WebchatShareLinkRepositoryPort."""
+
+    def __init__(self) -> None:
+        self.links: Dict[str, WebchatShareLink] = {}  # token_hash -> link
+
+    async def create(self, *, agent_id, token, token_hash, created_by, expires_at):
+        link = WebchatShareLink(
+            id=uuid4(), agent_id=agent_id, token=token, created_by=created_by,
+            created_at=datetime.now(timezone.utc), expires_at=expires_at,
+        )
+        self.links[token_hash] = link
+        return link
+
+    async def list_by_agent(self, agent_id):
+        found = [l for l in self.links.values() if l.agent_id == agent_id and l.revoked_at is None]
+        return sorted(found, key=lambda l: l.created_at, reverse=True)
+
+    async def get_by_token_hash(self, token_hash):
+        return self.links.get(token_hash)
+
+    async def revoke(self, agent_id, share_id, now):
+        for token_hash, link in self.links.items():
+            if link.id == share_id and link.agent_id == agent_id and link.revoked_at is None:
+                self.links[token_hash] = link.model_copy(update={"revoked_at": now})
+                return True
+        return False

@@ -1,46 +1,31 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <title>Flowsdone Voice Demo Softphone</title>
-  <link rel="stylesheet" href="softphone.css?v=20260811" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Demo de voz · Flowsdone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+           font-family: "Outfit", system-ui, sans-serif; color: #eaf6f2;
+           background: radial-gradient(900px 500px at 80% -10%, rgb(25 180 230 / 0.22), transparent 60%), #04141f; }
+    main { max-width: 520px; text-align: center; }
+    h1 { margin: 0; font-size: 30px; color: #fff; }
+    p { color: #9fb3c2; line-height: 1.6; }
+    a { color: #24e5a3; font-weight: 600; }
+  </style>
 </head>
 <body>
-  <main class="demo-page">
-    <section class="demo-card">
-      <h1>Voicebot - Softphone de prueba</h1>
-      <p>
-        Llama por WebRTC (Twilio Voice SDK) directo al mismo webhook
-        <code>/webhooks/voice</code> que usa una llamada telefónica real -
-        sin gastar minutos ni necesitar un teléfono.
-      </p>
-
-      <div id="sp-status" class="sp-status">
-        <span class="sp-status-dot"></span>
-        <span id="sp-status-text">Inicializando...</span>
-      </div>
-
-      <button id="sp-call-btn" class="sp-call-btn" disabled>Conectando...</button>
-
-      <div id="sp-log" class="sp-log"></div>
-    </section>
+  <main>
+    <h1>La demo de voz se ha movido</h1>
+    <p>
+      Ahora se abre desde el enlace de la demo del agente, en la pestaña <strong>Llamar</strong>.
+      En la consola (<a href="https://app.flowsdone.com">app.flowsdone.com</a> → Agentes), usa
+      <strong>Probar en webchat</strong> o <strong>Compartir</strong> en un agente con canal de voz.
+    </p>
   </main>
-
-  <script>
-    const params = new URLSearchParams(location.search);
-
-    window.VoiceDemoConfig = {
-      // Número Twilio registrado como ChannelConnection(channel_type="voice").
-      toNumber: params.get("to") || "+16014944500",
-      identity: params.get("identity") || ("demo-" + Math.random().toString(36).slice(2, 8)),
-    };
-  </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2/dist/twilio.min.js"></script>
-  <script src="softphone.js?v=20260811"></script>
 </body>
 </html>

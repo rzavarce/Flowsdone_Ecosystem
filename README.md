@@ -433,10 +433,21 @@ El webchat es un canal más (`channel_type: webchat`), uno por proyecto:
 
 **Demo genérica (probar cualquier agente):** en *Agentes*, el botón *Probar en webchat* pide `POST /internal/admin/agents/{id}/webchat-test` y abre `WEBCHAT_PUBLIC_URL?test_token=…`. El token va firmado (HMAC derivado de `CALLBACK_HMAC_SECRET`), nombra el flujo del agente y caduca a los `WEBCHAT_TEST_TOKEN_TTL_SECONDS` (30 min por defecto). Esas conversaciones van directas al flujo: **no se registran ni se facturan**. Ya no se acepta un `workflow_id` arbitrario en el WebSocket.
 
+**Enlaces compartidos (botón *Compartir*):** para enseñar un agente a alguien de fuera (un cliente potencial). En *Agentes*, *Compartir* abre un diálogo que crea enlaces `WEBCHAT_PUBLIC_URL?share=…&agent=…` con validez de **7 días, 30 días o sin vencimiento** (por defecto), los lista para copiarlos y permite **revocarlos**.
+- Endpoints: `POST|GET /internal/admin/agents/{id}/webchat-shares` y `DELETE …/webchat-shares/{share_id}`. Crear y revocar piden permiso de escritura sobre agentes (quien tenga el enlace podrá usar el agente); listar, de lectura.
+- Se guardan en `webchat_share_links` (migración `0015`): el token va **cifrado** (para poder volver a copiarlo) y se busca por su **hash**. Al ser una fila de base de datos, un enlace sin vencimiento se puede revocar.
+- El enlace apunta al **agente**, no a un flujo: si el agente pasa a otro flujo, el enlace sigue funcionando con el nuevo. Se vuelve a comprobar en cada mensaje: revocarlo, que caduque o suspender el agente corta también los chats abiertos.
+- Como la demo, los mensajes van directos al flujo (canal `webchat-share`) y **no se registran ni se facturan**; si el agente falla, quien escribe ve el aviso genérico sin el detalle técnico (que solo se muestra en *Probar en webchat*).
+- Un enlace revocado o caducado abre el chat con el aviso «Este enlace ya no está disponible» y el campo de texto desactivado (el WebSocket cierra con el código 4001, que el widget no reintenta).
+
+**Página de demo** (`static/webchat/index.html`, lo que ve quien abre el enlace): mismo estilo que la landing (Outfit, navy, degradado cian→verde, logo en `static/webchat/brand/`), con el chat **integrado en la página** (modo `inline` del widget: `mode: "inline", mountTarget: "#…"`, sin botón flotante) y botones *Quiero uno para mi negocio* y *Nueva conversación*. Sin enlace válido explica que el enlace no es válido. La guía técnica para integrar el widget (snippets y todas las opciones de `AgentChatConfig`) está aparte, en `integracion.html`.
+
 | Conexión a `/ws` | Uso |
 |---|---|
 | `?key=wc_…` | Web del cliente (canal del tenant) |
-| `?test_token=…` | Demo desde la consola |
+| `?test_token=…` | Demo desde la consola (*Probar en webchat*) |
+| `?share=…` | Enlace compartido (*Compartir*) |
+| Enlace de prueba caducado, o compartido revocado/caducado | Se acepta, avisa (`chat.error`) y cierra con 4001 |
 | Ninguno / inválido / origen no permitido | Rechazada antes del handshake (código 1008) |
 
 
@@ -569,12 +580,12 @@ etc.), queda logueado como `channel.sender.failed` / `handle.outbound.channel.de
 | Servicio | URL |
 |---|---|
 | API Gateway | http://localhost:8000 |
-| Webchat (demo) | http://localhost:8000/static/webchat/ — se abre desde la consola (Agentes → *Probar en webchat*), ver sección 8 |
+| Webchat (demo) | http://localhost:8000/static/webchat/ — se abre desde la consola (Agentes → *Probar en webchat* o *Compartir*), ver sección 8. Guía técnica de integración: `…/static/webchat/integracion.html` |
 | Admin API (tenants/proyectos/agentes/canales) | http://localhost:8000/internal/admin/* (sección 8) |
 | Webhooks de canal | http://localhost:8000/webhooks/{facebook,instagram,twitter,whatsapp,telegram/{bot_token},tiktok} (sección 9) |
 | Webhook de voz (Twilio) | http://localhost:8000/webhooks/voice — sin el nombre del proveedor en la ruta, a propósito (sección 18) |
 | WebSocket de streaming de voz | ws://localhost:8000/voice/stream/{call_sid} (lo abre Twilio, no se usa a mano — sección 18) |
-| Softphone de prueba (demo) | http://localhost:8000/static/voice_demo/ (sección 19) |
+| Softphone de prueba (demo) | pestaña *Llamar* de la demo del agente (sección 19) |
 | Langflow | http://localhost:7860 |
 | Langfuse | http://localhost:4100 |
 | n8n | http://localhost:5678 |
@@ -1213,9 +1224,15 @@ Si `human_transfer_number` no está configurado, el `<Connect>` inicial no lleva
 
 ## 19. Softphone de prueba (demo)
 
-Herramienta de dev/testing — **no** es parte del canal de voz de producción (sección 18). Deja llamar por WebRTC (Twilio Voice JS SDK) desde el navegador al mismo `/webhooks/voice` que usa una llamada real, sin gastar minutos ni necesitar un teléfono. Vive en `static/voice_demo/`, mismo patrón que el widget de webchat (`static/webchat/`, sección 10).
+La demo de voz es la pestaña **Llamar** de la página de demo del agente (`static/webchat/index.html`, sección 8): la misma que se abre con *Probar en webchat* o con un enlace de *Compartir*. Llama por WebRTC (Twilio Voice JS SDK, `static/webchat/voice-call.js`) desde el navegador al mismo `/webhooks/voice` que usa una llamada real, sin necesitar un teléfono. **No** es parte del canal de voz de producción (sección 18): la llamada entra por el canal de voz del agente como cualquier otra.
 
-El TwiML App que usa el softphone apunta su Voice Request URL al mismo `/webhooks/voice` de siempre — no hay lógica de backend nueva para la llamada en sí, solo un endpoint que emite el Access Token que el SDK necesita para autenticar al navegador contra Twilio (`GET /voice-demo/token`, `adapters/inbound/http/voice_demo.py`).
+- La pestaña solo aparece si el agente del enlace tiene un **canal de voz activo**; marca su número (`external_id` del canal). La página muestra además ese número para llamar desde un teléfono.
+- `GET /voice-demo/token?share=…` o `?test_token=…` (`adapters/inbound/http/voice_demo.py`) emite el Access Token del SDK y devuelve el número (`ResolveVoiceDemoTargetUseCase`). **Sin un enlace válido no hay token**: el token permite llamar con la cuenta de Twilio, así que ya no se entrega a cualquiera que abra la página.
+- En producción la página vive en `chat.flowsdone.com`, así que Traefik manda también `/voice-demo/*` de ese dominio al gateway sin reescribirlo a estáticos (igual que `/ws`).
+- A diferencia del chat de la demo, **la llamada sí se registra y se factura** como cualquier llamada del canal: pasa por el `/webhooks/voice` normal.
+- La antigua página `static/voice_demo/` ahora solo explica dónde está la demo.
+
+El TwiML App que usa el softphone apunta su Voice Request URL al mismo `/webhooks/voice` de siempre — no hay lógica de backend nueva para la llamada en sí.
 
 ### Puesta en marcha
 
@@ -1242,7 +1259,7 @@ print('API_KEY_SECRET=' + key.secret)
 docker compose up -d --force-recreate api
 ```
 
-Luego abrí `http://localhost:8000/static/voice_demo/index.html?to=+1XXXXXXXXXX` (o el dominio público) — pide permiso de micrófono, y el botón "Llamar" dispara `device.connect({params: {To: "+1XXXXXXXXXX"}})`, que Twilio traduce en una request a `/webhooks/voice` con `To=+1XXXXXXXXXX` y `From=client:<identity>` — el mismo webhook de siempre, sin cambios.
+Luego, en la consola, *Probar en webchat* (o *Compartir*) en un agente con canal de voz y pestaña **Llamar**: pide permiso de micrófono, y el botón "Llamar" dispara `device.connect({params: {To: <número del canal>}})`, que Twilio traduce en una request a `/webhooks/voice` con `To=<número>` y `From=client:<identity>` — el mismo webhook de siempre, sin cambios.
 
 ### Exponer el stack local a internet (`scripts/dev/voice_demo_tunnel.sh`)
 

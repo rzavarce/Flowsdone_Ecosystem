@@ -1,4 +1,4 @@
-import { Bot, MessageSquareText, Pause, Pencil, Play, Plus, Star, Trash2 } from 'lucide-react'
+import { Bot, MessageSquareText, Pause, Pencil, Play, Plus, Share2, Star, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
@@ -11,6 +11,7 @@ import type { Agent, Project } from '@/core/admin/types'
 import { ApiError } from '@/core/http/apiFetch'
 import { describeError } from '@/core/http/describeError'
 import { AgentDialog } from './AgentDialog'
+import { ShareAgentDialog } from './ShareAgentDialog'
 import { useTranslation } from 'react-i18next'
 
 /** Pending confirmation: delete or suspend an agent. */
@@ -26,6 +27,7 @@ function ProjectAgents({
   onMakeDefault,
   onReactivate,
   onTryWebchat,
+  onShare,
 }: {
   project: Project
   agents: Agent[]
@@ -35,6 +37,7 @@ function ProjectAgents({
   onMakeDefault: (agent: Agent) => void
   onReactivate: (agent: Agent) => void
   onTryWebchat: (agent: Agent) => void
+  onShare: (agent: Agent) => void
 }) {
   const { t } = useTranslation()
   const flows = useProjectFlows(agents.length ? project.id : undefined)
@@ -84,6 +87,11 @@ function ProjectAgents({
                         <MessageSquareText className="size-4" aria-hidden="true" />
                       </Button>
                     )}
+                    {!suspended && (
+                      <Button variant="ghost" size="icon" onClick={() => onShare(agent)} aria-label={t('agents.list.shareItem', { name: agent.name })} title={t('agents.list.share')}>
+                        <Share2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    )}
                     {!agent.is_default && (
                       <Button variant="ghost" size="icon" onClick={() => onMakeDefault(agent)} aria-label={t('agents.list.makeDefaultItem', { name: agent.name })} title={t('agents.list.makeDefault')}>
                         <Star className="size-4" aria-hidden="true" />
@@ -129,6 +137,7 @@ export function AgentsPanel({ tenantId }: { tenantId: string }) {
   const webchatTest = useWebchatTestLink()
   const [dialog, setDialog] = useState<{ agent: Agent | null; projectId?: string } | null>(null)
   const [pending, setPending] = useState<Pending>(null)
+  const [sharing, setSharing] = useState<Agent | null>(null)
 
   if (projects.isPending || agents.isPending) return <Spinner label={t('agents.list.loading')} className="py-16" />
   if (projects.isError || agents.isError) {
@@ -172,9 +181,11 @@ export function AgentsPanel({ tenantId }: { tenantId: string }) {
               })
               .catch(() => tab?.close())
           }}
+          onShare={setSharing}
         />
       ))}
 
+      {sharing && <ShareAgentDialog agent={sharing} onClose={() => setSharing(null)} />}
       {dialog && <AgentDialog projects={projects.data} agent={dialog.agent} projectId={dialog.projectId} onClose={() => setDialog(null)} />}
       <ConfirmDialog
         open={pending !== null}

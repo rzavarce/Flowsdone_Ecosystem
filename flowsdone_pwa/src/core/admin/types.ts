@@ -197,6 +197,19 @@ export interface WebchatTestLink {
   expires_in: number
 }
 
+/** How long a share link works: 7 or 30 days, or `null` for never. */
+export type ShareLinkDays = 7 | 30 | null
+
+/** Public link to chat with one agent ("Share"): anyone with it can use the agent until it's revoked or expires. */
+export interface WebchatShareLink {
+  id: string
+  url: string
+  created_at: string
+  /** `null` = never expires. */
+  expires_at: string | null
+  expired: boolean
+}
+
 /** A provider's shared credentials; only whether they're configured is known here. */
 export interface ChannelApp {
   id: string

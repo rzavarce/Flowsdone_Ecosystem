@@ -8,6 +8,10 @@ Two ways in, chosen by the query string (see application/services/webchat.py):
 - `?test_token=...`: the **generic demo**, opened by console staff to try one
   agent. The signed token names the agent's flow; messages go straight to it
   and are neither tracked nor billed.
+- `?share=...`: a **share link** (the console's "Share"), for anyone outside
+  the team. The link is looked up in the database, so it can be revoked;
+  like the demo, messages go straight to the agent's current flow and are
+  neither tracked nor billed.
 
 A connection without either is refused before the handshake completes (the
 browser gets HTTP 403). Frames keep the widget's format: the first one
@@ -26,7 +30,9 @@ from uuid import uuid4
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.application.services.switchboard import ChannelMessageNotRoutable, build_conversation_id
+from app.application.use_cases.webchat_share import SharedAgent
 from app.application.services.webchat import (
+    WEBCHAT_SHARE_CHANNEL,
     WEBCHAT_TEST_CHANNEL,
     TestTokenClaims,
     is_test_token_expired,
@@ -53,13 +59,18 @@ class WebchatRoute:
     Attributes:
         channel (Optional[ChannelResolution]): The tenant's webchat channel.
         test (Optional[TestTokenClaims]): The agent under test (demo).
-        key (str): Rate-limit scope (channel key, or the tested agent).
+        share (Optional[SharedAgent]): The agent a share link opens.
+        key (str): Rate-limit scope (channel key, tested agent, or share link).
+        test_token (str): The demo token, re-checked on every message.
+        share_token (str): The share link's token, re-checked on every message.
     """
 
     channel: Optional[ChannelResolution] = None
     test: Optional[TestTokenClaims] = None
+    share: Optional[SharedAgent] = None
     key: str = ""
     test_token: str = ""
+    share_token: str = ""
 
 
 def _client_ip(ws: WebSocket) -> str:
@@ -78,17 +89,26 @@ def _client_ip(ws: WebSocket) -> str:
     return ws.client.host if ws.client else "unknown"
 
 
-async def _authorize(ws: WebSocket, key: Optional[str], test_token: Optional[str]) -> Optional[WebchatRoute]:
+async def _authorize(
+    ws: WebSocket, key: Optional[str], test_token: Optional[str], share: Optional[str] = None
+) -> Optional[WebchatRoute]:
     """Decide whether the connection may open, and where it goes.
 
     Args:
         ws (WebSocket): The (not yet accepted) connection.
         key (Optional[str]): A webchat channel's public key.
         test_token (Optional[str]): A demo test token.
+        share (Optional[str]): A share link's token.
 
     Returns:
         Optional[WebchatRoute]: The route, or None to refuse.
     """
+    if share:
+        shared = await ws.app.state.webchat_share_use_case.open(share)
+        if shared is None:
+            logger.warning("websocket.share.unavailable")
+            return None
+        return WebchatRoute(share=shared, key=f"share:{shared.share_id}", share_token=share)
     if test_token:
         claims = verify_test_token(test_token, settings.CALLBACK_HMAC_SECRET)
         if claims is None:
@@ -122,6 +142,8 @@ def _registry_id(route: WebchatRoute, visitor_id: str) -> str:
     """
     if route.channel is not None:
         return build_conversation_id(route.channel.project_id, WEBCHAT, visitor_id)
+    if route.share is not None:
+        return f"share:{route.share.share_id}:{visitor_id}"
     return f"test:{route.test.agent_id}:{visitor_id}"  # type: ignore[union-attr]
 
 
@@ -136,16 +158,26 @@ async def _error(ws: WebSocket, code: str) -> None:
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket, key: Optional[str] = None, test_token: Optional[str] = None) -> None:
+async def websocket_endpoint(
+    ws: WebSocket, key: Optional[str] = None, test_token: Optional[str] = None, share: Optional[str] = None
+) -> None:
     """Handle a web chat connection end to end (see the module docstring).
 
     Args:
         ws (WebSocket): The FastAPI WebSocket connection.
         key (Optional[str]): A webchat channel's public key (query string).
         test_token (Optional[str]): A demo test token (query string).
+        share (Optional[str]): A share link's token (query string).
     """
-    route = await _authorize(ws, key, test_token)
+    route = await _authorize(ws, key, test_token, share)
     if route is None:
+        if share and await ws.app.state.webchat_share_use_case.exists(share):
+            # A real link that was revoked, expired or whose agent is off:
+            # say so, and close with the code the widget doesn't retry.
+            await ws.accept()
+            await _error(ws, "share_link_unavailable")
+            await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+            return
         if test_token and is_test_token_expired(test_token, settings.CALLBACK_HMAC_SECRET):
             # A refused handshake is just a failed connection to the browser,
             # which the widget keeps retrying without a word. For a link that
@@ -171,7 +203,8 @@ async def websocket_endpoint(ws: WebSocket, key: Optional[str] = None, test_toke
 
         registry_id = _registry_id(route, visitor_id)
         ws.app.state.ws_registry.add(registry_id, ws)
-        logger.info("websocket.connected", extra={"correlation_id": correlation_id, "mode": "test" if route.test else "channel"})
+        mode = "share" if route.share else "test" if route.test else "channel"
+        logger.info("websocket.connected", extra={"correlation_id": correlation_id, "mode": mode})
         await ws.send_json({"type": "connected", "conversation_id": visitor_id})
 
         frame: Dict[str, Any] = first_frame
@@ -230,6 +263,24 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
         except ChannelMessageNotRoutable:
             await _error(ws, "channel_unavailable")
             return
+    elif route.share is not None:
+        # Re-checked on every message: revoking the link (or suspending the
+        # agent) must cut chats already open; and the agent's current flow
+        # is used, in case it was moved to another one.
+        shared = await ws.app.state.webchat_share_use_case.open(route.share_token)
+        if shared is None:
+            await _error(ws, "share_link_unavailable")
+            await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+            # Ends the connection loop as a normal disconnect.
+            raise WebSocketDisconnect(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+        await ws.app.state.ingest_message_use_case.execute(
+            workflow_id=shared.workflow_id,
+            conversation_id=registry_id,
+            sender_id=f"share:{visitor_id}",
+            transport=frame.get("transport") or "rabbitmq",
+            payload={"message": text, "conversation_id": registry_id},
+            channel=WEBCHAT_SHARE_CHANNEL,
+        )
     else:
         # Re-checked on every message: a demo tab left open must stop
         # working when its token expires.

@@ -120,3 +120,64 @@ async def test_onboarding_status_of_another_or_unknown_tenant_is_404(world):
         other = await _call(c, "GET", f"/tenants/{world.tenant_b.id}/onboarding", token=await world.token("tenant_manager"))
         unknown = await _call(c, "GET", f"/tenants/{uuid4()}/onboarding", token=await world.token("admin"))
     assert other.status_code == unknown.status_code == 404
+
+
+async def test_share_links_default_to_no_expiry_and_can_last_7_or_30_days(world):
+    token = await world.token("botmaster")
+    path = f"/agents/{world.agent_a.id}/webchat-shares"
+    async with world.client() as c:
+        forever = await _call(c, "POST", path, token=token, json={})
+        week = await _call(c, "POST", path, token=token, json={"expires_in_days": 7})
+        month = await _call(c, "POST", path, token=token, json={"expires_in_days": 30})
+        other = await _call(c, "POST", path, token=token, json={"expires_in_days": 15})
+        listed = await _call(c, "GET", path, token=token)
+
+    assert forever.status_code == 201
+    assert forever.json()["expires_at"] is None and forever.json()["expired"] is False
+    assert forever.json()["url"].startswith("https://chat.flowsdone.test/?share=")
+    assert week.status_code == 201 and week.json()["expires_at"] is not None
+    assert month.status_code == 201
+    assert other.status_code == 422
+    assert [link["id"] for link in listed.json()] == [month.json()["id"], week.json()["id"], forever.json()["id"]]
+
+
+async def test_share_links_record_who_created_them(world):
+    token = await world.token("botmaster")
+    async with world.client() as c:
+        created = await _call(c, "POST", f"/agents/{world.agent_a.id}/webchat-shares", token=token, json={})
+
+    stored = next(iter(world.share_links.links.values()))
+    assert created.status_code == 201 and stored.created_by is not None
+
+
+async def test_a_revoked_share_link_disappears_from_the_list(world):
+    token = await world.token("botmaster")
+    path = f"/agents/{world.agent_a.id}/webchat-shares"
+    async with world.client() as c:
+        link = (await _call(c, "POST", path, token=token, json={})).json()
+        revoked = await _call(c, "DELETE", f"{path}/{link['id']}", token=token)
+        again = await _call(c, "DELETE", f"{path}/{link['id']}", token=token)
+        listed = await _call(c, "GET", path, token=token)
+
+    assert revoked.status_code == 204
+    assert again.status_code == 404
+    assert listed.json() == []
+
+
+async def test_share_links_of_other_tenants_are_out_of_reach(world):
+    token = await world.token("botmaster")
+    async with world.client() as c:
+        created = await _call(c, "POST", f"/agents/{world.agent_b.id}/webchat-shares", token=token, json={})
+        listed = await _call(c, "GET", f"/agents/{world.agent_b.id}/webchat-shares", token=token)
+        mine = (await _call(c, "POST", f"/agents/{world.agent_a.id}/webchat-shares", token=token, json={})).json()
+        cross = await _call(c, "DELETE", f"/agents/{world.agent_b.id}/webchat-shares/{mine['id']}", token=token)
+
+    assert created.status_code == 404 and listed.status_code == 404 and cross.status_code == 404
+
+
+async def test_clients_cannot_share_agents(world):
+    token = await world.token("client")
+    async with world.client() as c:
+        created = await _call(c, "POST", f"/agents/{world.agent_a.id}/webchat-shares", token=token, json={})
+
+    assert created.status_code == 403
