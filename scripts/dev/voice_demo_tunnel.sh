@@ -23,6 +23,9 @@ CLOUDFLARED_BIN="$SCRIPT_DIR/cloudflared"
 LOG_FILE="/tmp/voice_demo_tunnel.log"
 PID_FILE="/tmp/voice_demo_tunnel.pid"
 BACKUP_FILE="/tmp/voice_demo_tunnel.public_base_url.bak"
+# The TwiML App is usually the same one production's "Llamar" tab uses:
+# its Voice URL is saved here on start and put back on stop.
+TWIML_BACKUP_FILE="/tmp/voice_demo_tunnel.twiml_voice_url.bak"
 
 require_cloudflared() {
   if [ ! -x "$CLOUDFLARED_BIN" ]; then
@@ -97,6 +100,13 @@ cmd_start() {
     "http://localhost:8000/internal/admin/channel-apps/twilio/credentials" \
     | jq -r '.credentials.auth_token')"
 
+  if [ ! -f "$TWIML_BACKUP_FILE" ]; then
+    curl -s -u "$account_sid:$auth_token" \
+      "https://api.twilio.com/2010-04-01/Accounts/$account_sid/Applications/$twiml_app_sid.json" \
+      | jq -r '.voice_url' > "$TWIML_BACKUP_FILE"
+    echo "Voice URL original del TwiML App guardada: $(cat "$TWIML_BACKUP_FILE")"
+  fi
+
   echo "Apuntando el TwiML App de Twilio ($twiml_app_sid) al túnel..."
   curl -s -u "$account_sid:$auth_token" \
     -X POST "https://api.twilio.com/2010-04-01/Accounts/$account_sid/Applications/$twiml_app_sid.json" \
@@ -127,6 +137,28 @@ cmd_stop() {
     echo "PUBLIC_BASE_URL restaurado a $original_url, recreando api..."
     (cd "$REPO_ROOT" && docker compose up -d --force-recreate api >/dev/null)
     echo "Listo."
+  fi
+
+  if [ -f "$TWIML_BACKUP_FILE" ]; then
+    original_voice_url="$(cat "$TWIML_BACKUP_FILE")"
+    if [ -n "$original_voice_url" ] && [ "$original_voice_url" != "null" ]; then
+      admin_key="$(get_env_var ADMIN_API_KEY)"
+      account_sid="$(get_env_var VOICE_DEMO_TWILIO_ACCOUNT_SID)"
+      twiml_app_sid="$(get_env_var VOICE_DEMO_TWILIO_TWIML_APP_SID)"
+      for _ in $(seq 1 30); do
+        curl -s -o /dev/null --max-time 2 "http://localhost:8000/voice-demo/token" && break
+        sleep 1
+      done
+      auth_token="$(curl -s -H "X-Admin-Api-Key: $admin_key" \
+        "http://localhost:8000/internal/admin/channel-apps/twilio/credentials" \
+        | jq -r '.credentials.auth_token')"
+      curl -s -u "$account_sid:$auth_token" \
+        -X POST "https://api.twilio.com/2010-04-01/Accounts/$account_sid/Applications/$twiml_app_sid.json" \
+        --data-urlencode "VoiceUrl=$original_voice_url" \
+        --data-urlencode "VoiceMethod=POST" >/dev/null
+      echo "TwiML App devuelto a su Voice URL original: $original_voice_url"
+    fi
+    rm -f "$TWIML_BACKUP_FILE"
   fi
 }
 
