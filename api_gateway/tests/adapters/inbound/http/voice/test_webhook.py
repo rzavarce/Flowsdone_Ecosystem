@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from app.adapters.inbound.http.voice.webhook import router
+from app.application.use_cases.accept_incoming_call import AcceptIncomingCallUseCase
 from app.domain.models.channel_app import ChannelApp
 from api_gateway.tests.support.asgi import client_for_router
 from api_gateway.tests.support.fakes import (
@@ -19,6 +20,19 @@ from api_gateway.tests.support.fakes import (
 )
 
 pytestmark = pytest.mark.anyio
+
+
+def _client(**state):
+    """The router with its state, plus the call use case over the same fakes."""
+    if "channel_connection_repo" in state and "call_session_repo" in state:
+        state["accept_incoming_call_use_case"] = AcceptIncomingCallUseCase(
+            channel_connections=state["channel_connection_repo"],
+            call_sessions=state["call_session_repo"],
+            session_ttl_seconds=3600,
+            provider="twilio",
+        )
+    return client_for_router(router, **state)
+
 
 CALL_PARAMS = {"To": "+15559998888", "From": "+15550001111", "CallSid": "CA123"}
 
@@ -41,8 +55,7 @@ async def test_valid_call_returns_twiml_and_saves_a_call_session():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -72,8 +85,7 @@ async def test_valid_call_passes_the_connections_voice_config_through_to_the_pro
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -98,8 +110,7 @@ async def test_valid_call_passes_the_welcome_greeting_through_to_the_provider():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -125,8 +136,7 @@ async def test_valid_call_requests_an_action_url_when_human_transfer_is_configur
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -148,8 +158,7 @@ async def test_valid_call_omits_action_url_when_no_human_transfer_configured():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -168,8 +177,7 @@ async def test_invalid_signature_is_rejected_without_saving_a_session():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=False)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -189,8 +197,7 @@ async def test_missing_twilio_app_credentials_is_rejected():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -210,8 +217,7 @@ async def test_unknown_number_is_rejected():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,
@@ -231,8 +237,7 @@ async def test_missing_call_params_is_rejected():
     call_session_repo = FakeCallSessionRepo()
     voice_provider = FakeVoiceProvider(signature_valid=True)
 
-    async with client_for_router(
-        router,
+    async with _client(
         channel_connection_repo=conn_repo,
         channel_app_repo=app_repo,
         call_session_repo=call_session_repo,

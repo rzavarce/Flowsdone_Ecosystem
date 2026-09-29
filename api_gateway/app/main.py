@@ -80,6 +80,7 @@ from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.demo_conversations import DemoConversationRecorder
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.accept_incoming_call import AcceptIncomingCallUseCase
 from app.application.use_cases.billing_catalog import ManageBillingCatalogUseCase
 from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
 from app.application.use_cases.billing import (
@@ -303,6 +304,12 @@ async def lifespan(app: FastAPI):
     app.state.agent_repo = SqlAlchemyAgentRepository(db_sessionmaker)
     app.state.workflow_config_repo = SqlAlchemyWorkflowConfigRepository(db_sessionmaker)
     app.state.channel_connection_repo = SqlAlchemyChannelConnectionRepository(db_sessionmaker)
+    app.state.accept_incoming_call_use_case = AcceptIncomingCallUseCase(
+        channel_connections=app.state.channel_connection_repo,
+        call_sessions=app.state.call_session_repo,
+        session_ttl_seconds=settings.CALL_SESSION_TTL_SECONDS,
+        provider="twilio",
+    )
     app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
     # Switchboard's durable transcript (Postgres) - needs db_sessionmaker,

@@ -10,7 +10,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Response
 
 from app.core.config import settings
-from app.domain.models.call_session import CallSession
 
 logger = logging.getLogger("channels.voice.webhook")
 
@@ -107,37 +106,17 @@ async def receive_call(request: Request) -> Response:
         logger.warning("channels.voice.invalid_signature", extra={"call_sid": call_sid})
         return Response(content=_REJECT_TWIML, media_type="application/xml", status_code=401)
 
-    channel_connection_repo = request.app.state.channel_connection_repo
-    resolution = await channel_connection_repo.get_by_channel_and_external_id(
-        CHANNEL_TYPE, to_number
+    session = await request.app.state.accept_incoming_call_use_case.execute(
+        to_number=to_number, from_number=from_number, call_sid=call_sid, now=datetime.now(timezone.utc)
     )
-
-    if resolution is None:
+    if session is None:
         logger.warning("channels.voice.not_routable", extra={"to": to_number})
         return Response(content=_REJECT_TWIML, media_type="application/xml", status_code=404)
-
-    voice_config = resolution.config or {}
-
-    session = CallSession(
-        call_sid=call_sid,
-        channel_connection_id=resolution.channel_connection_id,
-        project_id=resolution.project_id,
-        agent_id=resolution.agent_id,
-        langflow_flow_id=resolution.langflow_flow_id,
-        from_number=from_number,
-        to_number=to_number,
-        provider=APP_PROVIDER,
-        status="ringing",
-        started_at=datetime.now(timezone.utc),
-        config=voice_config,
-    )
-
-    call_session_repo = request.app.state.call_session_repo
-    await call_session_repo.save(session, ttl_seconds=settings.CALL_SESSION_TTL_SECONDS)
+    voice_config = session.config
 
     logger.info(
         "channels.voice.call.accepted",
-        extra={"call_sid": call_sid, "project_id": str(resolution.project_id)},
+        extra={"call_sid": call_sid, "project_id": str(session.project_id)},
     )
 
     # Only ask Twilio to call us back post-session (action_url) when this
