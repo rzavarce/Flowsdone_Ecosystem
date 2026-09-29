@@ -274,10 +274,11 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             await ws.close(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
             # Ends the connection loop as a normal disconnect.
             raise WebSocketDisconnect(code=TEST_TOKEN_EXPIRED_CLOSE_CODE)
+        demo_conversation_id = None
         if shared.project_id is not None:
             # Staff see what prospects asked, in Conversations ("Demo"),
             # without it counting for the plan's quota.
-            await ws.app.state.demo_conversation_recorder.record_inbound(
+            demo_conversation_id = await ws.app.state.demo_conversation_recorder.record_inbound(
                 session_id=registry_id,
                 share_id=shared.share_id,
                 agent_id=shared.agent_id,
@@ -293,6 +294,9 @@ async def _handle_message(ws: WebSocket, route: WebchatRoute, frame: Dict[str, A
             transport=frame.get("transport") or "rabbitmq",
             payload={"message": text, "conversation_id": registry_id},
             channel=WEBCHAT_SHARE_CHANNEL,
+            # Like every channel, Langflow's session is the conversation: its
+            # memory follows it, and tools (e.g. "Guardar contacto") know it.
+            llm_session_id=str(demo_conversation_id) if demo_conversation_id else None,
         )
     else:
         # Re-checked on every message: a demo tab left open must stop

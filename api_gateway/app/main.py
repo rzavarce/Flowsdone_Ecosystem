@@ -28,6 +28,7 @@ from app.adapters.outbound.apps.factory import AppConnectorFactory
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
 from app.adapters.outbound.db.agent_repository import SqlAlchemyAgentRepository
+from app.adapters.outbound.db.conversation_contact_repository import SqlAlchemyContactRepository
 from app.adapters.outbound.db.webchat_share_link_repository import SqlAlchemyWebchatShareLinkRepository
 from app.adapters.outbound.db.channel_app_repository import SqlAlchemyChannelAppRepository
 from app.adapters.outbound.db.channel_connection_repository import SqlAlchemyChannelConnectionRepository
@@ -114,6 +115,7 @@ from app.application.use_cases.reset_password import ResetPasswordUseCase
 from app.application.use_cases.send_contact_request import SendContactRequestUseCase
 from app.application.use_cases.update_channel_connection import UpdateChannelConnectionUseCase
 from app.application.use_cases.upsert_channel_app import UpsertChannelAppUseCase
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from app.application.use_cases.voice_demo import ResolveVoiceDemoTargetUseCase
 from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
@@ -332,6 +334,9 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.conversation_tracker = conversation_tracker
+    app.state.conversation_contacts_use_case = ManageConversationContactsUseCase(
+        contacts=SqlAlchemyContactRepository(db_sessionmaker), conversations=conversation_repo
+    )
     # Share link ("Share") chats, recorded as "demo" conversations, not billed.
     app.state.demo_conversation_recorder = DemoConversationRecorder(
         sessions=session_repo,

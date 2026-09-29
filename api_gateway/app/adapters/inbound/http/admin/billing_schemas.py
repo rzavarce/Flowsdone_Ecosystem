@@ -37,6 +37,7 @@ class ConversationOut(BaseModel):
         outbound_count (int): Messages to the contact.
         closed_at (Optional[datetime]): End.
         close_reason (Optional[str]): Why it ended.
+        contact_name (Optional[str]): Name on the contact's card, if it has one.
     """
 
     id: UUID
@@ -46,6 +47,7 @@ class ConversationOut(BaseModel):
     channel_type: str
     channel_connection_id: UUID
     contact: str
+    contact_name: Optional[str] = None
     status: str
     started_at: datetime
     last_inbound_at: datetime
@@ -113,15 +115,55 @@ class ConversationDetailOut(BaseModel):
         llm_input_tokens (int): Input tokens.
         llm_output_tokens (int): Output tokens.
         llm_cached_input_tokens (int): Cached input tokens.
+        contact_card (Optional[ContactCardOut]): The contact's card, if any.
     """
 
     conversation: ConversationOut
+    contact_card: Optional["ContactCardOut"] = None
     messages: List[ConversationMessageOut]
     usage: List[UsageLineOut]
     cost_micros: Optional[int] = None
     llm_input_tokens: int
     llm_output_tokens: int
     llm_cached_input_tokens: int
+
+
+class ContactCardOut(BaseModel):
+    """The card of the person behind a conversation.
+
+    Attributes:
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        notes (Optional[str]): Notes.
+        updated_at (datetime): Last change.
+    """
+
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+    updated_at: datetime
+
+
+class ContactCardIn(BaseModel):
+    """Fields to set on a contact's card; the ones left out are not touched,
+    an empty one is cleared (for staff) or ignored (for an agent).
+
+    Attributes:
+        name (Optional[str]): Name.
+        email (Optional[str]): Email.
+        phone (Optional[str]): Phone.
+        notes (Optional[str]): Notes.
+    """
+
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+
+
+ConversationDetailOut.model_rebuild()
 
 
 # Plans

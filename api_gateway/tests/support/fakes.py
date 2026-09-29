@@ -25,6 +25,7 @@ from app.domain.models.user import User, UserAvatar, UserCredentials
 from app.domain.ports.outbound import AlreadyExistsError, UserAlreadyExistsError
 from app.domain.models.voice_relay_event import VoiceRelayEvent
 from app.domain.models.webchat_share_link import WebchatShareLink
+from app.domain.models.conversation_contact import Contact
 
 
 def make_channel_connection(**overrides: Any) -> ChannelConnection:
@@ -1245,3 +1246,28 @@ class FakeWebchatShareLinkRepo:
                 self.links[token_hash] = link.model_copy(update={"revoked_at": now})
                 return True
         return False
+
+
+class FakeContactRepo:
+    """In-memory ContactRepositoryPort, with the real one's "only_empty" rule."""
+
+    def __init__(self) -> None:
+        self.contacts: Dict[Any, Contact] = {}
+
+    async def get(self, key):
+        return self.contacts.get(key)
+
+    async def find_many(self, keys):
+        return {k: self.contacts[k] for k in keys if k in self.contacts}
+
+    async def upsert(self, key, fields, *, only_empty=False):
+        now = datetime.now(timezone.utc)
+        current = self.contacts.get(key) or Contact(
+            id=uuid4(), tenant_id=key[0], channel_type=key[1], identifier=key[2], created_at=now, updated_at=now
+        )
+        updates = {
+            name: value for name, value in fields.items()
+            if not (only_empty and getattr(current, name) is not None)
+        }
+        self.contacts[key] = current.model_copy(update={**updates, "updated_at": now})
+        return self.contacts[key]

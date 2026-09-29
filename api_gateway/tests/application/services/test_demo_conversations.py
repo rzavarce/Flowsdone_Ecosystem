@@ -60,7 +60,7 @@ class World:
         self.session_id = f"share:{self.share_id}:visitor-12345678-abcd"
 
     async def visitor_says(self, text, now=NOW):
-        await self.recorder.record_inbound(
+        return await self.recorder.record_inbound(
             session_id=self.session_id, share_id=self.share_id, agent_id=self.agent_id,
             project_id=self.project.id, visitor_id="visitor-12345678-abcd", text=text, now=now,
         )
@@ -87,8 +87,10 @@ async def test_a_visitor_message_opens_a_demo_conversation_that_is_not_billed():
 async def test_later_messages_stay_in_the_same_conversation():
     world = World()
 
-    await world.visitor_says("Hola")
-    await world.visitor_says("¿Y el precio?", now=NOW + timedelta(minutes=2))
+    first = await world.visitor_says("Hola")
+    second = await world.visitor_says("¿Y el precio?", now=NOW + timedelta(minutes=2))
+
+    assert first == second == next(iter(world.conversations.conversations))
 
     assert len(world.conversations.conversations) == 1
     assert [e.text for e in world.events.events] == ["Hola", "¿Y el precio?"]
@@ -154,4 +156,4 @@ async def test_a_recording_failure_never_breaks_the_chat():
     world = World()
     world.events.fail = True
 
-    await world.visitor_says("Hola")  # must not raise
+    assert await world.visitor_says("Hola") is None  # and it must not raise

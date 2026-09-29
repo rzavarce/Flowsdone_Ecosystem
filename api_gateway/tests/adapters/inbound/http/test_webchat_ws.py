@@ -59,9 +59,11 @@ class FakeIngest:
 class FakeDemoRecorder:
     def __init__(self):
         self.calls: List[Dict[str, Any]] = []
+        self.conversation_id = uuid4()
 
     async def record_inbound(self, **kwargs):
         self.calls.append(kwargs)
+        return self.conversation_id
 
 
 class FakeAgents:
@@ -228,6 +230,7 @@ def test_a_share_link_goes_straight_to_the_agents_flow_on_its_own_channel():
     assert recorded["agent_id"] == state["agents"].agent.id
     assert recorded["project_id"] == state["agents"].agent.project_id
     assert recorded["visitor_id"] == "visitor-1" and recorded["text"] == "Hola"
+    assert call["llm_session_id"] == str(state["demo_conversation_recorder"].conversation_id)
 
 
 def test_the_console_demo_is_not_recorded_as_a_conversation():

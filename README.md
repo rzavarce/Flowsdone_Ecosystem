@@ -1485,8 +1485,21 @@ El id de la Conversation viaja en el envelope como `meta.llm_session_id`, y `Exe
 | Catálogo de costes, planes, suscripciones y extractos cerrados | Postgres: `cost_rates`, `plans`, `tenant_subscriptions`, `usage_statements` (migraciones `0011` y `0012`) | Configuración y cierres mensuales congelados |
 | Contadores de cuota del mes | Redis, `billing:quota:{tenant}:{YYYY-MM}` | Se consultan en cada mensaje. Si se pierden, se reconstruyen desde ClickHouse |
 | Auditoría de sesión | Postgres, `session_events` | Un evento `closed` por cada conversación cerrada |
+| Ficha del contacto (nombre, email, teléfono, notas) | Postgres, tabla `contacts` (migración `0016`) | Editable; se comparte entre todas las conversaciones de la misma persona |
 
 `session_messages` (Postgres) se sigue escribiendo en paralelo por ahora. Se retira cuando el archivo de ClickHouse esté validado en producción.
+
+### Ficha del contacto
+
+Cada conversación muestra al contacto por el identificador que da su canal (un teléfono, `@usuario`, `client:demo-…`, «Demo · visitante …»). Para verlo con su nombre, se le pone una **ficha**:
+
+- La ficha es de un tenant, un canal y ese identificador (`uq_contacts_identity`). Todas las conversaciones de la misma persona por ese canal muestran el mismo nombre; el mismo número por otro canal (o en otro tenant) es otra ficha.
+- **El equipo la edita** en el detalle de la conversación (*Añadir datos* / *Editar contacto*): `PATCH /internal/admin/conversations/{id}/contact`, recurso `contacts`, todo el staff. Un campo vacío lo borra; un email no válido o un valor demasiado largo devuelve 422.
+- **El agente la rellena** con el componente de Langflow *Guardar contacto (Flowsdone)*: cuando el cliente dice su nombre, email o teléfono, llama a `POST /internal/admin/conversations/{id}/contact/capture` con la `X-Admin-Api-Key` del entorno del contenedor (`GATEWAY_INTERNAL_URL`, `GATEWAY_ADMIN_API_KEY`). El id de la conversación no lo elige el modelo: es el `session_id` con el que el gateway ejecuta el flujo (ver arriba). La captura **solo rellena campos vacíos**, así que lo que escribió el equipo nunca se sobrescribe con un nombre mal entendido por voz. En el playground de Langflow o en *Probar en webchat* no hay conversación registrada y el componente no llama al gateway.
+- En el prompt del agente basta con una línea: «Cuando el cliente te diga su nombre, email o teléfono, guárdalo con la herramienta Guardar contacto».
+- La lista, el detalle y la búsqueda muestran el nombre de la ficha, con el identificador debajo; el filtro *Contacto* busca también por ese nombre.
+- Las llamadas desde la página de demo (softphone) llegan como `client:demo-xxxxxxxx`: la consola las muestra como «Llamada desde el navegador · demo-…», y el navegador guarda esa identidad (`localStorage`, `fd-voice-demo-identity`), así que las llamadas de una misma persona son el mismo contacto.
+- Las conversaciones de los enlaces de *Compartir* también pasan su id a Langflow como `session_id`, así que el componente funciona igual en el canal Demo.
 
 ### Flujo
 

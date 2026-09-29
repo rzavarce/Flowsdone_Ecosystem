@@ -75,7 +75,7 @@ class DemoConversationRecorder:
         visitor_id: str,
         text: str,
         now: datetime,
-    ) -> None:
+    ) -> Optional[UUID]:
         """Record one message of a share link visitor. Never raises.
 
         A recording failure must not break the chat, so it is logged instead.
@@ -88,13 +88,18 @@ class DemoConversationRecorder:
             visitor_id (str): The visitor's browser id.
             text (str): What the visitor wrote.
             now (datetime): When (timezone-aware).
+
+        Returns:
+            Optional[UUID]: The conversation it was recorded in (the chat
+            passes it to Langflow as its session, like every channel), or
+            None if it couldn't be recorded.
         """
         try:
             session = await self._sessions.get(session_id)
             if session is None:
                 session = await self._new_session(session_id, share_id, agent_id, project_id, visitor_id, now)
                 if session is None:
-                    return
+                    return None
                 await self._history.append_event(
                     session_id=session_id, project_id=project_id, event_type="started", to_app=_APP
                 )
@@ -102,10 +107,12 @@ class DemoConversationRecorder:
                 session_id=session_id, project_id=project_id, direction="inbound", text=text, app=_APP
             )
             session.record_message(direction="inbound", text=text, app=_APP, timestamp=now)
-            await self._tracker.record_inbound(session=session, text=text, now=now, billable=False)
+            conversation = await self._tracker.record_inbound(session=session, text=text, now=now, billable=False)
             await self._sessions.save(session, ttl_seconds=self._ttl)
+            return conversation.id
         except Exception:
             logger.error("conversations.demo.record_failed", extra={"session_id": session_id}, exc_info=True)
+            return None
 
     async def _new_session(
         self,

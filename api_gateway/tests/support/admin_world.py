@@ -37,7 +37,9 @@ from app.application.use_cases.billing import (
 from app.application.use_cases.conversation_queries import GetConversationDetailUseCase
 from app.application.use_cases.manage_agents import ManageAgentsUseCase, ProjectFlow
 from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
+from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from api_gateway.tests.support.fakes import (
+    FakeContactRepo,
     FakeWebchatShareLinkRepo,
     FakeAccountTokenStore,
     FakeConversationRepository,
@@ -194,6 +196,7 @@ class World:
         self.conversation_a = make_conversation(tenant_id=self.tenant_a.id, project_id=self.project_a.id, contact="+34 600 111")
         self.conversation_b = make_conversation(tenant_id=self.tenant_b.id, project_id=self.project_b.id, contact="+34 600 222")
         self.conversations = FakeConversationRepository(self.conversation_a, self.conversation_b)
+        self.contacts = FakeContactRepo()
         self.archived_messages: List[Any] = []
         self.usage = FakeUsageStore()
         self.cost_rates = FakeCostRateRepo()
@@ -332,6 +335,9 @@ class World:
         )
         return dict(
             conversation_repo=self.conversations,
+            conversation_contacts_use_case=ManageConversationContactsUseCase(
+                contacts=self.contacts, conversations=self.conversations
+            ),
             cost_rate_repo=self.cost_rates,
             plan_repo=self.plans,
             subscription_repo=self.subscriptions,

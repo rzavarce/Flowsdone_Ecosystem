@@ -12,6 +12,7 @@ import pytest
 
 from app.adapters.inbound.http import me as me_module
 from app.adapters.inbound.http.admin import billing as billing_module
+from app.core.config import settings
 from app.domain.models.conversation_message import ConversationMessageRecorded
 from app.domain.models.usage import UsageEvent
 from api_gateway.tests.support.admin_world import CSRF, World, cookie
@@ -62,6 +63,70 @@ async def test_conversation_filters_are_passed_through(world):
     assert (call["status"], call["channel_type"], call["contact"], call["limit"]) == ("open", "telegram", "600", 10)
     assert call["project_id"] == world.project_a.id
     assert bad_status.status_code == 422
+
+
+async def test_staff_name_the_contact_and_the_list_and_detail_show_it(world):
+    token = await world.token("botmaster")
+    path = f"/conversations/{world.conversation_a.id}"
+    async with world.client() as c:
+        before = await _call(c, "GET", path, token=token)
+        edited = await _call(c, "PATCH", f"{path}/contact", token=token,
+                             json={"name": "Ana Pérez", "email": "ANA@example.com", "notes": "Pidió demo"})
+        listed = await _call(c, "GET", "/conversations", token=token)
+        detail = await _call(c, "GET", path, token=token)
+
+    assert before.json()["contact_card"] is None and before.json()["conversation"]["contact_name"] is None
+    assert edited.status_code == 200
+    assert edited.json()["name"] == "Ana Pérez" and edited.json()["email"] == "ana@example.com"
+    assert listed.json()[0]["contact_name"] == "Ana Pérez"
+    assert listed.json()[0]["contact"] == "+34 600 111"
+    assert detail.json()["contact_card"]["notes"] == "Pidió demo"
+
+
+async def test_contacts_of_other_tenants_cannot_be_edited_and_bad_emails_are_refused(world):
+    token = await world.token("botmaster")
+    async with world.client() as c:
+        foreign = await _call(c, "PATCH", f"/conversations/{world.conversation_b.id}/contact", token=token, json={"name": "X"})
+        missing = await _call(c, "PATCH", f"/conversations/{uuid4()}/contact", token=token, json={"name": "X"})
+        bad = await _call(c, "PATCH", f"/conversations/{world.conversation_a.id}/contact", token=token,
+                          json={"email": "no-es-un-email"})
+        client_role = await _call(c, "PATCH", f"/conversations/{world.conversation_a.id}/contact",
+                                  token=await world.token("client"), json={"name": "X"})
+
+    assert foreign.status_code == 404 and missing.status_code == 404
+    assert bad.status_code == 422
+    assert client_role.status_code == 403
+    assert world.contacts.contacts == {}
+
+
+async def test_an_agent_capture_fills_only_empty_fields(world):
+    token = await world.token("admin")
+    path = f"/conversations/{world.conversation_a.id}/contact"
+    async with world.client() as c:
+        await _call(c, "PATCH", path, token=token, json={"name": "Ana Pérez"})
+        captured = await _call(c, "POST", f"{path}/capture", token=token,
+                               json={"name": "Ana Peres", "phone": "600111222", "email": ""})
+
+    assert captured.status_code == 200
+    assert captured.json()["name"] == "Ana Pérez" and captured.json()["phone"] == "600111222"
+    assert captured.json()["email"] is None
+
+
+async def test_the_langflow_component_captures_with_the_admin_api_key(world):
+    async with world.client() as c:
+        captured = await c.post(
+            f"{BASE}/conversations/{world.conversation_a.id}/contact/capture",
+            headers={"X-Admin-Api-Key": settings.ADMIN_API_KEY},
+            json={"name": "Ana Pérez"},
+        )
+        unknown = await c.post(
+            f"{BASE}/conversations/{uuid4()}/contact/capture",
+            headers={"X-Admin-Api-Key": settings.ADMIN_API_KEY},
+            json={"name": "Ana"},
+        )
+
+    assert captured.status_code == 200 and captured.json()["name"] == "Ana Pérez"
+    assert unknown.status_code == 404
 
 
 async def test_conversation_detail_shows_costs_only_to_admins(world):
