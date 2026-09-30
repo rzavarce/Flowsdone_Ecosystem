@@ -207,6 +207,10 @@ class Settings(BaseModel):
 
     # Webhook callbacks
     CALLBACK_HMAC_SECRET: str = "dev-secret-change-me"
+    # Hosts a result callback may go to (comma-separated; http allowed for
+    # them, e.g. an internal n8n). Empty = any https host that resolves only
+    # to public addresses. See adapters/outbound/http/callback_sender.py.
+    CALLBACK_ALLOWED_HOSTS: str = ""
     CALLBACK_MAX_RETRIES: int = 3
     CALLBACK_BACKOFF_SECONDS: int = 2
     GATEWAY_INTERNAL_URL: str = "http://api:8000"
@@ -369,6 +373,7 @@ settings = Settings(
     TIKTOK_API_BASE_URL=os.getenv("TIKTOK_API_BASE_URL"),
 
     CALLBACK_HMAC_SECRET=os.getenv("CALLBACK_HMAC_SECRET", "dev-secret-change-me"),
+    CALLBACK_ALLOWED_HOSTS=os.getenv("CALLBACK_ALLOWED_HOSTS", ""),
     CALLBACK_MAX_RETRIES=int(os.getenv("CALLBACK_MAX_RETRIES", "3")),
     CALLBACK_BACKOFF_SECONDS=int(os.getenv("CALLBACK_BACKOFF_SECONDS", "2")),
 

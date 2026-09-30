@@ -33,10 +33,16 @@ from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
 from workers.langflow_run_keys import build_langflow_run_keys
+from pathlib import Path
+from workers.heartbeat import heartbeat_forever
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
 logger = logging.getLogger("kafka.voice.worker")
+
+# Checked by the docker-compose healthcheck (see workers/heartbeat.py).
+HEARTBEAT_FILE = Path("/tmp/kafka-voice-worker.heartbeat")
+
 
 _FALLBACK_RESPONSE = "The workflow did not return a valid response."
 
@@ -153,7 +159,12 @@ async def main() -> None:
         group_id="voice-workers",
     )
 
-    await consumer.start(handler)
+    # Liveness for the docker-compose healthcheck (see workers/heartbeat.py).
+    heartbeat = asyncio.create_task(heartbeat_forever(HEARTBEAT_FILE))
+    try:
+        await consumer.start(handler)
+    finally:
+        heartbeat.cancel()
 
 
 if __name__ == "__main__":

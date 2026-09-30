@@ -3,7 +3,7 @@
 import logging
 from typing import Dict
 
-from fastapi import WebSocket
+from app.domain.ports.outbound import JsonConnection
 
 logger = logging.getLogger("ws")
 
@@ -17,14 +17,16 @@ class WSRegistry:
     """
 
     def __init__(self) -> None:
-        self._connections: Dict[str, WebSocket] = {}
+        """Start with no connections."""
+        self._connections: Dict[str, JsonConnection] = {}
 
-    def add(self, conversation_id: str, websocket: WebSocket) -> None:
+    def add(self, conversation_id: str, websocket: JsonConnection) -> None:
         """Register a connected WebSocket for a conversation.
 
         Args:
             conversation_id (str): Id of the conversation.
-            websocket (WebSocket): The connected WebSocket instance.
+            websocket (JsonConnection): The connected client (a FastAPI
+                WebSocket in production).
         """
         self._connections[conversation_id] = websocket
         logger.info(

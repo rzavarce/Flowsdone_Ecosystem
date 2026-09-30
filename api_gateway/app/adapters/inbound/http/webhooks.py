@@ -1,12 +1,19 @@
-"""Generic inbound webhook, for callers that already speak the canonical envelope shape."""
+"""Generic inbound webhook, for callers that already speak the canonical envelope shape.
+
+Internal only (n8n and other platform services): it runs any flow by id and
+can ask for a result callback, so it requires the admin API key
+(`X-Admin-Api-Key`), like the rest of the internal API.
+"""
 
 from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+
+from app.adapters.inbound.http.admin.auth import require_admin_api_key
 
 logger = logging.getLogger("http.webhooks")
 
@@ -33,7 +40,7 @@ class GenericWebhookRequest(BaseModel):
     payload: Dict[str, Any] = Field(default_factory=dict)
 
 
-@router.post("/generic")
+@router.post("/generic", dependencies=[Depends(require_admin_api_key)])
 async def generic_webhook(body: GenericWebhookRequest, request: Request):
     """Ingest a generic message and inject it into the pipeline.
 
@@ -50,7 +57,8 @@ async def generic_webhook(body: GenericWebhookRequest, request: Request):
         dict: A status dict acknowledging the message.
 
     Raises:
-        HTTPException: 500 if ingestion fails.
+        HTTPException: 401 without a valid `X-Admin-Api-Key` (raised by
+            the dependency); 500 if ingestion fails.
     """
     try:
         use_case = request.app.state.ingest_message_use_case

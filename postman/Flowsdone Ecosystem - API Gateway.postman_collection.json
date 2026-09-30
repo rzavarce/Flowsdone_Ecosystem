@@ -690,7 +690,7 @@
           "request": {
             "auth": { "type": "noauth" },
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "X-Admin-Api-Key", "value": "{{adminApiKey}}" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"workflow_id\": \"n8n-demo-workflow\",\n  \"conversation_id\": \"conv-demo-1\",\n  \"sender_id\": \"tester\",\n  \"transport\": \"rabbitmq\",\n  \"channel\": \"web\",\n  \"payload\": {\n    \"message\": \"Hola, este es un mensaje de prueba para n8n\"\n  }\n}"

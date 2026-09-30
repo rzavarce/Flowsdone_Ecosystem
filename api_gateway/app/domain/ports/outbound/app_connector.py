@@ -24,6 +24,11 @@ class AppTurnResult:
     """
 
     def __init__(self, text: str) -> None:
+        """Build the result.
+
+        Args:
+            text (str): Text to deliver back to the caller right away.
+        """
         self.text = text
 
 

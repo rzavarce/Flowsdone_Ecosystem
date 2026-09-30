@@ -12,6 +12,28 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    # Postgres desechable para los tests de integración de los repositorios
+    # (api_gateway/tests/integration, marcados con TEST_POSTGRES_URL): sin él
+    # se omitían siempre y los repositorios SQL quedaban sin probar en CI.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: it
+          POSTGRES_PASSWORD: it
+          POSTGRES_DB: it
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U it -d it"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL_SQLALCHEMY: postgresql+asyncpg://it:it@localhost:5432/it
+      TEST_POSTGRES_URL: postgresql+asyncpg://it:it@localhost:5432/it
+
     steps:
       - name: Checkout del código
         uses: actions/checkout@v4
@@ -31,7 +53,15 @@ jobs:
       # stack de docker-compose. El piso de cobertura vive en
       # pyproject.toml ([tool.coverage.report].fail_under) para que
       # local y CI usen el mismo número.
-      - name: Correr tests con cobertura
+      # Clave de cifrado de credenciales de canal solo para los tests
+      # (generada en cada run; nunca un secreto real).
+      - name: Clave de cifrado de prueba
+        run: echo "CHANNEL_CREDENTIALS_ENCRYPTION_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Migrar el Postgres de pruebas
+        run: alembic -c api_gateway/alembic.ini upgrade head
+
+      - name: Correr tests con cobertura (unitarios + integración con Postgres)
         run: python -m pytest api_gateway/tests --cov --cov-report=term-missing
 
   deploy:
@@ -69,6 +99,11 @@ jobs:
           script: |
             # Entrar al directorio del proyecto
             cd /srv/Flowsdone_Ecosystem
+
+            # Este es el ambiente de producción: el gateway oculta la documentación
+            # de la API y se niega a arrancar con claves por defecto (ver
+            # api_gateway/app/core/security_checks.py).
+            export ENV=production
 
             # Descargar los cambios más recientes desde main (guardando el commit
             # anterior para saber después qué cambió)
@@ -138,6 +173,17 @@ jobs:
             # Metabase: cuenta de administrador y fuentes de datos (idempotente;
             # espera a que Metabase esté sano).
             docker compose --profile prod run --rm --no-deps -v ./scripts/metabase:/scripts/metabase api python /scripts/metabase/provision.py
+
+            # Verificar los healthchecks (CLAUDE.md): esperar a que ningún servicio
+            # siga arrancando y fallar el deploy si alguno queda unhealthy (se ve
+            # en rojo en Actions en vez de descubrirlo en producción).
+            timeout 300 sh -c 'while docker compose --profile prod ps --format "{{.Health}}" | grep -q starting; do sleep 5; done' || true
+            UNHEALTHY=$(docker compose --profile prod ps --format "{{.Service}} {{.Health}}" | grep -E " (unhealthy|starting)$" || true)
+            if [ -n "$UNHEALTHY" ]; then
+              echo "Servicios sin salud tras el deploy:"
+              echo "$UNHEALTHY"
+              exit 1
+            fi
 
             # Limpiar imágenes antiguas/huérfanas para ahorrar espacio en disco
             docker image prune -f

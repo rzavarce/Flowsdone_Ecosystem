@@ -5,10 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import UUID
 
-import httpx
-
 from app.domain.models.message_envelope import MessageEnvelope
 from app.domain.ports.outbound import (
+    CallbackSenderPort,
     ChannelConnectionRepositoryPort,
     ChannelSenderPort,
     SessionHistoryRepositoryPort,
@@ -45,6 +44,7 @@ class HandleOutboundResponseUseCase:
         session_ttl_seconds: int = 86400,
         conversation_tracker: Optional[ConversationTracker] = None,
         failure_message: str = DEFAULT_FAILURE_MESSAGE,
+        callback_sender: Optional[CallbackSenderPort] = None,
     ):
         """Build the use case.
 
@@ -73,6 +73,9 @@ class HandleOutboundResponseUseCase:
                 Conversation. Optional, like the session ports.
             failure_message (str): Sent to the customer by
                 `notify_failure` when their workflow fails.
+            callback_sender (Optional[CallbackSenderPort]): Delivers the
+                result to `payload.callback_url` (signed, and only to
+                allowed destinations). Without it, callbacks are skipped.
         """
         self.publisher = publisher
         self.ws_registry = ws_registry
@@ -83,6 +86,7 @@ class HandleOutboundResponseUseCase:
         self.session_ttl_seconds = session_ttl_seconds
         self.conversation_tracker = conversation_tracker
         self.failure_message = failure_message
+        self.callback_sender = callback_sender
 
     def _extract_text(self, value: Any) -> Optional[str]:
         """Recursively extract a human-readable response string.
@@ -173,7 +177,7 @@ class HandleOutboundResponseUseCase:
             extra={"message_id": envelope.meta.message_id},
         )
 
-        # Optional HTTP callback.
+        # Optional callback to the caller that asked for it (generic webhook).
         callback_url = None
 
         try:
@@ -181,34 +185,20 @@ class HandleOutboundResponseUseCase:
         except Exception:
             pass
 
-        if callback_url:
-            try:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    await client.post(
-                        callback_url,
-                        json={
-                            "conversation_id": envelope.meta.conversation_id,
-                            "message": response_message,
-                        },
-                    )
-
-                logger.info(
-                    "handle.outbound.callback.sent",
-                    extra={
-                        "url": callback_url,
-                        "message_id": envelope.meta.message_id,
-                    },
-                )
-
-            except Exception as e:
-                logger.error(
-                    "handle.outbound.callback.failed",
-                    extra={
-                        "url": callback_url,
-                        "message_id": envelope.meta.message_id,
-                    },
-                    exc_info=e,
-                )
+        if callback_url and self.callback_sender is None:
+            logger.warning(
+                "handle.outbound.callback.no_sender",
+                extra={"message_id": envelope.meta.message_id},
+            )
+        elif callback_url:
+            delivered = await self.callback_sender.send(
+                str(callback_url),
+                {"conversation_id": envelope.meta.conversation_id, "message": response_message},
+            )
+            logger.info(
+                "handle.outbound.callback.sent" if delivered else "handle.outbound.callback.failed",
+                extra={"url": callback_url, "message_id": envelope.meta.message_id},
+            )
         else:
             logger.debug(
                 "handle.outbound.callback.not_present",

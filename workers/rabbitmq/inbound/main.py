@@ -14,6 +14,7 @@ from app.adapters.outbound.db.idempotency_repository import (
 from app.adapters.outbound.langflow.executor import LangflowExecutor
 from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
 from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from app.adapters.outbound.http.callback_sender import build_callback_sender
 from app.application.use_cases.handle_outbound_response import (
     HandleOutboundResponseUseCase,
 )
@@ -22,10 +23,16 @@ from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from workers.langflow_run_keys import build_langflow_run_keys
+from pathlib import Path
+from workers.heartbeat import heartbeat_forever
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
 logger = logging.getLogger("rabbitmq.inbound.worker")
+
+# Checked by the docker-compose healthcheck (see workers/heartbeat.py).
+HEARTBEAT_FILE = Path("/tmp/rabbitmq-inbound-worker.heartbeat")
+
 
 
 async def main() -> None:
@@ -74,7 +81,9 @@ async def main() -> None:
     await publisher.start()
 
     outbound_use_case = HandleOutboundResponseUseCase(
-        publisher=publisher, failure_message=settings.WORKFLOW_FAILURE_MESSAGE
+        publisher=publisher,
+        failure_message=settings.WORKFLOW_FAILURE_MESSAGE,
+        callback_sender=build_callback_sender(settings),
     )
 
     async def handler(body: bytes) -> None:
@@ -137,7 +146,12 @@ async def main() -> None:
         routing_key=settings.RABBITMQ_ROUTING_KEY,
     )
 
-    await consumer.start(handler)
+    # Liveness for the docker-compose healthcheck (see workers/heartbeat.py).
+    heartbeat = asyncio.create_task(heartbeat_forever(HEARTBEAT_FILE))
+    try:
+        await consumer.start(handler)
+    finally:
+        heartbeat.cancel()
 
 
 if __name__ == "__main__":

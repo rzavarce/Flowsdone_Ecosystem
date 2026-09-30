@@ -22,8 +22,10 @@ from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
 from app.adapters.inbound.http.voice_demo import router as voice_demo_router
+from app.adapters.inbound.http.health import router as health_router
 from app.adapters.inbound.http.webhooks import router as webhooks_router
 from app.adapters.inbound.http.websocket import router as ws_router
+from app.adapters.outbound.http.callback_sender import build_callback_sender
 from app.adapters.outbound.apps.factory import AppConnectorFactory
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
 from app.adapters.outbound.channels.webhook_registrar_factory import WebhookRegistrarFactory
@@ -78,6 +80,8 @@ from app.application.services.conversation_tracker import ConversationTracker
 from app.application.services.demo_conversations import DemoConversationRecorder
 from app.application.services.quota_alerts import QuotaAlertMailer
 from app.application.services.quota_gate import QuotaGate
+from app.application.use_cases.accept_incoming_call import AcceptIncomingCallUseCase
+from app.application.use_cases.billing_catalog import ManageBillingCatalogUseCase
 from app.application.use_cases.analytics_dashboards import GetOverviewDashboardUseCase, ReportsUseCase
 from app.application.use_cases.billing import (
     CloseBillingPeriodUseCase,
@@ -120,6 +124,7 @@ from app.application.use_cases.conversation_contacts import ManageConversationCo
 from app.application.use_cases.voice_demo import ResolveVoiceDemoTargetUseCase
 from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCase
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
+from app.core.security_checks import api_docs_urls, check_production_settings
 from app.core.config import settings
 from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
@@ -299,6 +304,12 @@ async def lifespan(app: FastAPI):
     app.state.agent_repo = SqlAlchemyAgentRepository(db_sessionmaker)
     app.state.workflow_config_repo = SqlAlchemyWorkflowConfigRepository(db_sessionmaker)
     app.state.channel_connection_repo = SqlAlchemyChannelConnectionRepository(db_sessionmaker)
+    app.state.accept_incoming_call_use_case = AcceptIncomingCallUseCase(
+        channel_connections=app.state.channel_connection_repo,
+        call_sessions=app.state.call_session_repo,
+        session_ttl_seconds=settings.CALL_SESSION_TTL_SECONDS,
+        provider="twilio",
+    )
     app.state.channel_app_repo = SqlAlchemyChannelAppRepository(db_sessionmaker)
 
     # Switchboard's durable transcript (Postgres) - needs db_sessionmaker,
@@ -600,6 +611,14 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.quota_gate = quota_gate
+    app.state.billing_catalog_use_case = ManageBillingCatalogUseCase(
+        plans=app.state.plan_repo,
+        subscriptions=app.state.subscription_repo,
+        cost_rates=app.state.cost_rate_repo,
+        statements=app.state.statement_repo,
+        tenants=app.state.tenant_repo,
+        quota_gate=quota_gate,
+    )
     app.state.get_conversation_detail_use_case = GetConversationDetailUseCase(
         conversations=conversation_repo,
         archive=ClickHouseMessageArchive(clickhouse),
@@ -654,6 +673,7 @@ async def lifespan(app: FastAPI):
         session_history_repo=session_history_repo,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
         conversation_tracker=conversation_tracker,
+        callback_sender=build_callback_sender(settings),
     )
     app.state.outbound_handler = outbound_handler
 
@@ -735,10 +755,14 @@ async def lifespan(app: FastAPI):
     logger.info("application.shutdown.complete")
 
 
+# Production: no public API map, and never start behind a well-known secret.
+check_production_settings(settings)
+
 app = FastAPI(
     title="Omni API Gateway",
     version="1.0.0",
     lifespan=lifespan,
+    **api_docs_urls(settings),
 )
 instrument_fastapi_app(app)
 register_error_handlers(app)
@@ -794,6 +818,7 @@ app.mount("/static", NoCacheStaticFiles(directory=static_dir, html=True), name="
 
 # Routers
 app.include_router(ws_router)
+app.include_router(health_router)
 app.include_router(webhooks_router)
 app.include_router(internal_router)
 app.include_router(channels_router)

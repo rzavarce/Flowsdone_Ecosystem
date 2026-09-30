@@ -144,6 +144,8 @@ El gateway es **multi-tenant**: varios clientes (tenants), cada uno con sus prop
 
 ¹ Solo corren en `profile: prod` — ver sección 4.
 
+**Healthchecks.** Todos los servicios tienen healthcheck salvo `otel-collector` (su imagen es distroless: sin shell ni curl, no puede ejecutar ninguna comprobación). El gateway expone `GET /health` (vivo, sin tocar dependencias; es lo que mira Docker) y `GET /ready` (Postgres y Redis responden en < 2 s; 503 si no, solo `ok`/`fail` por dependencia). Los workers de Kafka/RabbitMQ tocan un fichero de latido cada 30 s (`workers/heartbeat.py`) y el healthcheck comprueba que tenga menos de 2 min. Los servicios que dependen de Kafka esperan a que esté *healthy*. El deploy termina esperando a que ningún servicio siga arrancando y **falla si alguno queda unhealthy**.
+
 ---
 
 ## 4. Perfiles de Docker (dev / prod)
@@ -632,6 +634,10 @@ Traefik usa el **file provider** (`traefik/dynamic.yml`), no el Docker provider 
 | Weaviate GUI | https://vector.flowsdone.com |
 | OpenSearch Dashboards | https://logs.flowsdone.com |
 
+**Producción (`ENV=production`).** El workflow de despliegue exporta `ENV=production` y el compose se lo pasa al gateway (en local vale `local`). Con él, el gateway (`core/security_checks.py`):
+- **no publica la documentación de la API**: `/docs`, `/redoc` y `/openapi.json` devuelven 404 (en local siguen disponibles);
+- **se niega a arrancar** si `ADMIN_API_KEY` o `CALLBACK_HMAC_SECRET` tienen el valor por defecto del código, el de `env.example.txt`, están vacíos o tienen menos de 24 caracteres. El error nombra la variable, nunca su valor. Si se levanta el stack a mano en el VPS, conviene tener también `ENV=production` en su `.env`.
+
 ### Langflow (`agents.flowsdone.com`): acceso y seguridad
 
 **Riesgo (corregido):** Langflow 1.4 arranca con `AUTO_LOGIN=true` y la cuenta `langflow`/`langflow`: quien abriera la URL entraba como superusuario **sin contraseña**, y un superusuario de Langflow ejecuta Python arbitrario en su contenedor (que recibe `ADMIN_API_KEY`, la URL de Postgres con su contraseña, claves de Langfuse…). Además Langflow **no tiene multi-tenancy**: una sola cuenta es dueña de todos los flujos (y el gateway los ejecuta con una única API key), así que quien vea su interfaz ve los flujos de **todos** los clientes y sus variables guardadas.
@@ -805,7 +811,11 @@ n8n **no** tiene el nodo AI Agent en el flujo recomendado de este proyecto. La o
 
 ### Gateway → n8n (el gateway dispara una automatización)
 
-El gateway publica en RabbitMQ (`/webhooks/generic` con `transport: "rabbitmq"`, o cualquier caller que use `IngestMessageUseCase`). Un workflow de n8n lo recibe con un nodo **RabbitMQ Trigger** apuntando a la misma cola/exchange, y responde publicando en la cola de salida que el gateway ya escucha (`rabbitmq_outbound_worker`):
+El gateway publica en RabbitMQ (`/webhooks/generic` con `transport: "rabbitmq"`, o cualquier caller que use `IngestMessageUseCase`).
+
+> **`/webhooks/generic` es interno:** exige la cabecera `X-Admin-Api-Key` (401 sin ella), porque ejecuta cualquier flujo por su id. Si el caller pide el resultado en `payload.callback_url`, el gateway lo envía firmado (`X-Flowsdone-Signature`, HMAC-SHA256 del cuerpo con `CALLBACK_HMAC_SECRET`, verificable con `hmac_signing.verify`) y solo a destinos permitidos: hosts de `CALLBACK_ALLOWED_HOSTS` (ahí se admite `http`, p. ej. `n8n`) o, si la lista está vacía, `https` hacia hosts que resuelvan solo a IPs públicas. No sigue redirecciones. Así un callback no puede usarse para llegar a servicios internos (SSRF).
+
+Un workflow de n8n lo recibe con un nodo **RabbitMQ Trigger** apuntando a la misma cola/exchange, y responde publicando en la cola de salida que el gateway ya escucha (`rabbitmq_outbound_worker`):
 
 1. **Credencial RabbitMQ** en n8n: host `rabbitmq`, puerto `5672`, user/pass = `RABBITMQ_USER`/`RABBITMQ_PASS`, vhost `/`.
 2. **RabbitMQ Trigger**: `Queue/Topic` = una cola propia (ej. `n8n_workflow_queue`) — **tiene que existir de antemano** (el nodo hace `checkQueue`, no la crea), bindeada al exchange `inbound.messages` con routing key `inbound.message`. Opción `JSON Parse Body` = true.
@@ -1030,13 +1040,13 @@ TEST_CLICKHOUSE_DATABASE=conversations_it pytest api_gateway/tests/integration
 docker compose run --rm api sh -c "pip install -e '.[test]' && python -m pytest --cov --cov-report=term-missing"
 ```
 
-Hoy da ~69% total, pero es un número engañoso si se lee suelto: `application/` y la mayor parte de `adapters/` están arriba del 90-100%, mientras que `admin/`, `adapters/outbound/db/`, `infrastructure/` y `main.py` están en 0% (no son parte de esta suite todavía, ver arriba). `fail_under = 65` en `pyproject.toml` es un **piso inicial**, no una meta — dejar margen bajo el actual evita que el gate rompa por fluctuaciones menores, pero la idea es subirlo a medida que se sumen tests a esas capas, nunca bajarlo para acomodar código nuevo sin cubrir.
+Con Postgres (como en la CI) da **~87 %**: dominio ~96 %, aplicación ~98 %, adaptadores ~88 % (los repositorios SQL se cubren con los tests de integración). `fail_under = 82` en `pyproject.toml` es el piso: subirlo a medida que crezca la cobertura, nunca bajarlo para acomodar código nuevo sin tests. Sin `TEST_POSTGRES_URL` los tests de integración se omiten y el total queda por debajo del piso, así que para medir cobertura en local levanta un Postgres desechable, migra (`alembic -c api_gateway/alembic.ini upgrade head`) y exporta `TEST_POSTGRES_URL`.
 
 ### CI
 
 `.github/workflows/deploy.yml` tiene dos triggers (`push` a `main` y `pull_request` contra `main`) y dos jobs:
 
-- **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`), con `--cov` respetando el `fail_under` de `pyproject.toml`.
+- **`test`** corre en ambos casos: en cada PR (para tener feedback antes de mergear — si querés que bloquee el botón de "Merge", hay que activar branch protection con este check como obligatorio, no viene forzado por el workflow en sí) y de nuevo en el push a `main` tras el merge. Corre en un runner de GitHub limpio (no en el stack de `docker-compose`) con un **Postgres de servicio** (`postgres:17-alpine`, migrado con Alembic) para los tests de integración, y con `--cov` respetando el `fail_under` de `pyproject.toml`.
 - **`deploy`** solo corre en el evento `push` (`if: github.event_name == 'push'`) y depende de `test` (`needs: test`) — nunca se dispara desde una PR (evitaría deployar código sin mergear al VPS), y si los tests o la cobertura fallan en el push a `main`, no llega a pegarle por SSH al servidor.
 
 ---

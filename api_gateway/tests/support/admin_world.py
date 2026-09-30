@@ -27,6 +27,7 @@ from app.domain.models.project import Project
 from app.domain.models.workflow_config import WorkflowConfig
 from app.domain.ports.outbound import AlreadyExistsError
 from api_gateway.tests.support.asgi import client_for_router
+from app.application.use_cases.billing_catalog import ManageBillingCatalogUseCase
 from app.application.services.quota_gate import QuotaGate
 from app.application.use_cases.billing import (
     CloseBillingPeriodUseCase,
@@ -341,6 +342,10 @@ class World:
             subscription_repo=self.subscriptions,
             statement_repo=self.statements,
             quota_gate=self.quota_gate,
+            billing_catalog_use_case=ManageBillingCatalogUseCase(
+                plans=self.plans, subscriptions=self.subscriptions, cost_rates=self.cost_rates,
+                statements=self.statements, tenants=self.tenants, quota_gate=self.quota_gate,
+            ),
             get_conversation_detail_use_case=GetConversationDetailUseCase(
                 conversations=self.conversations, archive=_Archive(), usage_store=self.usage, cost_rates=self.cost_rates
             ),

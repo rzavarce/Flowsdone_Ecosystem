@@ -14,6 +14,7 @@ from app.adapters.outbound.db.idempotency_repository import (
 from app.adapters.outbound.langflow.executor import LangflowExecutor
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
 from app.application.use_cases.execute_workflow import ExecuteWorkflowUseCase
+from app.adapters.outbound.http.callback_sender import build_callback_sender
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
 from app.core.config import settings
 from app.core.logging import setup_logging
@@ -21,10 +22,16 @@ from app.core.tracing import setup_tracing
 from app.domain.models.message_envelope import MessageEnvelope
 from app.infrastructure.kafka_admin import ensure_topics_exist
 from workers.langflow_run_keys import build_langflow_run_keys
+from pathlib import Path
+from workers.heartbeat import heartbeat_forever
 
 setup_logging(settings.LOG_LEVEL)
 setup_tracing()
 logger = logging.getLogger("kafka.inbound.worker")
+
+# Checked by the docker-compose healthcheck (see workers/heartbeat.py).
+HEARTBEAT_FILE = Path("/tmp/kafka-inbound-worker.heartbeat")
+
 
 
 async def main() -> None:
@@ -72,7 +79,9 @@ async def main() -> None:
     await publisher.start()
 
     outbound_use_case = HandleOutboundResponseUseCase(
-        publisher=publisher, failure_message=settings.WORKFLOW_FAILURE_MESSAGE
+        publisher=publisher,
+        failure_message=settings.WORKFLOW_FAILURE_MESSAGE,
+        callback_sender=build_callback_sender(settings),
     )
 
     async def handler(body: dict):
@@ -125,7 +134,12 @@ async def main() -> None:
         group_id="workflow-workers",
     )
 
-    await consumer.start(handler)
+    # Liveness for the docker-compose healthcheck (see workers/heartbeat.py).
+    heartbeat = asyncio.create_task(heartbeat_forever(HEARTBEAT_FILE))
+    try:
+        await consumer.start(handler)
+    finally:
+        heartbeat.cancel()
 
 
 if __name__ == "__main__":
