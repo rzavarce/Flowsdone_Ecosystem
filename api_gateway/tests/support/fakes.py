@@ -1302,3 +1302,98 @@ class FakeContactRepo:
         }
         self.contacts[key] = current.model_copy(update={**updates, "updated_at": now})
         return self.contacts[key]
+
+
+# --------------------------------------------------------------------------
+# CRM handoffs
+# --------------------------------------------------------------------------
+
+
+def make_crm_integration(**overrides: Any) -> "CrmIntegration":
+    """Build an active generic-webhook CrmIntegration, overridable per test."""
+    from app.domain.models.crm import CrmIntegration
+
+    now = datetime.now(timezone.utc)
+    defaults: Dict[str, Any] = dict(
+        id=uuid4(),
+        tenant_id=uuid4(),
+        project_id=uuid4(),
+        provider="generic_webhook",
+        config={"url": "https://crm.example.com/hooks/flowsdone"},
+        credentials={"signing_secret": "SIGN", "api_key": "KEY"},
+        status="active",
+        created_at=now,
+        updated_at=now,
+    )
+    defaults.update(overrides)
+    return CrmIntegration(**defaults)
+
+
+class FakeCrmIntegrationRepository:
+    """In-memory stand-in for CrmIntegrationRepositoryPort (one per project)."""
+
+    def __init__(self, *integrations: Any) -> None:
+        self.integrations: Dict[UUID, Any] = {i.id: i for i in integrations}
+
+    async def create(self, *, tenant_id, project_id, provider, config, credentials):
+        if any(i.project_id == project_id for i in self.integrations.values()):
+            raise AlreadyExistsError("crm integration for project")
+        integration = make_crm_integration(
+            tenant_id=tenant_id, project_id=project_id, provider=provider, config=config, credentials=credentials
+        )
+        self.integrations[integration.id] = integration
+        return integration
+
+    async def get(self, integration_id):
+        return self.integrations.get(integration_id)
+
+    async def get_for_project(self, project_id):
+        return next((i for i in self.integrations.values() if i.project_id == project_id), None)
+
+    async def list(self, *, tenant_ids=None):
+        return [i for i in self.integrations.values() if tenant_ids is None or i.tenant_id in tenant_ids]
+
+    async def update(self, integration_id, *, config=None, credentials=None, status=None):
+        current = self.integrations.get(integration_id)
+        if current is None:
+            return None
+        changes = {k: v for k, v in (("config", config), ("credentials", credentials), ("status", status)) if v is not None}
+        self.integrations[integration_id] = current.model_copy(update=changes)
+        return self.integrations[integration_id]
+
+    async def delete(self, integration_id):
+        return self.integrations.pop(integration_id, None) is not None
+
+
+class FakeHandoffRepository:
+    """In-memory stand-in for HandoffRepositoryPort (one open per session)."""
+
+    def __init__(self, *handoffs: Any) -> None:
+        self.handoffs: Dict[UUID, Any] = {h.id: h for h in handoffs}
+
+    async def open(self, handoff):
+        existing = await self.get_open(handoff.session_id)
+        if existing is not None:
+            return existing
+        self.handoffs[handoff.id] = handoff
+        return handoff
+
+    async def get_open(self, session_id):
+        return next((h for h in self.handoffs.values() if h.session_id == session_id and h.status == "open"), None)
+
+    async def close(self, handoff_id, *, status, reason, at):
+        current = self.handoffs.get(handoff_id)
+        if current is None or current.status != "open":
+            return None
+        self.handoffs[handoff_id] = current.model_copy(update={"status": status, "close_reason": reason, "closed_at": at})
+        return self.handoffs[handoff_id]
+
+
+class FakeCrmEventPublisher:
+    """Records queued CRM events."""
+
+    def __init__(self) -> None:
+        self.events: List[Any] = []
+
+    async def publish(self, event: Any) -> None:
+        self.events.append(event)

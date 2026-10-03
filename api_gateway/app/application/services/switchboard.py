@@ -27,6 +27,7 @@ from app.domain.ports.outbound import (
     SessionRepositoryPort,
 )
 from app.application.services.conversation_tracker import ConversationTracker
+from app.application.services.crm_handoffs import CrmHandoffs
 from app.application.services.quota_gate import QuotaGate
 from app.application.use_cases.conversation_contacts import ManageConversationContactsUseCase
 from app.application.use_cases.handle_outbound_response import HandleOutboundResponseUseCase
@@ -101,6 +102,7 @@ class Switchboard:
         quota_gate: Optional[QuotaGate] = None,
         contacts: Optional[ManageConversationContactsUseCase] = None,
         profile_lookup: Optional[SenderProfileLookupPort] = None,
+        crm_handoffs: Optional[CrmHandoffs] = None,
     ) -> None:
         """Build the switchboard.
 
@@ -132,6 +134,9 @@ class Switchboard:
             profile_lookup (Optional[SenderProfileLookupPort]): Asks the
                 channel who the sender is, when its webhook only carries an
                 id (Facebook, Instagram). Optional.
+            crm_handoffs (Optional[CrmHandoffs]): Ends the CRM handoff a
+                conversation was left in when its session expired (the
+                new session starts on the bot). Optional.
         """
         self.channel_connection_repo = channel_connection_repo
         self.session_repo = session_repo
@@ -144,6 +149,7 @@ class Switchboard:
         self.quota_gate = quota_gate
         self.contacts = contacts
         self.profile_lookup = profile_lookup
+        self.crm_handoffs = crm_handoffs
 
     async def handle_inbound_turn(
         self,
@@ -195,6 +201,7 @@ class Switchboard:
         now = datetime.now(timezone.utc)
 
         if session is None:
+            await self._expire_crm_handoff(session_id)
             session = Session(
                 id=session_id,
                 tenant_id=resolution.tenant_id,
@@ -318,6 +325,21 @@ class Switchboard:
         )
 
         return session
+
+    async def _expire_crm_handoff(self, session_id: str) -> None:
+        """Best-effort: a conversation whose session expired while handed
+        over to a CRM comes back to the bot; its CRM is told.
+
+        Args:
+            session_id (str): The (new) session's id - the same id the
+                expired one had.
+        """
+        if self.crm_handoffs is None:
+            return
+        try:
+            await self.crm_handoffs.expire_open(session_id)
+        except Exception:
+            logger.error("switchboard.crm_handoff_expiry.failed", extra={"session_id": session_id}, exc_info=True)
 
     async def _admit(self, session: Session, now: datetime) -> bool:
         """Best-effort quota check for one inbound message.
