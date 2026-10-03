@@ -26,6 +26,8 @@ _RULES: Dict[str, WindowRule] = {
     "whatsapp_360dialog": "template_required",
     "facebook": "not_allowed",
     "instagram": "not_allowed",
+    # Facebook/Instagram inboxes reached through Chatwoot: same Meta rules.
+    "chatwoot": "not_allowed",
     "whatsapp_evolution": None,
     "telegram": None,
     "webchat": None,

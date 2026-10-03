@@ -18,6 +18,7 @@ ChannelType = Literal[
     "tiktok",
     "voice",
     "webchat",
+    "chatwoot",
 ]
 
 # The console's own web chat: no external platform, its external_id is a
@@ -45,7 +46,9 @@ class ChannelConnection(BaseModel):
         external_id (str): Identifier used to route inbound webhooks
             (instance name, page id, bot token, etc., depending on the
             channel). For channel_type="whatsapp_360dialog", the
-            business number in digits only (e.g. "34600111222").
+            business number in digits only (e.g. "34600111222"). For
+            channel_type="chatwoot", the id of the Chatwoot inbox (a
+            Facebook page or Instagram account connected in Chatwoot).
         display_name (Optional[str]): Optional human-readable label.
         credentials (Dict[str, Any]): Channel credentials (plain text
             in-process, encrypted at rest).

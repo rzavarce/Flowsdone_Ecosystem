@@ -47,7 +47,7 @@ def test_channel_sender_factory_wires_voice_dependencies_into_its_sender():
 def test_webhook_registrar_factory_covers_the_auto_registered_channels():
     registrars = WebhookRegistrarFactory().build_all()
 
-    assert set(registrars.keys()) == {"telegram", "facebook", "instagram", "whatsapp_360dialog"}
+    assert set(registrars.keys()) == {"telegram", "facebook", "instagram", "whatsapp_360dialog", "chatwoot"}
     assert isinstance(registrars["whatsapp_360dialog"], D360WebhookRegistrar)
     assert isinstance(registrars["telegram"], TelegramWebhookRegistrar)
     assert isinstance(registrars["facebook"], MetaWebhookRegistrar)

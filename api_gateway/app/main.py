@@ -502,7 +502,7 @@ async def lifespan(app: FastAPI):
     # are shared instances: both use cases must agree on which
     # channels are auto-registered.
     secret_generator = RandomHexSecretGenerator()
-    webhook_registrars = WebhookRegistrarFactory().build_all()
+    webhook_registrars = WebhookRegistrarFactory().build_all(channel_app_repo=app.state.channel_app_repo)
 
     app.state.create_channel_connection_use_case = CreateChannelConnectionUseCase(
         channel_connection_repo=app.state.channel_connection_repo,
@@ -668,6 +668,7 @@ async def lifespan(app: FastAPI):
             call_session_registry=call_session_registry,
             voice_provider=app.state.voice_provider,
             call_session_repo=app.state.call_session_repo,
+            channel_app_repo=app.state.channel_app_repo,
         ),
         session_repo=session_repo,
         session_history_repo=session_history_repo,

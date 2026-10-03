@@ -48,3 +48,10 @@ def test_the_window_length_is_configurable():
     short = MessagingWindowPolicy(window=timedelta(hours=1))
 
     assert short.decide(channel_type="facebook", last_inbound_at=NOW - timedelta(hours=2), now=NOW).mode == "not_allowed"
+
+
+def test_chatwoot_follows_metas_rules_for_facebook_and_instagram():
+    inside = policy.decide(channel_type="chatwoot", last_inbound_at=NOW - timedelta(hours=1), now=NOW)
+    outside = policy.decide(channel_type="chatwoot", last_inbound_at=NOW - timedelta(days=2), now=NOW)
+
+    assert inside.free_form_allowed and outside.mode == "not_allowed"

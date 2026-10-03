@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-ChannelAppProvider = Literal["meta", "twitter", "tiktok", "twilio"]
+ChannelAppProvider = Literal["meta", "twitter", "tiktok", "twilio", "chatwoot"]
 
 
 class ChannelApp(BaseModel):
@@ -19,6 +19,11 @@ class ChannelApp(BaseModel):
     is what varies per connected client/channel. For "twilio", this
     holds the SaaS-wide Account SID + Auth Token; the specific phone
     number lives in a channel_connections row with channel_type="voice".
+    For "chatwoot", the SaaS's own Chatwoot account (credentials
+    `api_access_token`, plus the gateway-managed `webhook_token` and
+    `bot_access_token`; config `account_id`, optional `base_url`, and the
+    gateway-managed `bot_id`); each connected inbox is a
+    channel_connections row with channel_type="chatwoot".
 
     `credentials` travels in plain text within the application;
     encryption with Fernet is the exclusive responsibility of the

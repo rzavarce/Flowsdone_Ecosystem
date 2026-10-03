@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
-from app.domain.ports.outbound import WebhookRegistrarPort
+from app.domain.ports.outbound import ChannelAppRepositoryPort, WebhookRegistrarPort
+from app.adapters.outbound.channels.chatwoot_webhook_registrar import ChatwootWebhookRegistrar
 from app.adapters.outbound.channels.d360_webhook_registrar import D360WebhookRegistrar
 from app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
 from app.adapters.outbound.channels.telegram_webhook_registrar import TelegramWebhookRegistrar
@@ -26,8 +27,14 @@ class WebhookRegistrarFactory:
     use cases themselves.
     """
 
-    def build_all(self) -> Dict[str, WebhookRegistrarPort]:
+    def build_all(
+        self, *, channel_app_repo: Optional[ChannelAppRepositoryPort] = None
+    ) -> Dict[str, WebhookRegistrarPort]:
         """Instantiate every supported webhook registrar.
+
+        Args:
+            channel_app_repo (Optional[ChannelAppRepositoryPort]): Shared
+                provider apps, forwarded to ChatwootWebhookRegistrar.
 
         Returns:
             Dict[str, WebhookRegistrarPort]: A dict mapping each
@@ -36,6 +43,7 @@ class WebhookRegistrarFactory:
         return {
             "telegram": TelegramWebhookRegistrar(),
             "whatsapp_360dialog": D360WebhookRegistrar(),
+            "chatwoot": ChatwootWebhookRegistrar(channel_app_repo),
             "facebook": MetaWebhookRegistrar(
                 channel="facebook", subscribed_fields=_FACEBOOK_SUBSCRIBED_FIELDS
             ),
