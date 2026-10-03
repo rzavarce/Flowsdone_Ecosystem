@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
@@ -72,7 +72,7 @@ class IngestMessageUseCase:
         envelope = MessageEnvelope(
             meta=MessageMeta(
                 message_id=str(uuid4()),
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 direction="inbound",
                 conversation_id=conversation_id,
                 workflow_id=workflow_id,

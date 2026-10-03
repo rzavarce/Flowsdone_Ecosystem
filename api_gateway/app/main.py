@@ -126,6 +126,7 @@ from app.application.use_cases.webchat_share import ManageWebchatShareLinksUseCa
 from app.application.use_cases.webchat_test import IssueWebchatTestLinkUseCase
 from app.core.security_checks import api_docs_urls, check_production_settings
 from app.core.config import settings
+from app.core.middleware import CorrelationIdMiddleware
 from app.domain.models.conversation import ConversationLifecyclePolicy
 from app.core.logging import setup_logging
 from app.core.tracing import instrument_fastapi_app, setup_tracing
@@ -811,6 +812,8 @@ async def no_cache_static(request, call_next):
         response.headers["Expires"] = "0"
     return response
 
+
+app.add_middleware(CorrelationIdMiddleware)
 
 # Static files (webchat, widgets, etc.)
 static_dir = Path(__file__).resolve().parent / "static"

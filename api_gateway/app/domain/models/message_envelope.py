@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
@@ -113,7 +113,7 @@ class MessageEnvelope(BaseModel):
             meta = payload["meta"]
 
             if "timestamp" not in meta:
-                meta["timestamp"] = datetime.utcnow().isoformat()
+                meta["timestamp"] = datetime.now(timezone.utc).isoformat()
 
             if "direction" not in meta:
                 meta["direction"] = "inbound"
