@@ -260,6 +260,8 @@ class ConversationModel(Base):
         Index("ix_conversations_tenant_last_message", "tenant_id", "last_message_at"),
         Index("ix_conversations_project_last_message", "project_id", "last_message_at"),
         Index("ix_conversations_open_last_inbound", "last_inbound_at", postgresql_where=text("status = 'open'")),
+        # Messaging window lookups (last inbound message of one contact).
+        Index("ix_conversations_session_last_inbound", "session_id", "last_inbound_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -581,6 +581,10 @@ class FakeConversationRepository:
         )
         return True
 
+    async def last_inbound_at(self, session_id: str) -> Optional[datetime]:
+        times = [c.last_inbound_at for c in self.conversations.values() if c.session_id == session_id]
+        return max(times) if times else None
+
     async def list(
         self,
         *,

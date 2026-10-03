@@ -178,6 +178,22 @@ class SqlAlchemyConversationRepository(ConversationRepositoryPort):
             await session.commit()
             return result.rowcount > 0
 
+    async def last_inbound_at(self, session_id: str) -> Optional[datetime]:
+        """When the contact behind a session last wrote.
+
+        Args:
+            session_id (str): Switchboard session id.
+
+        Returns:
+            Optional[datetime]: MAX(last_inbound_at) over the session's
+            conversations, or None if it has none.
+        """
+        query = select(func.max(ConversationModel.last_inbound_at)).where(
+            ConversationModel.session_id == session_id
+        )
+        async with self._sessionmaker() as session:
+            return (await session.execute(query)).scalar_one_or_none()
+
     async def list(
         self,
         *,
