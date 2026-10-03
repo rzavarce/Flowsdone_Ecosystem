@@ -326,6 +326,7 @@ class HandleOutboundResponseUseCase:
                 recipient_id=envelope.meta.external_conversation_key or "",
                 text=text,
                 credentials=connection.credentials,
+                config=connection.config,
             )
 
             logger.info(

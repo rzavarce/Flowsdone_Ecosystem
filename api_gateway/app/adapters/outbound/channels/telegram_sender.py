@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -27,6 +27,7 @@ class TelegramSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Send a text message to a Telegram chat.
 
@@ -36,6 +37,8 @@ class TelegramSender(ChannelSenderPort):
             text (str): Message body to send.
             credentials (Dict[str, Any]): Unused for Telegram; kept for
                 interface consistency with ChannelSenderPort.
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         url = f"{settings.TELEGRAM_API_BASE_URL}/bot{external_id}/sendMessage"
 

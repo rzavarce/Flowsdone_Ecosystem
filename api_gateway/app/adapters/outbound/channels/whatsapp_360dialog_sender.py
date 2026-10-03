@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -32,6 +32,7 @@ class WhatsApp360DialogSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Send a text message to a WhatsApp recipient.
 
@@ -42,8 +43,9 @@ class WhatsApp360DialogSender(ChannelSenderPort):
                 number in digits).
             text (str): Message body to send.
             credentials (Dict[str, Any]): Must contain "api_key" (the
-                number's D360-API-KEY); "sandbox": true targets the
-                sandbox host.
+                number's D360-API-KEY).
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; {"sandbox": true} targets the sandbox host.
         """
         api_key = credentials.get(API_KEY_FIELD)
         if not api_key:
@@ -56,7 +58,7 @@ class WhatsApp360DialogSender(ChannelSenderPort):
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT_SECONDS) as client:
             try:
                 response = await client.post(
-                    messages_url(credentials),
+                    messages_url(config or {}),
                     headers={"D360-API-KEY": api_key},
                     json={
                         "messaging_product": "whatsapp",

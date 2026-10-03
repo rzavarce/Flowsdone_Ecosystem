@@ -147,13 +147,17 @@ class FakeWebhookRegistrar:
         self.register_calls: List[Dict[str, Any]] = []
         self.deregister_calls: List[Dict[str, Any]] = []
 
-    async def register(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
-        self.register_calls.append({"external_id": external_id, "credentials": dict(credentials)})
+    async def register(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
+        self.register_calls.append({"external_id": external_id, "credentials": dict(credentials), "config": config})
         if self.fail:
             raise RuntimeError("registration rejected by platform")
 
-    async def deregister(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
-        self.deregister_calls.append({"external_id": external_id, "credentials": dict(credentials)})
+    async def deregister(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
+        self.deregister_calls.append({"external_id": external_id, "credentials": dict(credentials), "config": config})
         if self.fail:
             raise RuntimeError("deregistration rejected by platform")
 
@@ -360,7 +364,13 @@ class FakeChannelSender:
         self.sent: List[Dict[str, Any]] = []
 
     async def send(
-        self, *, external_id: str, recipient_id: str, text: str, credentials: Dict[str, Any]
+        self,
+        *,
+        external_id: str,
+        recipient_id: str,
+        text: str,
+        credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         if self.fail:
             raise RuntimeError("send failed")
@@ -370,6 +380,7 @@ class FakeChannelSender:
                 "recipient_id": recipient_id,
                 "text": text,
                 "credentials": credentials,
+                "config": config,
             }
         )
 

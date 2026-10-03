@@ -31,7 +31,9 @@ class WebhookRegistrarPort(Protocol):
 
     secret_field: Optional[str]
 
-    async def register(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def register(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Register the webhook with the external platform.
 
         Args:
@@ -42,6 +44,9 @@ class WebhookRegistrarPort(Protocol):
                 credentials; implementations read whatever key(s) they
                 need from it (e.g. `secret_field` for Telegram,
                 "page_access_token" for Meta).
+            config (Optional[Dict[str, Any]]): The connection's
+                non-secret configuration (e.g. which API environment
+                to use), for the channels that need it.
 
         Raises:
             Exception: If the external platform rejects the
@@ -51,7 +56,9 @@ class WebhookRegistrarPort(Protocol):
         """
         ...
 
-    async def deregister(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def deregister(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Remove the webhook registration from the external platform.
 
         Called when the owning channel_connection is deleted, so the
@@ -68,6 +75,8 @@ class WebhookRegistrarPort(Protocol):
             credentials (Dict[str, Any]): The channel_connection's
                 credentials, in case deregistration needs them (e.g.
                 Meta's `page_access_token`).
+            config (Optional[Dict[str, Any]]): The connection's
+                non-secret configuration.
 
         Raises:
             Exception: If the external platform rejects the

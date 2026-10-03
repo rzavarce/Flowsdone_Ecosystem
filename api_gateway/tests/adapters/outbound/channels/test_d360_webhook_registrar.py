@@ -52,7 +52,7 @@ async def test_register_sets_our_callback_url_and_the_secret_header(monkeypatch)
 async def test_register_on_a_sandbox_connection_uses_the_sandbox_host(monkeypatch):
     fake_client = _patch_client(monkeypatch, lambda call: FakeResponse(200))
 
-    await D360WebhookRegistrar().register(external_id="1", credentials={**CREDENTIALS, "sandbox": True})
+    await D360WebhookRegistrar().register(external_id="1", credentials=CREDENTIALS, config={"sandbox": True})
 
     assert fake_client.calls[0].url == "https://waba-sandbox.360dialog.io/v1/configs/webhook"
 

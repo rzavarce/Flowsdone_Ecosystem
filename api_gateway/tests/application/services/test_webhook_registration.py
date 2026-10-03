@@ -30,7 +30,7 @@ async def test_success_never_triggers_compensation():
     )
 
     assert compensated is False
-    assert registrar.register_calls == [{"external_id": "ext-1", "credentials": {"a": 1}}]
+    assert registrar.register_calls == [{"external_id": "ext-1", "credentials": {"a": 1}, "config": None}]
 
 
 async def test_failure_runs_compensation_then_raises_typed_error():

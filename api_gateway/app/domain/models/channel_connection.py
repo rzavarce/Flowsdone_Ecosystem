@@ -55,6 +55,8 @@ class ChannelConnection(BaseModel):
             VoiceProviderPort implementation without a dedicated column.
             For channel_type="webchat", {"allowed_origins": [...]}: the
             websites allowed to embed the chat (empty = any).
+            For channel_type="whatsapp_360dialog", {"sandbox": true} to
+            use 360dialog's sandbox host instead of production.
         status (str): Lifecycle status (e.g. "active").
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.

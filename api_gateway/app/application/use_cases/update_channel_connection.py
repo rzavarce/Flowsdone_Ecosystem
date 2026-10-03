@@ -145,5 +145,6 @@ class UpdateChannelConnectionUseCase:
             credentials=credentials,
             channel_type=existing.channel_type,
             on_failure=_restore_previous_credentials,
+            config=connection.config if connection is not None else existing.config,
         )
         return connection

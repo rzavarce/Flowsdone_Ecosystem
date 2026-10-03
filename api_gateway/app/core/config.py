@@ -200,7 +200,7 @@ class Settings(BaseModel):
     META_GRAPH_API_VERSION: str = "v21.0"
     TELEGRAM_API_BASE_URL: str = "https://api.telegram.org"
     # 360dialog (official WhatsApp Cloud API). Each channel_connection
-    # carries its own D360-API-KEY; a connection whose credentials say
+    # carries its own D360-API-KEY; a connection whose config says
     # {"sandbox": true} talks to the sandbox host instead.
     D360_API_BASE_URL: str = "https://waba-v2.360dialog.io"
     D360_SANDBOX_API_BASE_URL: str = "https://waba-sandbox.360dialog.io"

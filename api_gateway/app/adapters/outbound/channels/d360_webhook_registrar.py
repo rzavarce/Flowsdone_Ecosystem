@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -36,15 +36,18 @@ class D360WebhookRegistrar:
 
     secret_field = WEBHOOK_SECRET_FIELD
 
-    async def register(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def register(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Set the number's webhook URL and secret header.
 
         Args:
             external_id (str): The connection's business number (digits),
                 part of our callback URL.
             credentials (Dict[str, Any]): Must contain "api_key" and the
-                generated `secret_field`; "sandbox": true targets the
-                sandbox host.
+                generated `secret_field`.
+            config (Optional[Dict[str, Any]]): {"sandbox": true} targets
+                the sandbox host.
 
         Raises:
             D360WebhookRegistrationError: If the API key or secret is
@@ -57,7 +60,7 @@ class D360WebhookRegistrar:
 
         url = callback_url(external_id)
         await self._configure(
-            credentials,
+            config or {},
             api_key,
             {"url": url, "headers": {WEBHOOK_SECRET_HEADER: secret}},
         )
@@ -66,7 +69,9 @@ class D360WebhookRegistrar:
             extra={"channel": CHANNEL, "callback_url": url},
         )
 
-    async def deregister(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def deregister(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Nothing to undo on 360dialog's side.
 
         360dialog has no "delete webhook" call. Once the connection is
@@ -76,17 +81,18 @@ class D360WebhookRegistrar:
         Args:
             external_id (str): The connection's business number.
             credentials (Dict[str, Any]): Unused.
+            config (Optional[Dict[str, Any]]): Unused.
         """
         logger.info(
             "channel.webhook_registrar.deregister_noop",
             extra={"channel": CHANNEL, "external_id": external_id},
         )
 
-    async def _configure(self, credentials: Dict[str, Any], api_key: str, body: Dict[str, Any]) -> None:
+    async def _configure(self, config: Dict[str, Any], api_key: str, body: Dict[str, Any]) -> None:
         """POST a webhook configuration to 360dialog.
 
         Args:
-            credentials (Dict[str, Any]): Picks the sandbox or production host.
+            config (Dict[str, Any]): Picks the sandbox or production host.
             api_key (str): The number's D360-API-KEY.
             body (Dict[str, Any]): The configuration to send.
 
@@ -97,7 +103,7 @@ class D360WebhookRegistrar:
         async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT_SECONDS) as client:
             try:
                 response = await client.post(
-                    webhook_config_url(credentials),
+                    webhook_config_url(config),
                     headers={"D360-API-KEY": api_key},
                     json=body,
                 )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.domain.ports.outbound import ChannelSenderPort
 
@@ -25,6 +25,7 @@ class TikTokSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Log that sending is not implemented for this channel.
 
@@ -33,6 +34,8 @@ class TikTokSender(ChannelSenderPort):
             recipient_id (str): Id of the intended recipient.
             text (str): Message body that would have been sent.
             credentials (Dict[str, Any]): Channel credentials (unused).
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         logger.warning(
             "channel.sender.not_implemented",

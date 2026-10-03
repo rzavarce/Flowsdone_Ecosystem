@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.domain.ports.outbound import ChannelSenderPort
 from app.adapters.outbound.channels.meta_sender import send_meta_message
@@ -18,6 +18,7 @@ class InstagramSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Send a text message to an Instagram DM recipient.
 
@@ -27,6 +28,8 @@ class InstagramSender(ChannelSenderPort):
             text (str): Message body to send.
             credentials (Dict[str, Any]): Channel credentials; must
                 contain "page_access_token".
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         await send_meta_message(
             channel="instagram",

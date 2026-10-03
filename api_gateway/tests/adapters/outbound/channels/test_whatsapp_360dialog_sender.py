@@ -25,9 +25,9 @@ def _patch_client(monkeypatch, response_factory):
     return fake_client
 
 
-async def _send(credentials):
+async def _send(credentials, config=None):
     await WhatsApp360DialogSender().send(
-        external_id="34600111222", recipient_id="34699000111", text="hola", credentials=credentials
+        external_id="34600111222", recipient_id="34699000111", text="hola", credentials=credentials, config=config
     )
 
 
@@ -51,7 +51,7 @@ async def test_sends_a_cloud_api_text_message_with_the_numbers_api_key(monkeypat
 async def test_a_sandbox_connection_uses_the_sandbox_host(monkeypatch):
     fake_client = _patch_client(monkeypatch, lambda call: FakeResponse(200))
 
-    await _send({"api_key": "KEY", "sandbox": True})
+    await _send({"api_key": "KEY"}, config={"sandbox": True})
 
     assert fake_client.calls[0].url == "https://waba-sandbox.360dialog.io/v1/messages"
 

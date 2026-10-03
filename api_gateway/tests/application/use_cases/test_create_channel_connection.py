@@ -64,7 +64,7 @@ async def test_registrar_channel_auto_generates_missing_secret():
 
     assert connection.credentials["telegram_webhook_secret"] == secret_generator.value
     assert registrar.register_calls == [
-        {"external_id": "123:ABC", "credentials": {"telegram_webhook_secret": secret_generator.value}}
+        {"external_id": "123:ABC", "credentials": {"telegram_webhook_secret": secret_generator.value}, "config": {}}
     ]
 
 
@@ -123,3 +123,20 @@ async def test_failed_registration_deletes_the_new_connection_and_raises():
 
     assert repo.connection is None
     assert len(repo.deleted) == 1
+
+
+async def test_the_connections_config_reaches_the_registrar():
+    registrar = FakeWebhookRegistrar(secret_field="d360_webhook_secret")
+    use_case, _repo, _secret_generator = _build_use_case({"whatsapp_360dialog": registrar})
+
+    await use_case.execute(
+        project_id=uuid4(),
+        agent_id=uuid4(),
+        channel_type="whatsapp_360dialog",
+        external_id="34600111222",
+        display_name=None,
+        credentials={"api_key": "K"},
+        config={"sandbox": True},
+    )
+
+    assert registrar.register_calls[0]["config"] == {"sandbox": True}

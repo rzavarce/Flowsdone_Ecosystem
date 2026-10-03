@@ -242,6 +242,7 @@ async def test_deliver_sends_to_native_channel_sender_when_connection_id_present
             "recipient_id": "chat-99",
             "text": "respuesta",
             "credentials": {"telegram_webhook_secret": "s"},
+            "config": connection.config,
         }
     ]
 

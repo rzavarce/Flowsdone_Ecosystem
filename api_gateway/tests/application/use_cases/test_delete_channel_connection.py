@@ -36,7 +36,7 @@ async def test_deletes_and_deregisters_registrar_channel():
     assert deleted is True
     assert repo.connection is None
     assert registrar.deregister_calls == [
-        {"external_id": connection.external_id, "credentials": {"s": "x"}}
+        {"external_id": connection.external_id, "credentials": {"s": "x"}, "config": connection.config}
     ]
 
 
