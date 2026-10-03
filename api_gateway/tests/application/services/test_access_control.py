@@ -27,7 +27,7 @@ def _principal(role, tenant_ids=None):
 def test_policy_covers_every_resource_with_read_and_write():
     assert set(POLICY) == {
         "tenants", "projects", "agents", "workflows", "channel_connections",
-        "channel_apps", "users", "langflow", "tenant_billing",
+        "channel_apps", "crm_integrations", "users", "langflow", "tenant_billing",
         "conversations", "contacts", "plans", "cost_rates", "billing",
     }
     for actions in POLICY.values():

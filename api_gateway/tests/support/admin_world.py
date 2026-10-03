@@ -258,6 +258,66 @@ class World:
             ),
             **self.billing_state(),
             **self.agents_state(),
+            **self.crm_state(),
+        )
+
+    def crm_state(self) -> Dict[str, Any]:
+        """`app.state` entries for the CRM integrations/handoffs endpoints."""
+        from app.application.use_cases.crm_handoff import HandoffNotPossibleError
+        from app.application.use_cases.crm_integrations import ManageCrmIntegrationsUseCase
+        from app.domain.models.crm import Handoff
+        from api_gateway.tests.support.fakes import (
+            FakeCrmIntegrationRepository,
+            FakeSecretGenerator,
+            FakeSessionRepository,
+            make_session,
+        )
+
+        world = self
+
+        async def ensure_allowed(url):
+            if not url.startswith("https://"):
+                raise ValueError("only https callbacks are allowed")
+
+        class _Provider:
+            def __init__(self):
+                self.delivered = []
+                self.error = None
+
+            async def deliver(self, event, integration):
+                if self.error:
+                    raise self.error
+                self.delivered.append(event)
+
+        class _StartHandoff:
+            async def execute(self, *, session_id, reason=None):
+                session = await world.live_sessions.get(session_id)
+                integration = await world.crm_integrations.get_for_project(session.project_id)
+                if integration is None:
+                    raise HandoffNotPossibleError("the project has no active CRM integration")
+                return Handoff(
+                    id=uuid4(), session_id=session_id, tenant_id=session.tenant_id, project_id=session.project_id,
+                    integration_id=integration.id, provider="generic_webhook", channel_type=session.channel_type,
+                    contact=session.external_conversation_key, reason=reason, opened_at=_now(),
+                )
+
+        if not hasattr(self, "crm_integrations"):  # state() runs once per client
+            self.crm_integrations = FakeCrmIntegrationRepository()
+            self.crm_provider = _Provider()
+            self.live_session_a = make_session(tenant_id=self.tenant_a.id, project_id=self.project_a.id)
+            self.live_session_b = make_session(tenant_id=self.tenant_b.id, project_id=self.project_b.id)
+            self.live_sessions = FakeSessionRepository(self.live_session_a)
+            self.live_sessions.sessions[self.live_session_b.id] = self.live_session_b
+        return dict(
+            crm_integration_repo=self.crm_integrations,
+            manage_crm_integrations_use_case=ManageCrmIntegrationsUseCase(
+                integrations=self.crm_integrations,
+                secret_generator=FakeSecretGenerator(),
+                ensure_allowed=ensure_allowed,
+                providers={"generic_webhook": self.crm_provider},
+            ),
+            session_repo=self.live_sessions,
+            start_handoff_use_case=_StartHandoff(),
         )
 
     def agents_state(self) -> Dict[str, Any]:

@@ -38,6 +38,7 @@ Resource = Literal[
     "workflows",
     "channel_connections",
     "channel_apps",
+    "crm_integrations",
     "users",
     "langflow",
     "tenant_billing",
@@ -68,6 +69,9 @@ POLICY: dict[str, dict[str, FrozenSet[str]]] = {
     "workflows": {"read": _ALL_STAFF, "write": _MANAGERS},
     "channel_connections": {"read": _ALL_STAFF, "write": _ALL_STAFF},
     "channel_apps": {"read": _ADMIN, "write": _ADMIN},
+    # A project's CRM integration (where handed-over conversations go) and
+    # handing a conversation over by hand. Secrets are only ever shown once.
+    "crm_integrations": {"read": _ALL_STAFF, "write": _MANAGERS},
     "users": {"read": _ADMIN, "write": _ADMIN},
     # Opening the Langflow editor as a tenant's user. Any staff role, scoped
     # to their own tenants by access.tenant() as usual - but the per-tenant

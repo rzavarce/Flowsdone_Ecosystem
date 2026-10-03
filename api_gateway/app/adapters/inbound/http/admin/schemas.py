@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.domain.models.channel_app import ChannelAppProvider
 from app.domain.models.channel_connection import ChannelType
+from app.domain.models.crm import CrmProvider
 
 
 # Tenants
@@ -668,3 +669,117 @@ class OnboardingOut(BaseModel):
     project_id: Optional[UUID] = None
     checks: List[OnboardingCheckOut]
 
+
+
+# ---------------------------------------------------------------------------
+# CRM integrations and handoffs
+# ---------------------------------------------------------------------------
+
+
+class CrmIntegrationCreate(BaseModel):
+    """Request body for POST /crm-integrations.
+
+    Attributes:
+        project_id (UUID): Project whose handed-over conversations it receives.
+        provider (CrmProvider): CRM provider.
+        config (Dict[str, Any]): Provider settings (generic_webhook: {"url"}).
+    """
+
+    project_id: UUID
+    provider: CrmProvider = "generic_webhook"
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CrmIntegrationUpdate(BaseModel):
+    """Request body for PATCH /crm-integrations/{id}.
+
+    Attributes:
+        config (Optional[Dict[str, Any]]): Settings to change (merged).
+        status (Optional[Literal["active", "inactive"]]): New status.
+    """
+
+    config: Optional[Dict[str, Any]] = None
+    status: Optional[Literal["active", "inactive"]] = None
+
+
+class CrmIntegrationOut(BaseModel):
+    """A CRM integration, without its secrets.
+
+    Attributes:
+        id (UUID): Integration id.
+        tenant_id (UUID): Owning tenant.
+        project_id (UUID): Project.
+        provider (CrmProvider): CRM provider.
+        config (Dict[str, Any]): Settings.
+        status (str): "active" or "inactive".
+        reply_url (str): Where the CRM posts the agent's replies.
+        close_url (str): Where the CRM closes a handoff.
+        created_at (datetime): Creation timestamp.
+        updated_at (datetime): Last update timestamp.
+    """
+
+    id: UUID
+    tenant_id: UUID
+    project_id: UUID
+    provider: CrmProvider
+    config: Dict[str, Any]
+    status: str
+    reply_url: str
+    close_url: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class CrmIntegrationSecretsOut(CrmIntegrationOut):
+    """A CRM integration with its secrets - returned only on create/rotate.
+
+    Attributes:
+        signing_secret (str): Verifies our events' X-Flowsdone-Signature.
+        api_key (str): Sent by the CRM as X-Api-Key with its replies.
+    """
+
+    signing_secret: str
+    api_key: str
+
+
+class CrmIntegrationTestOut(BaseModel):
+    """Result of sending a test event.
+
+    Attributes:
+        ok (bool): Whether the CRM accepted it.
+        error (Optional[str]): What went wrong, if it did not.
+    """
+
+    ok: bool
+    error: Optional[str] = None
+
+
+class CrmHandoffCreate(BaseModel):
+    """Request body for POST /crm-handoffs (hand a conversation over by hand).
+
+    Attributes:
+        conversation_id (str): The conversation's session id, or its
+            conversation UUID (what a Langflow flow sees as session_id).
+        reason (Optional[str]): Shown to the agent in the CRM.
+    """
+
+    conversation_id: str = Field(min_length=1)
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class CrmHandoffOut(BaseModel):
+    """A handoff.
+
+    Attributes:
+        id (UUID): Handoff id.
+        conversation_id (str): The conversation (session) id.
+        integration_id (UUID): Integration it went to.
+        status (str): "open", "closed" or "expired".
+        opened_at (datetime): When it was handed over.
+    """
+
+    id: UUID
+    conversation_id: str
+    integration_id: UUID
+    status: str
+    opened_at: datetime

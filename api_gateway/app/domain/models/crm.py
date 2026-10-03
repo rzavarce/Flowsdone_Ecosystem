@@ -23,7 +23,8 @@ CrmProvider = Literal["generic_webhook"]
 HandoffStatus = Literal["open", "closed", "expired"]
 HandoffCloseReason = Literal["agent", "expired"]
 
-CrmEventType = Literal["handoff.started", "message.inbound", "handoff.expired"]
+# "integration.test" is only sent from the console, to check a setup.
+CrmEventType = Literal["handoff.started", "message.inbound", "handoff.expired", "integration.test"]
 
 # Name of the destination app (see AppConnectorPort) that a handed-off
 # conversation is assigned to.
