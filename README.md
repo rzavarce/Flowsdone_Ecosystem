@@ -30,6 +30,7 @@ Gateway de mensajería multicanal (webchat, WhatsApp) con arquitectura hexagonal
 22. [Activación de cuentas por email + Usuarios en la PWA](#22-activación-de-cuentas-por-email--usuarios-en-la-pwa)
 23. [Editor de Langflow para todo el staff, rol `consultant`, Reportes y facturación del cliente](#23-editor-de-langflow-para-todo-el-staff-rol-consultant-reportes-y-facturación-del-cliente)
 24. [Conversaciones, consumo y planes (ClickHouse)](#24-conversaciones-consumo-y-planes-clickhouse)
+25. [Traspaso a CRM (handoff)](#25-traspaso-a-crm-handoff)
 
 ---
 
@@ -471,6 +472,8 @@ Cada canal tiene su propio endpoint HTTP que entiende el payload **nativo** de e
 | WhatsApp (Evolution API) | `POST /webhooks/whatsapp` | Header `apikey` == `EVOLUTION_API_KEY` | `instance` (nombre de la instancia Evolution) |
 | Telegram | `POST /webhooks/telegram/{bot_token}` | Header `X-Telegram-Bot-Api-Secret-Token` == `channel_connections.credentials.telegram_webhook_secret` de esa conexión | `{bot_token}` (path) |
 | TikTok | `POST /webhooks/tiktok` | Header `TikTok-Signature` (HMAC-SHA256 con `channel_apps.tiktok.client_secret`) | `data.open_id` |
+| WhatsApp (360dialog, API oficial) | `POST /webhooks/whatsapp-360dialog/{numero}` | Header `X-Flowsdone-Webhook-Secret` == `channel_connections.credentials.d360_webhook_secret` (lo genera el gateway y lo configura en 360dialog) | `{numero}` (path: número del negocio, solo dígitos) |
+| Facebook / Instagram vía Chatwoot | `POST /webhooks/chatwoot?token=…` | `token` == `channel_apps.chatwoot.webhook_token` y `account.id` == `channel_apps.chatwoot.config.account_id` | `inbox.id` (bandeja de Chatwoot) |
 
 Si el `channel_connection` no existe para ese `(channel_type, external_id)` (canal sin registrar todavía en el admin API), el webhook responde `200` igual (para que la plataforma no reintente infinito) pero no publica nada — queda logueado como `*.not_routable`.
 
@@ -497,6 +500,25 @@ El `PATCH` re-suscribe la página cuando `credentials.page_access_token` cambia 
 `WebhookRegistrarPort.register()`/`deregister()` reciben el diccionario `credentials` completo (no un `secret` suelto), justamente para que cada canal pueda tomar lo que realmente necesita — el generado (`secret_field`) para Telegram, el `page_access_token` provisto por el admin para Meta — sin forzar a todos los canales a encajar en la forma de Telegram.
 
 Falta configurar por fuera de este flujo (no automatizado, es setup de app, no por conexión): la App de Meta compartida (`channel_apps.meta`, sección 9) y su suscripción a nivel App en el dashboard de Meta (qué campos escucha el Webhooks product) — eso se hace una sola vez para todo el SaaS, no por `channel_connection`.
+
+### WhatsApp vía 360dialog (API oficial de Meta)
+
+Alternativa oficial a Evolution: 360dialog es BSP de Meta y no hace falta ser partner para usarlo.
+
+- **Alta:** `POST /internal/admin/channel-connections` con `channel_type="whatsapp_360dialog"`, `external_id` = número del negocio en dígitos (`34600111222`) y `credentials={"api_key": "<D360-API-KEY del número>"}`. Para el sandbox de 360dialog, `config={"sandbox": true}`.
+- **Al guardar**, el gateway genera `d360_webhook_secret` y llama a `POST /v1/configs/webhook` de 360dialog con nuestra URL y la cabecera `X-Flowsdone-Webhook-Secret`. 360dialog no firma sus webhooks: esa cabecera es la autenticación.
+- **Sandbox:** envía `START` por WhatsApp a `+55 11 4673-3492` y 360dialog responde con una API key. Solo puede escribir a tu propio móvil.
+- **Ventana de 24 h:** fuera de ella WhatsApp solo admite plantillas aprobadas (todavía no implementadas). Ver `MessagingWindowPolicy`.
+
+### Facebook e Instagram vía Chatwoot Cloud
+
+Mientras Flowsdone no tenga la app de Meta aprobada (App Review), Facebook e Instagram entran por la cuenta de Chatwoot de Flowsdone. Chatwoot pone la app aprobada; nosotros solo recibimos y respondemos como **Agent Bot**.
+
+1. **Una vez:** `PUT /internal/admin/channel-apps/chatwoot` con `credentials={"api_access_token": "<token de un admin de la cuenta>"}` y `config={"account_id": <id>}` (y `base_url` si no es Chatwoot Cloud). El gateway genera `webhook_token`.
+2. **Por cliente:** conectar su página / cuenta de Instagram como bandeja en Chatwoot y crear `channel_type="chatwoot"` con `external_id` = id de la bandeja.
+3. **La primera conexión crea el Agent Bot compartido** (su id y token se guardan en la app y sobreviven a nuevos `PUT`). Cada conexión lo asigna a su bandeja; al borrarla se desasigna.
+
+Solo se puede responder dentro de las 24 h siguientes al último mensaje del contacto: Meta no permite iniciar conversaciones ni enviar fuera de esa ventana.
 
 ### Secrets de canal: App compartida (`channel_apps`) vs. credenciales por conexión
 
@@ -1617,3 +1639,63 @@ HandleOutboundResponse.deliver ──┘        │
 - **Los modelos permitidos no se imponen dentro de Langflow.** Solo se detectan en el consumo.
 - **`session_messages` (Postgres)** se sigue escribiendo en paralelo hasta validar el archivo de ClickHouse en producción.
 
+---
+
+## 25. Traspaso a CRM (handoff)
+
+El bot puede pasar una conversación a una persona que trabaja en el CRM o helpdesk del cliente. Mientras dura el traspaso **el bot no responde**: los mensajes del contacto van al CRM y las respuestas del agente vuelven al contacto por su canal. Flowsdone sigue registrando toda la conversación.
+
+### Ciclo de vida
+
+1. **Inicio:** el Agent de Langflow usa la tool **"Traspasar a CRM (Flowsdone)"**, o alguien de la consola llama a `POST /internal/admin/crm-handoffs`. La conversación pasa al app `crm` del Switchboard y el CRM recibe `handoff.started` con el contacto y la transcripción reciente.
+2. **Durante:** cada mensaje del contacto llega al CRM como `message.inbound`. El agente responde con `POST /integrations/crm/{id}/messages`.
+3. **Fin:** el CRM llama a `POST /integrations/crm/{id}/close` y el siguiente mensaje lo contesta el bot. Si la sesión caduca antes (24 h sin actividad), el siguiente mensaje también lo contesta el bot y el CRM recibe `handoff.expired`.
+
+### Configuración
+
+Una integración por proyecto: `POST /internal/admin/crm-integrations` con `{"project_id": "...", "provider": "generic_webhook", "config": {"url": "https://..."}}`. La respuesta trae **`signing_secret`** y **`api_key`**, que solo se muestran al crear o al rotar (`POST .../rotate-secrets`). `POST .../test` envía un evento `integration.test` en el momento. La URL debe ser https y pública (mismas reglas anti-SSRF que los callbacks).
+
+### Contrato del webhook genérico (para el desarrollador del CRM)
+
+**Eventos que enviamos.** `POST` a la URL configurada, con cuerpo JSON:
+
+```json
+{
+  "id": "6f1c…",
+  "type": "handoff.started",
+  "occurred_at": "2026-10-03T12:00:00+00:00",
+  "conversation_id": "<id de la conversación>",
+  "handoff_id": "…",
+  "data": {"reason": "…", "contact": {"channel_type": "whatsapp_360dialog", "id": "34699000111", "user_identifier": "…"}, "transcript": [{"direction": "inbound", "text": "…", "at": "…"}]},
+  "reply_url": "https://<gateway>/integrations/crm/<integration_id>/messages",
+  "close_url": "https://<gateway>/integrations/crm/<integration_id>/close"
+}
+```
+
+| `type` | `data` |
+|---|---|
+| `handoff.started` | `reason`, `contact`, `transcript` |
+| `message.inbound` | `text`, `contact` |
+| `handoff.expired` | `{}`: la conversación volvió al bot, cierra el ticket |
+| `integration.test` | `message` (solo desde la consola) |
+
+**Verificar la firma.** Cabeceras `X-Flowsdone-Timestamp` (Unix, segundos) y `X-Flowsdone-Signature` = `sha256=` + HMAC-SHA256 en hex de `"{timestamp}.{cuerpo_crudo}"` con el `signing_secret`. Compara en tiempo constante y rechaza timestamps viejos (más de 5 minutos).
+
+**Reintentos.** Responde `2xx` para aceptar. Red caída, timeout, `5xx`, `408`, `425` y `429` se reintentan con espera exponencial (6 intentos por defecto); otro `4xx` no se reintenta. Un mismo evento puede llegar dos veces: deduplica por `X-Flowsdone-Event-Id` (= `id`). Los eventos que no se pueden entregar quedan en la cola `crm.events.dead` de RabbitMQ.
+
+**Responder al contacto.** `POST {reply_url}` con cabecera `X-Api-Key: <api_key>` y cuerpo `{"conversation_id": "...", "text": "..."}` (máx. 4096 caracteres). Respuestas:
+
+- `202`: enviado.
+- `401`: clave inválida. `403`: integración inactiva.
+- `409`: la conversación ya no está traspasada a esta integración (cerrada o caducada).
+- `422`: la ventana de 24 h del canal está cerrada. `detail.allowed` dice qué se permitiría (`template_required` en WhatsApp, `not_allowed` en Facebook/Instagram).
+
+**Cerrar.** `POST {close_url}` con la misma cabecera y `{"conversation_id": "..."}`: `200`, o `409` si no estaba traspasada.
+
+### Piezas
+
+- **Dominio:** `domain/models/crm.py` (`CrmIntegration`, `Handoff`, `CrmEvent`) y `domain/models/messaging_window.py`.
+- **Aplicación:** `services/crm_handoffs.py`, `use_cases/crm_handoff.py` (iniciar, responder, cerrar), `use_cases/crm_integrations.py` y `use_cases/deliver_crm_event.py`.
+- **Adaptadores:** `outbound/apps/crm_app_connector.py` (app `crm`), `outbound/crm/` (un proveedor por CRM; hoy `generic_webhook`), `outbound/queue/rabbitmq_crm_events.py`, `inbound/http/crm.py` y `inbound/http/admin/crm.py`.
+- **Worker:** `workers/crm/main.py` (servicio `crm_worker`).
+- **Siguientes proveedores** (Zendesk, Salesforce, Jira Service Management, Zoho): cada uno es un adaptador `CrmProviderPort` y su tarjeta en la PWA.
