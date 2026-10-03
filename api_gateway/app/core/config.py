@@ -93,6 +93,15 @@ class Settings(BaseModel):
     RABBITMQ_OUTBOUND_ROUTING_KEY: Optional[str] = None
     RABBITMQ_OUTBOUND_QUEUE: Optional[str] = None
 
+    # CRM handoff events (gateway -> crm_worker -> each client's CRM).
+    RABBITMQ_CRM_EXCHANGE: str = "crm_events"
+    RABBITMQ_CRM_ROUTING_KEY: str = "crm.event"
+    RABBITMQ_CRM_QUEUE: str = "crm.events"
+    # Events whose delivery failed for good (kept for inspection/replay).
+    RABBITMQ_CRM_DEAD_QUEUE: str = "crm.events.dead"
+    CRM_DELIVERY_MAX_ATTEMPTS: int = 6
+    CRM_DELIVERY_BACKOFF_SECONDS: float = 2.0
+
     # Database (no hard crash if unset; only raised when actually used)
     DATABASE_URL: Optional[str] = None
     DATABASE_URL_ASYNC: Optional[str] = None
@@ -316,6 +325,12 @@ settings = Settings(
     RABBITMQ_OUTBOUND_EXCHANGE=os.getenv("RABBITMQ_OUTBOUND_EXCHANGE"),
     RABBITMQ_OUTBOUND_ROUTING_KEY=os.getenv("RABBITMQ_OUTBOUND_ROUTING_KEY"),
     RABBITMQ_OUTBOUND_QUEUE=os.getenv("RABBITMQ_OUTBOUND_QUEUE"),
+    RABBITMQ_CRM_EXCHANGE=os.getenv("RABBITMQ_CRM_EXCHANGE", "crm_events"),
+    RABBITMQ_CRM_ROUTING_KEY=os.getenv("RABBITMQ_CRM_ROUTING_KEY", "crm.event"),
+    RABBITMQ_CRM_QUEUE=os.getenv("RABBITMQ_CRM_QUEUE", "crm.events"),
+    RABBITMQ_CRM_DEAD_QUEUE=os.getenv("RABBITMQ_CRM_DEAD_QUEUE", "crm.events.dead"),
+    CRM_DELIVERY_MAX_ATTEMPTS=int(os.getenv("CRM_DELIVERY_MAX_ATTEMPTS", "6")),
+    CRM_DELIVERY_BACKOFF_SECONDS=float(os.getenv("CRM_DELIVERY_BACKOFF_SECONDS", "2")),
 
     DATABASE_URL=os.getenv("DATABASE_URL"),
     DATABASE_URL_ASYNC=os.getenv("DATABASE_URL_ASYNC"),

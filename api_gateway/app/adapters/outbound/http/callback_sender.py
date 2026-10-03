@@ -123,6 +123,19 @@ class HttpCallbackSender(CallbackSenderPort):
                     await asyncio.sleep(self._backoff * 2 ** (attempt - 1))
         return False
 
+    async def ensure_allowed(self, url: str) -> None:
+        """Refuse destinations that aren't allowed (public form of the check
+        used before every callback, reused by other outbound webhooks).
+
+        Args:
+            url (str): The destination.
+
+        Raises:
+            CallbackRefusedError: If the scheme, host or its addresses
+                aren't allowed.
+        """
+        await self._check(url)
+
     async def _check(self, url: str) -> None:
         """Refuse destinations that aren't allowed.
 

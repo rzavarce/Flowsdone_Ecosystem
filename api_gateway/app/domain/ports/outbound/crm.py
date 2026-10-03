@@ -163,6 +163,20 @@ class CrmEventPublisherPort(Protocol):
         ...
 
 
+class CrmDeadLetterPort(Protocol):
+    """Keeps the CRM events that could not be delivered, for inspection
+    and manual replay."""
+
+    async def publish_dead(self, event: CrmEvent, *, reason: str) -> None:
+        """Park an undeliverable event.
+
+        Args:
+            event (CrmEvent): The event.
+            reason (str): Why it was given up on.
+        """
+        ...
+
+
 class CrmDeliveryError(Exception):
     """A CRM delivery failed in a way worth retrying (network, 5xx, 429)."""
 
