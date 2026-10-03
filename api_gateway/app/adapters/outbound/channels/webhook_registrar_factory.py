@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict
 
 from app.domain.ports.outbound import WebhookRegistrarPort
+from app.adapters.outbound.channels.d360_webhook_registrar import D360WebhookRegistrar
 from app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
 from app.adapters.outbound.channels.telegram_webhook_registrar import TelegramWebhookRegistrar
 
@@ -34,6 +35,7 @@ class WebhookRegistrarFactory:
         """
         return {
             "telegram": TelegramWebhookRegistrar(),
+            "whatsapp_360dialog": D360WebhookRegistrar(),
             "facebook": MetaWebhookRegistrar(
                 channel="facebook", subscribed_fields=_FACEBOOK_SUBSCRIBED_FIELDS
             ),

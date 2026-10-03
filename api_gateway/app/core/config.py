@@ -199,6 +199,11 @@ class Settings(BaseModel):
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
     META_GRAPH_API_VERSION: str = "v21.0"
     TELEGRAM_API_BASE_URL: str = "https://api.telegram.org"
+    # 360dialog (official WhatsApp Cloud API). Each channel_connection
+    # carries its own D360-API-KEY; a connection whose credentials say
+    # {"sandbox": true} talks to the sandbox host instead.
+    D360_API_BASE_URL: str = "https://waba-v2.360dialog.io"
+    D360_SANDBOX_API_BASE_URL: str = "https://waba-sandbox.360dialog.io"
     # Twitter/TikTok: real sending is not implemented yet (see the
     # channel_sender for those channels) - these settings only exist
     # for when it is activated; they are unused for now.
@@ -369,6 +374,10 @@ settings = Settings(
     META_GRAPH_API_BASE_URL=os.getenv("META_GRAPH_API_BASE_URL", "https://graph.facebook.com"),
     META_GRAPH_API_VERSION=os.getenv("META_GRAPH_API_VERSION", "v21.0"),
     TELEGRAM_API_BASE_URL=os.getenv("TELEGRAM_API_BASE_URL", "https://api.telegram.org"),
+    D360_API_BASE_URL=os.getenv("D360_API_BASE_URL", "https://waba-v2.360dialog.io").rstrip("/"),
+    D360_SANDBOX_API_BASE_URL=os.getenv(
+        "D360_SANDBOX_API_BASE_URL", "https://waba-sandbox.360dialog.io"
+    ).rstrip("/"),
     TWITTER_API_BASE_URL=os.getenv("TWITTER_API_BASE_URL"),
     TIKTOK_API_BASE_URL=os.getenv("TIKTOK_API_BASE_URL"),
 

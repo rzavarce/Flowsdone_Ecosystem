@@ -13,6 +13,7 @@ from app.adapters.outbound.channels.tiktok_sender import TikTokSender
 from app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
 from app.adapters.outbound.channels.twitter_sender import TwitterSender
 from app.adapters.outbound.channels.webchat_sender import WebchatSender
+from app.adapters.outbound.channels.whatsapp_360dialog_sender import WhatsApp360DialogSender
 from app.adapters.outbound.channels.whatsapp_evolution_sender import WhatsAppEvolutionSender
 
 
@@ -49,6 +50,7 @@ class ChannelSenderFactory:
         """
         return {
             "whatsapp_evolution": WhatsAppEvolutionSender(),
+            "whatsapp_360dialog": WhatsApp360DialogSender(),
             "facebook": FacebookSender(),
             "instagram": InstagramSender(),
             "telegram": TelegramSender(),

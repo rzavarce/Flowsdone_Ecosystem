@@ -13,6 +13,7 @@ ChannelType = Literal[
     "instagram",
     "twitter",
     "whatsapp_evolution",
+    "whatsapp_360dialog",
     "telegram",
     "tiktok",
     "voice",
@@ -43,7 +44,8 @@ class ChannelConnection(BaseModel):
         channel_type (ChannelType): Which platform this connection is for.
         external_id (str): Identifier used to route inbound webhooks
             (instance name, page id, bot token, etc., depending on the
-            channel).
+            channel). For channel_type="whatsapp_360dialog", the
+            business number in digits only (e.g. "34600111222").
         display_name (Optional[str]): Optional human-readable label.
         credentials (Dict[str, Any]): Channel credentials (plain text
             in-process, encrypted at rest).

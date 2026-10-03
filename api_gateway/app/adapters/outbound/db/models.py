@@ -117,7 +117,7 @@ class ChannelConnectionModel(Base):
             "channel_type", "external_id", name="uq_channel_connections_type_external"
         ),
         CheckConstraint(
-            "channel_type IN ('facebook','instagram','twitter','whatsapp_evolution','telegram','tiktok','voice','webchat')",
+            "channel_type IN ('facebook','instagram','twitter','whatsapp_evolution','whatsapp_360dialog','telegram','tiktok','voice','webchat')",
             name="ck_channel_connections_channel_type",
         ),
     )

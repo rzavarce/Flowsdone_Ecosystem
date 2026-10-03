@@ -1,5 +1,5 @@
 """Native chat channel inbound webhooks (Facebook, Instagram, Telegram,
-TikTok, X, WhatsApp), aggregated under a single router.
+TikTok, X, WhatsApp via Evolution and 360dialog), aggregated under a single router.
 """
 
 from fastapi import APIRouter
@@ -10,6 +10,7 @@ from app.adapters.inbound.http.channels.telegram import router as telegram_route
 from app.adapters.inbound.http.channels.tiktok import router as tiktok_router
 from app.adapters.inbound.http.channels.twitter import router as twitter_router
 from app.adapters.inbound.http.channels.whatsapp_evolution import router as whatsapp_router
+from app.adapters.inbound.http.channels.whatsapp_360dialog import router as whatsapp_360dialog_router
 
 router = APIRouter()
 
@@ -20,5 +21,6 @@ for _sub_router in (
     telegram_router,
     tiktok_router,
     whatsapp_router,
+    whatsapp_360dialog_router,
 ):
     router.include_router(_sub_router)
