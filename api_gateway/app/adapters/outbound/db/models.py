@@ -559,3 +559,68 @@ class TenantBillingProfileModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class CrmIntegrationModel(Base):
+    """Row for a project's CRM integration (one per project). Credentials
+    are Fernet-encrypted (see crypto.py), like channel connections'.
+    """
+
+    __tablename__ = "crm_integrations"
+    __table_args__ = (
+        UniqueConstraint("project_id", name="uq_crm_integrations_project"),
+        CheckConstraint("provider IN ('generic_webhook')", name="ck_crm_integrations_provider"),
+        CheckConstraint("status IN ('active','inactive')", name="ck_crm_integrations_status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    credentials: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class HandoffModel(Base):
+    """Row for one CRM handoff of a conversation. At most one open per
+    session. integration_id has no foreign key on purpose: deleting an
+    integration must not erase the history of past handoffs.
+    """
+
+    __tablename__ = "handoffs"
+    __table_args__ = (
+        CheckConstraint("status IN ('open','closed','expired')", name="ck_handoffs_status"),
+        CheckConstraint(
+            "close_reason IS NULL OR close_reason IN ('agent','expired')", name="ck_handoffs_close_reason"
+        ),
+        Index("uq_handoffs_open_session", "session_id", unique=True, postgresql_where=text("status = 'open'")),
+        Index("ix_handoffs_project_opened", "project_id", "opened_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[str] = mapped_column(Text, nullable=False)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    channel_type: Mapped[str] = mapped_column(Text, nullable=False)
+    contact: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="open")
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    close_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
