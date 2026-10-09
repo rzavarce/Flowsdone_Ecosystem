@@ -18,6 +18,7 @@ from app.adapters.inbound.http.me import router as me_router
 from app.adapters.inbound.http.errors import register_error_handlers
 from app.adapters.inbound.http.channels import router as channels_router
 from app.adapters.inbound.http.contact import router as contact_router
+from app.adapters.inbound.http.crm import router as crm_router
 from app.adapters.inbound.http.langflow_sso import router as langflow_sso_router
 from app.adapters.inbound.http.internal_outbound import router as internal_router
 from app.adapters.inbound.http.voice import router as voice_router
@@ -67,7 +68,14 @@ from app.adapters.outbound.db.usage_repositories import SqlAlchemyCostRateReposi
 from app.adapters.outbound.langflow.admin_client import LangflowAdminClient
 from app.adapters.outbound.queue.factory import PublisherFactory
 from app.adapters.outbound.queue.kafka_publisher import KafkaPublisher
+from app.adapters.outbound.queue.rabbitmq_crm_events import RabbitMQCrmEvents
 from app.adapters.outbound.queue.rabbitmq_publisher import RabbitMQPublisher
+from app.adapters.outbound.crm.factory import CrmProviderFactory
+from app.adapters.outbound.db.crm_repositories import SqlAlchemyCrmIntegrationRepository, SqlAlchemyHandoffRepository
+from app.application.services.crm_handoffs import CrmHandoffs
+from app.application.services.messaging_window import MessagingWindowService
+from app.application.use_cases.crm_handoff import CloseHandoffUseCase, ReplyFromCrmUseCase, StartHandoffUseCase
+from app.application.use_cases.crm_integrations import ManageCrmIntegrationsUseCase
 from app.adapters.outbound.security.scrypt_password_hasher import ScryptPasswordHasher
 from app.adapters.outbound.security.secret_generator import RandomHexSecretGenerator
 from app.adapters.outbound.session.postgres_session_history_repository import (
@@ -276,6 +284,17 @@ async def lifespan(app: FastAPI):
         publishers["rabbitmq"] = rabbitmq_publisher
 
         logger.info("rabbitmq.publisher.ready")
+
+        # CRM handoff events, consumed by crm_worker.
+        crm_events = RabbitMQCrmEvents(
+            url=settings.RABBITMQ_URL,
+            exchange_name=settings.RABBITMQ_CRM_EXCHANGE,
+            routing_key=settings.RABBITMQ_CRM_ROUTING_KEY,
+            queue_name=settings.RABBITMQ_CRM_QUEUE,
+            dead_queue_name=settings.RABBITMQ_CRM_DEAD_QUEUE,
+        )
+        await crm_events.start()
+        app.state.crm_events = crm_events
 
     publisher_factory = PublisherFactory(publishers=publishers)
     app.state.publisher_factory = publisher_factory
@@ -502,7 +521,7 @@ async def lifespan(app: FastAPI):
     # are shared instances: both use cases must agree on which
     # channels are auto-registered.
     secret_generator = RandomHexSecretGenerator()
-    webhook_registrars = WebhookRegistrarFactory().build_all()
+    webhook_registrars = WebhookRegistrarFactory().build_all(channel_app_repo=app.state.channel_app_repo)
 
     app.state.create_channel_connection_use_case = CreateChannelConnectionUseCase(
         channel_connection_repo=app.state.channel_connection_repo,
@@ -668,6 +687,7 @@ async def lifespan(app: FastAPI):
             call_session_registry=call_session_registry,
             voice_provider=app.state.voice_provider,
             call_session_repo=app.state.call_session_repo,
+            channel_app_repo=app.state.channel_app_repo,
         ),
         session_repo=session_repo,
         session_history_repo=session_history_repo,
@@ -679,6 +699,20 @@ async def lifespan(app: FastAPI):
 
     logger.info("outbound.handler.initialized")
 
+    # CRM handoffs: conversations handed over to a client's CRM (the "crm"
+    # app). Events go through RabbitMQ to crm_worker; without RabbitMQ they
+    # are only logged.
+    app.state.crm_integration_repo = SqlAlchemyCrmIntegrationRepository(db_sessionmaker)
+    handoff_repo = SqlAlchemyHandoffRepository(db_sessionmaker)
+    crm_handoffs = CrmHandoffs(handoffs=handoff_repo, publisher=getattr(app.state, "crm_events", None))
+    callback_guard = build_callback_sender(settings)
+    app.state.manage_crm_integrations_use_case = ManageCrmIntegrationsUseCase(
+        integrations=app.state.crm_integration_repo,
+        secret_generator=secret_generator,
+        ensure_allowed=callback_guard.ensure_allowed,
+        providers=CrmProviderFactory().build_all(ensure_allowed=callback_guard.ensure_allowed),
+    )
+
     # Switchboard: single entry point for every inbound channel turn.
     # Built after outbound_handler, which it needs to deliver any
     # AppConnector result that isn't handled asynchronously.
@@ -686,7 +720,9 @@ async def lifespan(app: FastAPI):
         channel_connection_repo=app.state.channel_connection_repo,
         session_repo=session_repo,
         session_history_repo=session_history_repo,
-        app_connectors=AppConnectorFactory().build_all(ingest_message_use_case=ingest_use_case),
+        app_connectors=AppConnectorFactory().build_all(
+            ingest_message_use_case=ingest_use_case, crm_handoffs=crm_handoffs
+        ),
         outbound_handler=outbound_handler,
         session_ttl_seconds=settings.SESSION_TTL_SECONDS,
         conversation_tracker=conversation_tracker,
@@ -694,9 +730,26 @@ async def lifespan(app: FastAPI):
         # Each contact's card starts with their first message (see README).
         contacts=conversation_contacts,
         profile_lookup=MetaSenderProfileLookup(),
+        crm_handoffs=crm_handoffs,
     )
 
     logger.info("switchboard.initialized")
+
+    app.state.start_handoff_use_case = StartHandoffUseCase(
+        sessions=session_repo,
+        integrations=app.state.crm_integration_repo,
+        handoffs=handoff_repo,
+        crm=crm_handoffs,
+        switchboard=app.state.switchboard,
+    )
+    app.state.reply_from_crm_use_case = ReplyFromCrmUseCase(
+        sessions=session_repo,
+        handoffs=handoff_repo,
+        crm=crm_handoffs,
+        window=MessagingWindowService(conversations=conversation_repo),
+        outbound=outbound_handler,
+    )
+    app.state.close_handoff_use_case = CloseHandoffUseCase(handoffs=handoff_repo, switchboard=app.state.switchboard)
 
     logger.info("application.startup.complete")
 
@@ -731,6 +784,9 @@ async def lifespan(app: FastAPI):
         if rabbit_pub:
             await rabbit_pub.stop()
             logger.info("rabbitmq.publisher.stopped")
+        crm_events = getattr(app.state, "crm_events", None)
+        if crm_events:
+            await crm_events.stop()
 
     langflow_admin_client = getattr(app.state, "langflow_admin_client", None)
     if langflow_admin_client:
@@ -822,6 +878,7 @@ app.include_router(health_router)
 app.include_router(webhooks_router)
 app.include_router(internal_router)
 app.include_router(channels_router)
+app.include_router(crm_router)
 app.include_router(voice_router)
 app.include_router(voice_demo_router)
 app.include_router(admin_router)

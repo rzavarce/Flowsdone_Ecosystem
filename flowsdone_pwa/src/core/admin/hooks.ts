@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/core/auth/useAuth'
 import type {
   ChannelAppProvider,
+  CreateCrmIntegrationInput,
+  UpdateCrmIntegrationInput,
   BaseAgentInput,
   CreateAgentInput,
   UpdateAgentInput,
@@ -31,6 +33,7 @@ export const adminKeys = {
   langflowFlows: ['langflow-flows'] as const,
   onboarding: ['onboarding'] as const,
   webchatShares: ['webchat-shares'] as const,
+  crm: ['crm-integrations'] as const,
 }
 
 /** Visible tenants with all of their data (slug, status…). */
@@ -366,8 +369,8 @@ export function useUpsertChannelApp() {
   const api = useAdminApi()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ provider, credentials }: { provider: ChannelAppProvider; credentials: Record<string, string> }) =>
-      api.upsertChannelApp(provider, credentials),
+    mutationFn: ({ provider, credentials, config }: { provider: ChannelAppProvider; credentials: Record<string, string>; config?: Record<string, unknown> }) =>
+      api.upsertChannelApp(provider, credentials, config),
     onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.apps }),
   })
 }
@@ -411,5 +414,66 @@ export function useLangflowSession(tenantId?: string, projectId?: string) {
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+  })
+}
+
+/** CRM integrations of the visible projects (or only `projectId`'s). */
+export function useCrmIntegrations(projectId?: string, enabled = true) {
+  const api = useAdminApi()
+  return useQuery({
+    queryKey: [...adminKeys.crm, projectId ?? 'all'],
+    queryFn: () => api.listCrmIntegrations(projectId),
+    enabled,
+  })
+}
+
+/** Creates a project's CRM integration (its secrets come back only now). */
+export function useCreateCrmIntegration() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateCrmIntegrationInput) => api.createCrmIntegration(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.crm }),
+  })
+}
+
+/** Changes a CRM integration's URL or status. */
+export function useUpdateCrmIntegration() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateCrmIntegrationInput }) => api.updateCrmIntegration(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.crm }),
+  })
+}
+
+/** Replaces a CRM integration's secrets (returned only now). */
+export function useRotateCrmSecrets() {
+  const api = useAdminApi()
+  return useMutation({ mutationFn: (id: string) => api.rotateCrmIntegrationSecrets(id) })
+}
+
+/** Sends a test event to the CRM. */
+export function useTestCrmIntegration() {
+  const api = useAdminApi()
+  return useMutation({ mutationFn: (id: string) => api.testCrmIntegration(id) })
+}
+
+/** Deletes a CRM integration. */
+export function useDeleteCrmIntegration() {
+  const api = useAdminApi()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api.deleteCrmIntegration(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.crm }),
+  })
+}
+
+/** Hands a live conversation over to its project's CRM. */
+export function useStartCrmHandoff() {
+  const api = useAdminApi()
+  return useMutation({
+    mutationFn: ({ conversationId, reason }: { conversationId: string; reason?: string }) =>
+      api.startCrmHandoff(conversationId, reason),
   })
 }

@@ -10,6 +10,7 @@ right for each platform.
 from __future__ import annotations
 
 from app.adapters.outbound.channels.factory import ChannelSenderFactory
+from app.adapters.outbound.channels.d360_webhook_registrar import D360WebhookRegistrar
 from app.adapters.outbound.channels.meta_webhook_registrar import MetaWebhookRegistrar
 from app.adapters.outbound.channels.telegram_webhook_registrar import (
     TelegramWebhookRegistrar,
@@ -46,7 +47,8 @@ def test_channel_sender_factory_wires_voice_dependencies_into_its_sender():
 def test_webhook_registrar_factory_covers_the_auto_registered_channels():
     registrars = WebhookRegistrarFactory().build_all()
 
-    assert set(registrars.keys()) == {"telegram", "facebook", "instagram"}
+    assert set(registrars.keys()) == {"telegram", "facebook", "instagram", "whatsapp_360dialog", "chatwoot"}
+    assert isinstance(registrars["whatsapp_360dialog"], D360WebhookRegistrar)
     assert isinstance(registrars["telegram"], TelegramWebhookRegistrar)
     assert isinstance(registrars["facebook"], MetaWebhookRegistrar)
     assert isinstance(registrars["instagram"], MetaWebhookRegistrar)

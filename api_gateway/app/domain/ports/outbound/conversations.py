@@ -76,6 +76,20 @@ class ConversationRepositoryPort(Protocol):
         """
         ...
 
+    async def last_inbound_at(self, session_id: str) -> Optional[datetime]:
+        """When the contact behind a session last wrote, across all of
+        its conversations (open or closed).
+
+        Args:
+            session_id (str): Switchboard session id (one contact on one
+                channel of one project).
+
+        Returns:
+            Optional[datetime]: The latest inbound message time, or None
+            if the contact never wrote.
+        """
+        ...
+
     async def list(
         self,
         *,

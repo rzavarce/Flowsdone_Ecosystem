@@ -8,13 +8,15 @@ export type ChannelType =
   | 'instagram'
   | 'twitter'
   | 'whatsapp_evolution'
+  | 'whatsapp_360dialog'
   | 'telegram'
   | 'tiktok'
   | 'voice'
   | 'webchat'
+  | 'chatwoot'
 
 /** Providers with one app shared across the whole platform. */
-export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio'
+export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio' | 'chatwoot'
 
 /** Lifecycle status of tenants and projects. `suspended` cuts off routing for their channels without deleting data. */
 export type LifecycleStatus = 'active' | 'suspended'
@@ -585,4 +587,60 @@ export interface Statement {
   disallowed_models: string[]
   unrated_meters: number | null
   generated_at: string
+}
+
+/** CRM providers a project can hand conversations over to (more will follow). */
+export type CrmProvider = 'generic_webhook'
+
+/** A project's CRM integration, without its secrets. */
+export interface CrmIntegration {
+  id: string
+  tenant_id: string
+  project_id: string
+  provider: CrmProvider
+  /** generic_webhook: `{ url }`. */
+  config: Record<string, unknown>
+  status: 'active' | 'inactive'
+  /** Where the CRM posts the agent's replies. */
+  reply_url: string
+  /** Where the CRM closes a handoff (the bot takes over again). */
+  close_url: string
+  created_at: string
+  updated_at: string
+}
+
+/** A CRM integration with its secrets: only returned when created or rotated. */
+export interface CrmIntegrationWithSecrets extends CrmIntegration {
+  /** Verifies our events' X-Flowsdone-Signature. */
+  signing_secret: string
+  /** The CRM sends it as X-Api-Key with its replies. */
+  api_key: string
+}
+
+/** Input for creating a CRM integration. */
+export interface CreateCrmIntegrationInput {
+  project_id: string
+  provider: CrmProvider
+  config: Record<string, unknown>
+}
+
+/** Changes to a CRM integration. */
+export interface UpdateCrmIntegrationInput {
+  config?: Record<string, unknown>
+  status?: 'active' | 'inactive'
+}
+
+/** Result of sending a test event to the CRM. */
+export interface CrmTestResult {
+  ok: boolean
+  error: string | null
+}
+
+/** A conversation handed over to the CRM. */
+export interface CrmHandoff {
+  id: string
+  conversation_id: string
+  integration_id: string
+  status: 'open' | 'closed' | 'expired'
+  opened_at: string
 }

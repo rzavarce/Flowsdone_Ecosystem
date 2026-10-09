@@ -948,6 +948,37 @@ services:
     mem_limit: ${RABBITMQ_OUTBOUND_WORKER_MEM_LIMIT}
     cpus: ${RABBITMQ_OUTBOUND_WORKER_CPUS}
 
+  # Entrega los eventos de traspaso a CRM (handoff.started, message.inbound,
+  # handoff.expired) al CRM de cada cliente, con reintentos y cola de
+  # fallidos (crm.events.dead).
+  crm_worker:
+    <<: *common
+    healthcheck:
+      # Latido del worker (workers/heartbeat.py): fichero tocado cada 30 s.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/crm-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    build:
+      context: .
+      dockerfile: dockers/Dockerfile.worker
+    command: python -m workers.crm.main
+    env_file: .env
+    environment:
+      OTEL_ENABLED: ${OTEL_ENABLED}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+      OTEL_SERVICE_NAME: fd-crm-worker
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - flowsdone-net
+    mem_limit: ${CRM_WORKER_MEM_LIMIT:-256m}
+    cpus: ${CRM_WORKER_CPUS:-0.25}
+
   # ------------------------------------------------------------------
   # EVOLUTION API (WhatsApp)
   # ------------------------------------------------------------------

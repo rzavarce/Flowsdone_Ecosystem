@@ -1,5 +1,11 @@
 import type {
   Agent,
+  CreateCrmIntegrationInput,
+  CrmHandoff,
+  CrmIntegration,
+  CrmIntegrationWithSecrets,
+  CrmTestResult,
+  UpdateCrmIntegrationInput,
   ChannelApp,
   ChannelAppProvider,
   ChannelConnection,
@@ -108,11 +114,24 @@ export interface AdminApi {
 
   /** Providers' shared apps (admin only). */
   listChannelApps(): Promise<ChannelApp[]>
-  /** Creates or REPLACES a provider's credentials (admin only). */
-  upsertChannelApp(provider: ChannelAppProvider, credentials: Record<string, string>): Promise<ChannelApp>
+  /** Creates or REPLACES a provider's credentials and config (admin only). */
+  upsertChannelApp(provider: ChannelAppProvider, credentials: Record<string, string>, config?: Record<string, unknown>): Promise<ChannelApp>
   deleteChannelApp(provider: ChannelAppProvider): Promise<void>
   /** Reveals a provider's credentials in plaintext (admin only). Use with care. */
   revealChannelAppCredentials(provider: ChannelAppProvider): Promise<Record<string, unknown>>
+
+  /** CRM integrations (one per project); managers write, staff read. */
+  listCrmIntegrations(projectId?: string): Promise<CrmIntegration[]>
+  /** Creates it; the secrets come back only now. */
+  createCrmIntegration(input: CreateCrmIntegrationInput): Promise<CrmIntegrationWithSecrets>
+  updateCrmIntegration(id: string, patch: UpdateCrmIntegrationInput): Promise<CrmIntegration>
+  /** New secrets (the old ones stop working); returned only now. */
+  rotateCrmIntegrationSecrets(id: string): Promise<CrmIntegrationWithSecrets>
+  /** Sends an "integration.test" event right away. */
+  testCrmIntegration(id: string): Promise<CrmTestResult>
+  deleteCrmIntegration(id: string): Promise<void>
+  /** Hands a live conversation over to its project's CRM. */
+  startCrmHandoff(conversationId: string, reason?: string): Promise<CrmHandoff>
 
   /**
    * Admin only. Provisions the tenant's Langflow (its user and one folder per

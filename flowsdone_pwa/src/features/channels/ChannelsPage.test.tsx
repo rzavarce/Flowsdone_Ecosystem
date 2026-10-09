@@ -158,6 +158,25 @@ describe('conectar un canal', () => {
     })))
   })
 
+  it('WhatsApp (360dialog) pide número y API key, limpia el número y guarda el modo sandbox en la config', async () => {
+    const create = vi.fn()
+    const dialog = await openCreate('tenant_manager', seeded({ createChannelConnection: create }))
+    await userEvent.selectOptions(within(dialog).getByLabelText('Canal'), 'whatsapp_360dialog')
+
+    expect(within(dialog).getByText(/configura el webhook del número en 360dialog/)).toBeInTheDocument()
+    await userEvent.type(within(dialog).getByLabelText('Número del negocio'), '+34 600 111 222')
+    await userEvent.type(within(dialog).getByLabelText('API key de 360dialog'), 'D360-KEY')
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Número de sandbox de 360dialog/ }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Conectar canal' }))
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      channel_type: 'whatsapp_360dialog',
+      external_id: '34600111222',
+      credentials: { api_key: 'D360-KEY' },
+      config: { sandbox: true },
+    })))
+  })
+
   it('los agentes ofrecidos son los del proyecto elegido', async () => {
     const dialog = await openCreate('admin')
     expect(within(dialog).getAllByRole('option').map((o) => o.textContent)).toContain('Recepción (por defecto)')

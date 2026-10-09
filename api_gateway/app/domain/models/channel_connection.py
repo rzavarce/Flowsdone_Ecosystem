@@ -13,10 +13,12 @@ ChannelType = Literal[
     "instagram",
     "twitter",
     "whatsapp_evolution",
+    "whatsapp_360dialog",
     "telegram",
     "tiktok",
     "voice",
     "webchat",
+    "chatwoot",
 ]
 
 # The console's own web chat: no external platform, its external_id is a
@@ -43,7 +45,10 @@ class ChannelConnection(BaseModel):
         channel_type (ChannelType): Which platform this connection is for.
         external_id (str): Identifier used to route inbound webhooks
             (instance name, page id, bot token, etc., depending on the
-            channel).
+            channel). For channel_type="whatsapp_360dialog", the
+            business number in digits only (e.g. "34600111222"). For
+            channel_type="chatwoot", the id of the Chatwoot inbox (a
+            Facebook page or Instagram account connected in Chatwoot).
         display_name (Optional[str]): Optional human-readable label.
         credentials (Dict[str, Any]): Channel credentials (plain text
             in-process, encrypted at rest).
@@ -53,6 +58,8 @@ class ChannelConnection(BaseModel):
             VoiceProviderPort implementation without a dedicated column.
             For channel_type="webchat", {"allowed_origins": [...]}: the
             websites allowed to embed the chat (empty = any).
+            For channel_type="whatsapp_360dialog", {"sandbox": true} to
+            use 360dialog's sandbox host instead of production.
         status (str): Lifecycle status (e.g. "active").
         created_at (datetime): Creation timestamp.
         updated_at (datetime): Last update timestamp.

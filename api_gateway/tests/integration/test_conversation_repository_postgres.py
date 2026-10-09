@@ -107,3 +107,16 @@ async def test_close_expired_stamps_the_real_expiry_and_reason(repo_and_project)
     assert by_id[too_long.id].close_reason == "max_duration"
     assert by_id[too_long.id].closed_at == now - DAY
     assert (await repo.get(active.id)).status == "open"
+
+
+async def test_last_inbound_at_is_the_latest_across_the_sessions_conversations(repo_and_project):
+    repo, tenant_id, project_id = repo_and_project
+    session_id = f"{project_id}:whatsapp_360dialog:34699000111"
+    first = await repo.open(_conversation(tenant_id, project_id, session_id=session_id,
+                                          started_at=T0, last_inbound_at=T0, last_message_at=T0))
+    await repo.close(first.id, reason="inactivity", closed_at=T0 + DAY)
+    await repo.open(_conversation(tenant_id, project_id, session_id=session_id,
+                                  started_at=T0 + WEEK, last_inbound_at=T0 + WEEK, last_message_at=T0 + WEEK))
+
+    assert await repo.last_inbound_at(session_id) == T0 + WEEK
+    assert await repo.last_inbound_at(f"{project_id}:whatsapp_360dialog:nobody") is None

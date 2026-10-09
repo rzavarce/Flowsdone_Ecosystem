@@ -2,6 +2,10 @@ import { ApiError, apiFetch } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
 import type {
   Agent,
+  CrmHandoff,
+  CrmIntegration,
+  CrmIntegrationWithSecrets,
+  CrmTestResult,
   ChannelApp,
   ChannelConnection,
   ContactCard,
@@ -72,13 +76,24 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
     deleteChannelConnection: (id) => call<void>(`/channel-connections/${id}`, 'DELETE'),
 
     listChannelApps: () => call<ChannelApp[]>('/channel-apps'),
-    upsertChannelApp: (provider, credentials) => call<ChannelApp>(`/channel-apps/${provider}`, 'PUT', { credentials }),
+    upsertChannelApp: (provider, credentials, config) =>
+      call<ChannelApp>(`/channel-apps/${provider}`, 'PUT', { credentials, ...(config ? { config } : {}) }),
     deleteChannelApp: (provider) => call<void>(`/channel-apps/${provider}`, 'DELETE'),
     createLangflowSession: (tenantId, projectId) =>
       call('/langflow/session', 'POST', { tenant_id: tenantId, project_id: projectId }),
 
     revealChannelAppCredentials: async (provider) =>
       (await call<{ credentials: Record<string, unknown> }>(`/channel-apps/${provider}/credentials`)).credentials,
+
+    listCrmIntegrations: (projectId) =>
+      call<CrmIntegration[]>(projectId ? `/crm-integrations?project_id=${encodeURIComponent(projectId)}` : '/crm-integrations'),
+    createCrmIntegration: (input) => call<CrmIntegrationWithSecrets>('/crm-integrations', 'POST', input),
+    updateCrmIntegration: (id, patch) => call<CrmIntegration>(`/crm-integrations/${id}`, 'PATCH', patch),
+    rotateCrmIntegrationSecrets: (id) => call<CrmIntegrationWithSecrets>(`/crm-integrations/${id}/rotate-secrets`, 'POST'),
+    testCrmIntegration: (id) => call<CrmTestResult>(`/crm-integrations/${id}/test`, 'POST'),
+    deleteCrmIntegration: (id) => call<void>(`/crm-integrations/${id}`, 'DELETE'),
+    startCrmHandoff: (conversationId, reason) =>
+      call<CrmHandoff>('/crm-handoffs', 'POST', { conversation_id: conversationId, reason: reason || null }),
 
     listUsers: () => call<UserRecord[]>('/users'),
     createUser: (input) => call<UserRecord>('/users', 'POST', input),

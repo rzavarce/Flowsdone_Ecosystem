@@ -85,6 +85,14 @@ from app.domain.ports.outbound.billing import (  # noqa: F401
 )
 from app.domain.ports.outbound.call_session_repository import CallSessionRepositoryPort  # noqa: F401
 from app.domain.ports.outbound.channel_sender import ChannelSenderPort  # noqa: F401
+from app.domain.ports.outbound.crm import (  # noqa: F401
+    CrmDeadLetterPort,
+    CrmDeliveryError,
+    CrmEventPublisherPort,
+    CrmIntegrationRepositoryPort,
+    CrmProviderPort,
+    HandoffRepositoryPort,
+)
 from app.domain.ports.outbound.conversations import (  # noqa: F401
     ConversationEventPublisherPort,
     ConversationRepositoryPort,

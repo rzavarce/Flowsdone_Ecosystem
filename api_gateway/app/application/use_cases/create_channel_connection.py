@@ -138,5 +138,6 @@ class CreateChannelConnectionUseCase:
             credentials=credentials,
             channel_type=channel_type,
             on_failure=_delete_orphaned_connection,
+            config=connection.config,
         )
         return connection

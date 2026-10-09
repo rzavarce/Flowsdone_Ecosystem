@@ -64,7 +64,7 @@ async def test_credentials_update_without_secret_preserves_previous_one():
     assert result.credentials["telegram_webhook_secret"] == "OLD"
     assert secret_generator.calls == 0
     assert registrar.register_calls == [
-        {"external_id": connection.external_id, "credentials": {"note": "unrelated change", "telegram_webhook_secret": "OLD"}}
+        {"external_id": connection.external_id, "credentials": {"note": "unrelated change", "telegram_webhook_secret": "OLD"}, "config": connection.config}
     ]
 
 

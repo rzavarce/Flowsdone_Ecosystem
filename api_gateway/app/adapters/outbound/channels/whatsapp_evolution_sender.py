@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -29,6 +29,7 @@ class WhatsAppEvolutionSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Send a text message to a WhatsApp recipient.
 
@@ -38,6 +39,8 @@ class WhatsAppEvolutionSender(ChannelSenderPort):
             text (str): Message body to send.
             credentials (Dict[str, Any]): Unused for WhatsApp; kept for
                 interface consistency with ChannelSenderPort.
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         if not settings.EVOLUTION_API_KEY:
             logger.error(

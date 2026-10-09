@@ -23,8 +23,9 @@ const FORM_ID = 'channel-app-form'
  * Configures a provider's shared credentials.
  *
  * The gateway never returns saved secrets, so editing means rewriting all of
- * them: `PUT` replaces the whole set (except Meta's webhook verification
- * token, which is kept if a new one isn't sent).
+ * them: `PUT` replaces the whole set (except the values the gateway manages
+ * itself: Meta's webhook verification token, Chatwoot's bot and webhook token).
+ * Fields marked `config` (e.g. Chatwoot's account id) go in the app's config.
  */
 export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogProps) {
   const { t } = useTranslation()
@@ -38,9 +39,14 @@ export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogP
     event.preventDefault()
     setSubmitted(true)
     if (missing.length) return
-    const credentials = Object.fromEntries(Object.entries(values).filter(([, v]) => v.trim()))
+    const filled = app.fields.filter((f) => values[f.key]?.trim())
+    const credentials = Object.fromEntries(filled.filter((f) => !f.config).map((f) => [f.key, values[f.key].trim()]))
+    const configFields = filled.filter((f) => f.config)
+    const config = configFields.length
+      ? Object.fromEntries(configFields.map((f) => [f.key, f.numeric ? Number(values[f.key].trim()) : values[f.key].trim()]))
+      : undefined
     try {
-      await save.mutateAsync({ provider: app.provider, credentials })
+      await save.mutateAsync({ provider: app.provider, credentials, config })
       onClose()
     } catch {
       // El error queda en save.error.
@@ -78,7 +84,7 @@ export function ChannelAppDialog({ app, configured, onClose }: ChannelAppDialogP
             error={submitted && missing.includes(field) ? t('common.fieldRequired', { field: field.label }) : undefined}
           >
             <Input
-              type="password"
+              type={field.config ? (field.numeric ? 'number' : 'text') : 'password'}
               value={values[field.key] ?? ''}
               onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
               autoComplete="off"

@@ -25,7 +25,7 @@ describe('Tenants: plan y consumo', { timeout: 20_000 }, () => {
 
   it('el consumo del mes muestra los mensajes por canal y el margen para el admin', async () => {
     renderApp('/tenants', fakeAuthApi(makeUser('admin')), createMockAdminApi({ latencyMs: 0, seed: SEED }))
-    expect(await screen.findByRole('progressbar', { name: 'WhatsApp' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByRole('progressbar', { name: 'WhatsApp (Evolution)' }, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByText('Total estimado del mes')).toBeInTheDocument()
     expect(screen.getByText('Margen')).toBeInTheDocument()
   })

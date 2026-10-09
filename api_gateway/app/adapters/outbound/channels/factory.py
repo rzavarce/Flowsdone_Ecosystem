@@ -5,7 +5,13 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from app.application.services.ws_registry import WSRegistry
-from app.domain.ports.outbound import CallSessionRepositoryPort, ChannelSenderPort, VoiceProviderPort
+from app.domain.ports.outbound import (
+    CallSessionRepositoryPort,
+    ChannelAppRepositoryPort,
+    ChannelSenderPort,
+    VoiceProviderPort,
+)
+from app.adapters.outbound.channels.chatwoot_sender import ChatwootSender
 from app.adapters.outbound.channels.facebook_sender import FacebookSender
 from app.adapters.outbound.channels.instagram_sender import InstagramSender
 from app.adapters.outbound.channels.telegram_sender import TelegramSender
@@ -13,6 +19,7 @@ from app.adapters.outbound.channels.tiktok_sender import TikTokSender
 from app.adapters.outbound.channels.twilio_voice_sender import TwilioVoiceSender
 from app.adapters.outbound.channels.twitter_sender import TwitterSender
 from app.adapters.outbound.channels.webchat_sender import WebchatSender
+from app.adapters.outbound.channels.whatsapp_360dialog_sender import WhatsApp360DialogSender
 from app.adapters.outbound.channels.whatsapp_evolution_sender import WhatsAppEvolutionSender
 
 
@@ -28,6 +35,7 @@ class ChannelSenderFactory:
         call_session_registry: Optional[WSRegistry] = None,
         voice_provider: Optional[VoiceProviderPort] = None,
         call_session_repo: Optional[CallSessionRepositoryPort] = None,
+        channel_app_repo: Optional[ChannelAppRepositoryPort] = None,
     ) -> Dict[str, ChannelSenderPort]:
         """Instantiate every supported channel sender.
 
@@ -42,6 +50,9 @@ class ChannelSenderFactory:
             call_session_repo (Optional[CallSessionRepositoryPort]):
                 Call session storage, forwarded to TwilioVoiceSender so
                 it can read the connection's `tts_language` config.
+            channel_app_repo (Optional[ChannelAppRepositoryPort]): Shared
+                provider apps, forwarded to ChatwootSender (the "chatwoot"
+                app holds the account and the Agent Bot token).
 
         Returns:
             Dict[str, ChannelSenderPort]: A dict mapping each supported
@@ -49,6 +60,8 @@ class ChannelSenderFactory:
         """
         return {
             "whatsapp_evolution": WhatsAppEvolutionSender(),
+            "whatsapp_360dialog": WhatsApp360DialogSender(),
+            "chatwoot": ChatwootSender(channel_app_repo),
             "facebook": FacebookSender(),
             "instagram": InstagramSender(),
             "telegram": TelegramSender(),

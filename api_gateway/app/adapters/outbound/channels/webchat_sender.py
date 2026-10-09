@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from app.domain.ports.outbound import ChannelSenderPort
 
@@ -24,6 +24,7 @@ class WebchatSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """No-op: already delivered over the WebSocket (see the class).
 
@@ -32,5 +33,7 @@ class WebchatSender(ChannelSenderPort):
             recipient_id (str): The visitor.
             text (str): The reply.
             credentials (Dict[str, Any]): Unused (the web chat has none).
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         return None

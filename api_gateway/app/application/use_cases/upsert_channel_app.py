@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from app.domain.models.channel_app import ChannelApp
 from app.domain.ports.outbound import ChannelAppRepositoryPort, SecretGeneratorPort
@@ -15,6 +15,15 @@ __all__ = ["UpsertChannelAppUseCase"]
 # here and the caller's `credentials` pass through untouched.
 AUTO_GENERATED_SECRET_FIELDS: Dict[str, str] = {
     "meta": "webhook_verify_token",
+    # Chatwoot: token in the Agent Bot's outgoing_url (see channels/chatwoot).
+    "chatwoot": "webhook_token",
+}
+
+# Values the gateway itself writes into a channel_app after setting it up
+# (e.g. the Chatwoot Agent Bot it creates). An admin's upsert never sends
+# them, so they are carried over instead of being wiped out.
+SERVER_MANAGED_FIELDS: Dict[str, Dict[str, Tuple[str, ...]]] = {
+    "chatwoot": {"credentials": ("bot_access_token",), "config": ("bot_id",)},
 }
 
 
@@ -62,17 +71,33 @@ class UpsertChannelAppUseCase:
                 secret and this omits it, one is generated (or the
                 previously stored value is preserved).
             config (Dict[str, Any]): Arbitrary app configuration.
+                Gateway-managed values (SERVER_MANAGED_FIELDS) the caller
+                omits are carried over from the stored app, in both
+                `credentials` and `config`.
 
         Returns:
             ChannelApp: The upserted channel app.
         """
         secret_field = AUTO_GENERATED_SECRET_FIELDS.get(provider)
+        managed = SERVER_MANAGED_FIELDS.get(provider, {})
         credentials = dict(credentials)
+        config = dict(config)
+        existing = None
+        if secret_field is not None or managed:
+            existing = await self._channel_app_repo.get_by_provider(provider)
 
         if secret_field is not None and secret_field not in credentials:
-            existing = await self._channel_app_repo.get_by_provider(provider)
             existing_value = existing.credentials.get(secret_field) if existing else None
             credentials[secret_field] = existing_value or self._secret_generator.generate()
+
+        # Gateway-managed values the caller did not send survive the upsert.
+        if existing is not None:
+            for key in managed.get("credentials", ()):
+                if key not in credentials and key in existing.credentials:
+                    credentials[key] = existing.credentials[key]
+            for key in managed.get("config", ()):
+                if key not in config and key in existing.config:
+                    config[key] = existing.config[key]
 
         return await self._channel_app_repo.upsert(
             provider=provider, credentials=credentials, config=config

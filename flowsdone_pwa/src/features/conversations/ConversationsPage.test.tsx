@@ -1,7 +1,9 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import type { AdminApi } from '@/core/admin/AdminApi'
 import { createMockAdminApi } from '@/core/admin/mockAdminApi'
+import { ApiError } from '@/core/http/apiFetch'
 import { SEED } from '@/test/adminFixtures'
 import { fakeAuthApi, makeUser, renderApp } from '@/test/renderApp'
 
@@ -114,5 +116,39 @@ describe('ConversationsPage', { timeout: 20_000 }, () => {
     await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
     await userEvent.type(screen.getByLabelText('Contacto'), 'nadie-con-este-nombre')
     expect(await screen.findByText('No hay conversaciones')).toBeInTheDocument()
+  })
+})
+
+describe('pasar a CRM', () => {
+  const openConversation = async (overrides: Partial<AdminApi>) => {
+    const admin = { ...createMockAdminApi({ latencyMs: 0, seed: SEED }), ...overrides }
+    const detail = await admin.getConversation((await admin.listConversations({}))[0]!.id)
+    admin.getConversation = vi.fn().mockResolvedValue({ ...detail, conversation: { ...detail.conversation, status: 'open' } })
+    renderApp('/conversations', fakeAuthApi(makeUser('admin')), admin)
+    const list = await screen.findByRole('list', { name: 'Conversaciones' }, { timeout: 5000 })
+    await userEvent.click(within(list).getAllByRole('button')[0]!)
+    await userEvent.click(await screen.findByRole('button', { name: 'Pasar a CRM' }, { timeout: 5000 }))
+    return { admin, detail, dialog: screen.getByRole('dialog', { name: 'Pasar la conversación al CRM' }) }
+  }
+
+  it('traspasa la conversación abierta con el motivo', async () => {
+    const start = vi.fn().mockResolvedValue({ id: 'h1', conversation_id: 'x', integration_id: 'i1', status: 'open', opened_at: '' })
+    const { detail, dialog } = await openConversation({ startCrmHandoff: start })
+
+    await userEvent.type(within(dialog).getByLabelText('Motivo'), 'Quiere hablar con una persona')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pasar a CRM' }))
+
+    await waitFor(() => expect(start).toHaveBeenCalledWith(detail.conversation.id, 'Quiere hablar con una persona'))
+    expect(await screen.findByText(/Conversación traspasada/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'En el CRM' })).toBeDisabled()
+  })
+
+  it('sin integración de CRM lo explica y deja el diálogo abierto', async () => {
+    const start = vi.fn().mockRejectedValue(new ApiError(409, 'the project has no active CRM integration'))
+    const { dialog } = await openConversation({ startCrmHandoff: start })
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pasar a CRM' }))
+
+    expect(await within(dialog).findByText(/no tiene una integración de CRM activa/)).toBeInTheDocument()
   })
 })

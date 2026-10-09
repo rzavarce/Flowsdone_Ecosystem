@@ -11,6 +11,7 @@ import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 import { ChannelsPage } from '@/features/channels/ChannelsPage'
+import { IntegrationsPage } from '@/features/integrations/IntegrationsPage'
 import { CompanyPage } from '@/features/company/CompanyPage'
 import { ConversationsPage } from '@/features/conversations/ConversationsPage'
 import { ContactsPage } from '@/features/contacts/ContactsPage'
@@ -78,6 +79,7 @@ export const routes = [
       { path: '/conversations', element: guarded('conversations:manage', <ConversationsPage />) },
       { path: '/contacts', element: guarded('conversations:manage', <ContactsPage />) },
       { path: '/channels', element: guarded('channels:manage', <ChannelsPage />) },
+      { path: '/integrations', element: guarded('projects:manage', <IntegrationsPage />) },
       { path: '/tenants', element: guarded('projects:manage', <TenantsPage />) },
       { path: '/onboarding', element: guarded('tenants:manage', <OnboardingPage />) },
       { path: '/users', element: guarded('users:manage', <UsersPage />) },

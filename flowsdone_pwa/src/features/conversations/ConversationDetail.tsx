@@ -12,6 +12,9 @@ import { channelLabel, contactLabel, identifierLabel, kindLabel, unitLabel } fro
 import { cn } from '@/lib/cn'
 import { formatMoney, formatNumber } from '@/lib/money'
 import { ContactCardPanel } from './ContactCardPanel'
+import { CrmHandoffButton } from './CrmHandoffButton'
+import { can } from '@/core/auth/permissions'
+import { useAuth } from '@/core/auth/useAuth'
 import { useTranslation } from 'react-i18next'
 
 /** Date and time in the active language. */
@@ -59,6 +62,7 @@ export interface ConversationDetailProps {
 export function ConversationDetail({ conversationId, onBack }: ConversationDetailProps) {
   const { t } = useTranslation()
   const detail = useConversation(conversationId)
+  const { user } = useAuth()
 
   if (detail.isPending) return <Spinner label={t('conversations.loading')} className="py-20" />
   if (detail.isError) return <Alert tone="danger">{describeError(detail.error)}</Alert>
@@ -82,6 +86,11 @@ export function ConversationDetail({ conversationId, onBack }: ConversationDetai
           </div>
           <Badge tone={c.status === 'open' ? 'success' : 'neutral'}>{t(`conversations.status.${c.status}`)}</Badge>
         </div>
+        {c.status === 'open' && can(user, 'projects:manage') && (
+          <div className="mt-4">
+            <CrmHandoffButton key={c.id} conversationId={c.id} />
+          </div>
+        )}
         <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted">{t('conversations.startedAt')}</dt>

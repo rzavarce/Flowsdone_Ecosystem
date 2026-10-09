@@ -12,7 +12,7 @@ real per-connection equivalent of Telegram's `setWebhook`.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 
@@ -57,7 +57,9 @@ class MetaWebhookRegistrar:
         self._channel = channel
         self._subscribed_fields = subscribed_fields
 
-    async def register(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def register(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Subscribe a page to the shared Meta app's webhook.
 
         Args:
@@ -65,6 +67,7 @@ class MetaWebhookRegistrar:
                 id of the page linked to the IG business account).
             credentials (Dict[str, Any]): Must contain
                 "page_access_token".
+            config (Optional[Dict[str, Any]]): Unused by this channel.
 
         Raises:
             MetaWebhookRegistrationError: If `page_access_token` is
@@ -84,7 +87,9 @@ class MetaWebhookRegistrar:
             extra={"channel": self._channel, "external_id": external_id},
         )
 
-    async def deregister(self, *, external_id: str, credentials: Dict[str, Any]) -> None:
+    async def deregister(
+        self, *, external_id: str, credentials: Dict[str, Any], config: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Unsubscribe a page from the shared Meta app's webhook.
 
         Args:
@@ -92,6 +97,7 @@ class MetaWebhookRegistrar:
                 Instagram).
             credentials (Dict[str, Any]): Must contain
                 "page_access_token".
+            config (Optional[Dict[str, Any]]): Unused by this channel.
 
         Raises:
             MetaWebhookRegistrationError: If `page_access_token` is

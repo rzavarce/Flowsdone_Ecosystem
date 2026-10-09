@@ -65,6 +65,7 @@ class TwilioVoiceSender(ChannelSenderPort):
         recipient_id: str,
         text: str,
         credentials: Dict[str, Any],
+        config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Speak `text` back to the caller on their live call.
 
@@ -76,6 +77,8 @@ class TwilioVoiceSender(ChannelSenderPort):
             text (str): Message text for the provider to synthesize.
             credentials (Dict[str, Any]): Unused; the streaming
                 WebSocket is already authenticated for this call.
+            config (Optional[Dict[str, Any]]): The connection's
+                configuration; unused by this channel.
         """
         if not self._call_session_registry or not self._voice_provider:
             logger.error(

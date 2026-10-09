@@ -57,7 +57,9 @@ class DeleteChannelConnectionUseCase:
         if registrar is not None:
             try:
                 await registrar.deregister(
-                    external_id=connection.external_id, credentials=connection.credentials
+                    external_id=connection.external_id,
+                    credentials=connection.credentials,
+                    config=connection.config,
                 )
             except Exception:
                 logger.warning(

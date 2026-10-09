@@ -11,7 +11,7 @@ error type" mechanics.
 from __future__ import annotations
 
 import logging
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from app.domain.ports.outbound import WebhookRegistrarPort
 
@@ -34,6 +34,7 @@ async def register_or_compensate(
     credentials: Dict[str, Any],
     channel_type: str,
     on_failure: Callable[[], Awaitable[None]],
+    config: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Register a webhook, compensating if the platform rejects it.
 
@@ -48,13 +49,15 @@ async def register_or_compensate(
         on_failure (Callable[[], Awaitable[None]]): Compensating
             action to run if registration fails (e.g. delete the row
             that was just created, or restore prior credentials).
+        config (Optional[Dict[str, Any]]): The channel_connection's
+            config, forwarded to the registrar.
 
     Raises:
         WebhookRegistrationError: If the external platform rejects the
             registration, after `on_failure()` has run.
     """
     try:
-        await registrar.register(external_id=external_id, credentials=credentials)
+        await registrar.register(external_id=external_id, credentials=credentials, config=config)
     except Exception as exc:
         logger.error(
             "webhook_registration.failed",
