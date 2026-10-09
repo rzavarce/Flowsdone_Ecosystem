@@ -1,12 +1,16 @@
 import type { ChannelAppProvider } from '@/core/admin/types'
 import { i18n } from '@/core/i18n/i18n'
 
-/** A secret value of the shared app (sent inside `credentials`). */
+/** A value of the shared app: a secret (sent inside `credentials`) or, with `config`, a plain setting (sent inside `config`). */
 export interface AppCredentialField {
   key: string
   label: string
   hint?: string
   required?: boolean
+  /** Not a secret: goes in the app's `config` and is typed in clear text. */
+  config?: boolean
+  /** Sent as a number (e.g. Chatwoot's account id). */
+  numeric?: boolean
 }
 
 /** What the shared app needs from each provider; checked against the gateway's webhooks. */
@@ -19,16 +23,23 @@ export interface ChannelAppConfig {
 
 /**
  * Platform-wide app credentials, one entry per provider (Meta, X, TikTok,
- * Twilio), shared across all tenants and configured once by an admin from
+ * Twilio, Chatwoot), shared across all tenants and configured once by an admin from
  * `PlatformIntegrations`.
  */
 /** Translates a platform-app text when read (follows language changes). */
 const tr = (key: string) => i18n.t(`settings.apps.${key}` as 'settings.apps.meta.description')
 
 /** A credential field whose label is the raw key name (a brand term) and whose hint is translated. */
-const field = (provider: ChannelAppProvider, key: string, label: string, opts: { hint?: boolean; required?: boolean } = {}): AppCredentialField => ({
+const field = (
+  provider: ChannelAppProvider,
+  key: string,
+  label: string,
+  opts: { hint?: boolean; required?: boolean; config?: boolean; numeric?: boolean } = {},
+): AppCredentialField => ({
   key,
   required: opts.required,
+  config: opts.config,
+  numeric: opts.numeric,
   get label() {
     return key === 'webhook_verify_token' ? tr(`${provider}.fields.${key}.label`) : label
   },
@@ -60,4 +71,9 @@ export const CHANNEL_APPS: readonly ChannelAppConfig[] = [
     field('twilio', 'auth_token', 'Auth Token', { hint: true, required: true }),
     field('twilio', 'account_sid', 'Account SID', { hint: true }),
   ], true),
+  app('chatwoot', [
+    field('chatwoot', 'api_access_token', 'Access Token', { hint: true, required: true }),
+    field('chatwoot', 'account_id', 'Account ID', { hint: true, required: true, config: true, numeric: true }),
+    field('chatwoot', 'base_url', 'Base URL', { hint: true, config: true }),
+  ], false, 'Chatwoot (Facebook + Instagram)'),
 ]

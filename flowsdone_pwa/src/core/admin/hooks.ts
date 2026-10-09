@@ -366,8 +366,8 @@ export function useUpsertChannelApp() {
   const api = useAdminApi()
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ provider, credentials }: { provider: ChannelAppProvider; credentials: Record<string, string> }) =>
-      api.upsertChannelApp(provider, credentials),
+    mutationFn: ({ provider, credentials, config }: { provider: ChannelAppProvider; credentials: Record<string, string>; config?: Record<string, unknown> }) =>
+      api.upsertChannelApp(provider, credentials, config),
     onSuccess: () => qc.invalidateQueries({ queryKey: adminKeys.apps }),
   })
 }

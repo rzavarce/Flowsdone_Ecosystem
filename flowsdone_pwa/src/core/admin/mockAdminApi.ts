@@ -417,7 +417,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
       await wait(latencyMs)
       return clone([...apps.values()].map((entry) => entry.app))
     },
-    async upsertChannelApp(provider, credentials) {
+    async upsertChannelApp(provider, credentials, config) {
       await wait(latencyMs)
       const now = new Date().toISOString()
       const stored: Record<string, unknown> = { ...credentials }
@@ -429,7 +429,7 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
         id: apps.get(provider)?.app.id ?? `app-${provider}`,
         provider,
         has_credentials: Object.keys(stored).length > 0,
-        config: {},
+        config: { ...(config ?? {}) },
         status: 'active',
         created_at: apps.get(provider)?.app.created_at ?? now,
         updated_at: now,

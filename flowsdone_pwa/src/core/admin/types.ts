@@ -8,13 +8,15 @@ export type ChannelType =
   | 'instagram'
   | 'twitter'
   | 'whatsapp_evolution'
+  | 'whatsapp_360dialog'
   | 'telegram'
   | 'tiktok'
   | 'voice'
   | 'webchat'
+  | 'chatwoot'
 
 /** Providers with one app shared across the whole platform. */
-export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio'
+export type ChannelAppProvider = 'meta' | 'twitter' | 'tiktok' | 'twilio' | 'chatwoot'
 
 /** Lifecycle status of tenants and projects. `suspended` cuts off routing for their channels without deleting data. */
 export type LifecycleStatus = 'active' | 'suspended'

@@ -586,6 +586,8 @@ export const en: Messages<typeof es> = {
       keepCredential: 'Leave it empty to keep the current one. If you type one, it replaces the previous.',
       allowedOrigins: 'Allowed websites',
       allowedOriginsHint: 'One per line (e.g. https://mycompany.com). Empty = any website can use the chat.',
+      sandbox: '360dialog sandbox number',
+      sandboxHint: 'Check it if the API key is a sandbox one (testing only: it can only message your own phone).',
       errors: {
         project: 'Pick a project.',
         agent: 'Pick an agent.',
@@ -603,11 +605,23 @@ export const en: Messages<typeof es> = {
       name: 'Project name',
     },
     types: {
+      whatsapp_360dialog: {
+        label: 'WhatsApp (360dialog)',
+        externalIdLabel: 'Business number',
+        externalIdHint: 'The number connected in 360dialog, digits only with country code (e.g. 34600111222).',
+        note: "On save, Flowsdone sets the number's webhook in 360dialog automatically.",
+      },
       whatsapp_evolution: {
-        label: 'WhatsApp',
+        label: 'WhatsApp (Evolution)',
         externalIdLabel: 'Instance name',
         externalIdHint: 'The instance created in Evolution API.',
         note: '',
+      },
+      chatwoot: {
+        label: 'Facebook / Instagram (Chatwoot)',
+        externalIdLabel: 'Chatwoot inbox ID',
+        externalIdHint: 'The number in the URL when you open the inbox in Chatwoot (Settings → Inboxes → …/inboxes/<ID>).',
+        note: 'On save, Flowsdone assigns its bot to that Chatwoot inbox. Requires the Chatwoot integration set up in Settings.',
       },
       webchat: {
         label: 'Web chat',
@@ -652,6 +666,10 @@ export const en: Messages<typeof es> = {
         note: '',
       },
       credentials: {
+        api_key: {
+          label: '360dialog API key',
+          hint: "The number's D360-API-KEY (from the 360dialog Hub, or the sandbox one).",
+        },
         page_access_token: {
           label: 'Page access token',
           hint: 'From the Meta app, with messaging permission.',
@@ -1079,6 +1097,15 @@ export const en: Messages<typeof es> = {
         fields: {
           auth_token: { label: 'Auth Token', hint: 'Checks that incoming calls really come from Twilio.' },
           account_sid: { label: 'Account SID', hint: 'Optional.' },
+        },
+      },
+      chatwoot: {
+        label: 'Chatwoot (Facebook + Instagram)',
+        description: "Flowsdone's Chatwoot account: each client's Facebook page or Instagram account is connected there as an inbox.",
+        fields: {
+          api_access_token: { label: 'Access Token', hint: 'From an account administrator (Profile Settings → Access Token).' },
+          account_id: { label: 'Account ID', hint: 'The number in the Chatwoot URL: /app/accounts/<ID>/.' },
+          base_url: { label: 'Base URL', hint: 'Only if it is not Chatwoot Cloud (default https://app.chatwoot.com).' },
         },
       },
     },
