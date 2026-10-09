@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ChannelType } from '@/core/admin/types'
 import { CHANNEL_TYPES, CHANNEL_TYPE_LIST, maskExternalId } from './channelTypes'
 
-const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'whatsapp_360dialog', 'telegram', 'tiktok', 'voice', 'webchat']
+const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'whatsapp_360dialog', 'telegram', 'tiktok', 'voice', 'webchat', 'chatwoot']
 
 describe('catálogo de canales', () => {
-  it('cubre exactamente los nueve canales que soporta el gateway', () => {
+  it('cubre exactamente los diez canales que soporta el gateway', () => {
     expect(Object.keys(CHANNEL_TYPES).sort()).toEqual([...ALL].sort())
     expect(CHANNEL_TYPE_LIST).toHaveLength(ALL.length)
   })

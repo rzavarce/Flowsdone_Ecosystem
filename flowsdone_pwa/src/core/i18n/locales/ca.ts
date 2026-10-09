@@ -617,6 +617,12 @@ export const ca: Messages<typeof es> = {
         externalIdHint: 'La instància creada a Evolution API.',
         note: '',
       },
+      chatwoot: {
+        label: 'Facebook / Instagram (Chatwoot)',
+        externalIdLabel: 'ID de la safata de Chatwoot',
+        externalIdHint: "El número de l'URL en obrir la safata a Chatwoot (Settings → Inboxes → …/inboxes/<ID>).",
+        note: "En desar, Flowsdone assigna el seu bot a aquesta safata de Chatwoot. Cal la integració de Chatwoot configurada a Configuració.",
+      },
       webchat: {
         label: 'Xat web',
         externalIdLabel: 'Clau pública',
@@ -1091,6 +1097,15 @@ export const ca: Messages<typeof es> = {
         fields: {
           auth_token: { label: 'Auth Token', hint: 'Valida que les trucades entrants vinguin de Twilio.' },
           account_sid: { label: 'Account SID', hint: 'Opcional.' },
+        },
+      },
+      chatwoot: {
+        label: 'Chatwoot (Facebook + Instagram)',
+        description: "El compte de Chatwoot de Flowsdone: cada pàgina de Facebook o compte d'Instagram d'un client s'hi connecta com a safata.",
+        fields: {
+          api_access_token: { label: 'Access Token', hint: "D'un administrador del compte (Profile Settings → Access Token)." },
+          account_id: { label: 'Account ID', hint: "El número de l'URL de Chatwoot: /app/accounts/<ID>/." },
+          base_url: { label: 'Base URL', hint: "Només si no és Chatwoot Cloud (per defecte https://app.chatwoot.com)." },
         },
       },
     },

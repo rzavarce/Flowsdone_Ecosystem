@@ -108,8 +108,8 @@ export interface AdminApi {
 
   /** Providers' shared apps (admin only). */
   listChannelApps(): Promise<ChannelApp[]>
-  /** Creates or REPLACES a provider's credentials (admin only). */
-  upsertChannelApp(provider: ChannelAppProvider, credentials: Record<string, string>): Promise<ChannelApp>
+  /** Creates or REPLACES a provider's credentials and config (admin only). */
+  upsertChannelApp(provider: ChannelAppProvider, credentials: Record<string, string>, config?: Record<string, unknown>): Promise<ChannelApp>
   deleteChannelApp(provider: ChannelAppProvider): Promise<void>
   /** Reveals a provider's credentials in plaintext (admin only). Use with care. */
   revealChannelAppCredentials(provider: ChannelAppProvider): Promise<Record<string, unknown>>

@@ -19,11 +19,11 @@ const row = (label: string) => screen.getByText(label).closest('li') as HTMLElem
 afterEach(() => vi.restoreAllMocks())
 
 describe('visibilidad por perfil', () => {
-  it('el admin ve las cuatro integraciones, todas sin configurar', async () => {
+  it('el admin ve las cinco integraciones, todas sin configurar', async () => {
     await open('admin')
     expect(await screen.findByText('Integraciones de plataforma')).toBeInTheDocument()
     await screen.findByText('Meta (Facebook + Instagram)') // espera a que carguen las filas
-    for (const label of ['Meta (Facebook + Instagram)', 'X (Twitter)', 'TikTok', 'Twilio (voz)']) {
+    for (const label of ['Meta (Facebook + Instagram)', 'X (Twitter)', 'TikTok', 'Twilio (voz)', 'Chatwoot (Facebook + Instagram)']) {
       expect(within(row(label)).getByText('Sin configurar')).toBeInTheDocument()
     }
   })
@@ -51,6 +51,21 @@ describe('configurar', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     await waitFor(() => expect(within(row('X (Twitter)')).getByText('Configurada')).toBeInTheDocument())
+  })
+
+  it('Chatwoot: el token va como credencial y el Account ID, como número, en la config', async () => {
+    const upsert = vi.fn().mockResolvedValue({ id: '1', provider: 'chatwoot', has_credentials: true, config: {}, status: 'active', created_at: '', updated_at: '' })
+    await open('admin', seeded({ upsertChannelApp: upsert }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Configurar Chatwoot (Facebook + Instagram)' }))
+    const dialog = screen.getByRole('dialog', { name: 'Configurar Chatwoot (Facebook + Instagram)' })
+
+    expect(within(dialog).getByLabelText('Access Token')).toHaveAttribute('type', 'password')
+    expect(within(dialog).getByLabelText('Account ID')).toHaveAttribute('type', 'number')
+    await userEvent.type(within(dialog).getByLabelText('Access Token'), 'cw-token')
+    await userEvent.type(within(dialog).getByLabelText('Account ID'), '189535')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(upsert).toHaveBeenCalledWith('chatwoot', { api_access_token: 'cw-token' }, { account_id: 189535 }))
   })
 
   it('los campos de secretos son de tipo password y el valor nunca vuelve a la pantalla', async () => {

@@ -618,6 +618,12 @@ export const es = {
         externalIdHint: 'La instancia creada en Evolution API.',
         note: '',
       },
+      chatwoot: {
+        label: 'Facebook / Instagram (Chatwoot)',
+        externalIdLabel: 'ID de la bandeja de Chatwoot',
+        externalIdHint: 'El número de la URL al abrir la bandeja en Chatwoot (Settings → Inboxes → …/inboxes/<ID>).',
+        note: 'Al guardar, Flowsdone asigna su bot a esa bandeja en Chatwoot. Requiere la integración de Chatwoot configurada en Ajustes.',
+      },
       webchat: {
         label: 'Chat web',
         externalIdLabel: 'Clave pública',
@@ -1092,6 +1098,15 @@ export const es = {
         fields: {
           auth_token: { label: 'Auth Token', hint: 'Valida que las llamadas entrantes vengan de Twilio.' },
           account_sid: { label: 'Account SID', hint: 'Opcional.' },
+        },
+      },
+      chatwoot: {
+        label: 'Chatwoot (Facebook + Instagram)',
+        description: 'La cuenta de Chatwoot de Flowsdone: cada página de Facebook o cuenta de Instagram de un cliente se conecta allí como bandeja.',
+        fields: {
+          api_access_token: { label: 'Access Token', hint: 'De un administrador de la cuenta (Profile Settings → Access Token).' },
+          account_id: { label: 'Account ID', hint: 'El número de la URL de Chatwoot: /app/accounts/<ID>/.' },
+          base_url: { label: 'Base URL', hint: 'Solo si no es Chatwoot Cloud (por defecto https://app.chatwoot.com).' },
         },
       },
     },

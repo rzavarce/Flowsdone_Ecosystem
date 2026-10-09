@@ -80,6 +80,7 @@ export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
     note: true,
   }),
   webchat: channelType('webchat', Globe, '', { autoKey: true, note: true }),
+  chatwoot: channelType('chatwoot', MessagesSquare, '12345', { label: 'Facebook / Instagram (Chatwoot)', note: true }),
   telegram: channelType('telegram', Send, '123456789:AA…', { label: 'Telegram', note: true }),
   facebook: channelType('facebook', MessagesSquare, '102030405060708', {
     label: 'Facebook Messenger',
