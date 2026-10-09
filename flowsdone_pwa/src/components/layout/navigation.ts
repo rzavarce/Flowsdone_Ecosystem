@@ -1,4 +1,4 @@
-import { Bot, Building2, Contact, FileBarChart, LayoutDashboard, MessageSquare, Plug, Receipt, Settings, Store, Users, type LucideIcon } from 'lucide-react'
+import { Bot, Building2, Cable, Contact, FileBarChart, LayoutDashboard, MessageSquare, Plug, Receipt, Settings, Store, Users, type LucideIcon } from 'lucide-react'
 import type { Permission } from '@/core/auth/types'
 import { i18n } from '@/core/i18n/i18n'
 
@@ -30,6 +30,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   item('/contacts', 'contacts', Contact, ['conversations:manage']),
   item('/agents', 'agents', Bot, ['agents:edit']),
   item('/channels', 'channels', Plug, ['channels:manage']),
+  item('/integrations', 'integrations', Cable, ['projects:manage']),
   item('/users', 'users', Users, ['users:manage']),
   item('/company', 'company', Store, ['company:view']),
   item('/plans', 'plans', Receipt, ['platform:manage']),

@@ -3,6 +3,7 @@ import type { AdminApi } from './AdminApi'
 import { createMockBilling } from './mockBilling'
 import type {
   Agent,
+  CrmIntegrationWithSecrets,
   LangflowFlow,
   OnboardingCheck,
   ChannelApp,
@@ -89,6 +90,8 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
   /** Photos (object URLs) by user id: the mock has no server to serve them from. */
   const avatars = new Map<string, string>()
   const apps = new Map<ChannelAppProvider, { app: ChannelApp; credentials: Record<string, unknown> }>()
+  /** CRM integrations with their secrets, by id. */
+  const crm = new Map<string, CrmIntegrationWithSecrets>()
   const billingProfiles = new Map<string, TenantBillingProfile>()
   /** Share links by agent id, oldest first. */
   const shareLinks = new Map<string, WebchatShareLink[]>()
@@ -449,6 +452,62 @@ export function createMockAdminApi({ latencyMs = 250, seed = {} }: MockAdminOpti
     async revealChannelAppCredentials(provider) {
       await wait(latencyMs)
       return clone(need(apps.get(provider), 'channel_app').credentials)
+    },
+
+    async listCrmIntegrations(projectId) {
+      await wait(latencyMs)
+      return [...crm.values()]
+        .filter((i) => !projectId || i.project_id === projectId)
+        .map(({ signing_secret: _s, api_key: _k, ...rest }) => clone(rest))
+    },
+    async createCrmIntegration(input) {
+      await wait(latencyMs)
+      const project = need(projects.find((p) => p.id === input.project_id), 'project')
+      if ([...crm.values()].some((i) => i.project_id === input.project_id)) {
+        throw new ApiError(409, 'the project already has a CRM integration')
+      }
+      const url = String(input.config.url ?? '')
+      if (!url.startsWith('https://')) throw new ApiError(400, 'the webhook url is not allowed: only https callbacks are allowed')
+      const id = `crm-${++seq}`
+      const now = new Date().toISOString()
+      const api = `https://platform.flowsdone.test/integrations/crm/${id}`
+      const integration: CrmIntegrationWithSecrets = {
+        id, tenant_id: project.tenant_id, project_id: project.id, provider: input.provider, config: { ...input.config },
+        status: 'active', reply_url: `${api}/messages`, close_url: `${api}/close`, created_at: now, updated_at: now,
+        signing_secret: `sig-${seq}`, api_key: `key-${seq}`,
+      }
+      crm.set(id, integration)
+      return clone(integration)
+    },
+    async updateCrmIntegration(id, patch) {
+      await wait(latencyMs)
+      const current = need(crm.get(id), 'crm_integration')
+      const updated = { ...current, config: { ...current.config, ...(patch.config ?? {}) }, status: patch.status ?? current.status, updated_at: new Date().toISOString() }
+      crm.set(id, updated)
+      const { signing_secret: _s, api_key: _k, ...rest } = updated
+      return clone(rest)
+    },
+    async rotateCrmIntegrationSecrets(id) {
+      await wait(latencyMs)
+      const current = need(crm.get(id), 'crm_integration')
+      const rotated = { ...current, signing_secret: `sig-${++seq}`, api_key: `key-${seq}` }
+      crm.set(id, rotated)
+      return clone(rotated)
+    },
+    async testCrmIntegration(id) {
+      await wait(latencyMs)
+      need(crm.get(id), 'crm_integration')
+      return { ok: true, error: null }
+    },
+    async deleteCrmIntegration(id) {
+      await wait(latencyMs)
+      if (!crm.delete(id)) throw new ApiError(404, 'crm_integration not found')
+    },
+    async startCrmHandoff(conversationId) {
+      await wait(latencyMs)
+      const integration = [...crm.values()][0]
+      if (!integration) throw new ApiError(409, 'the project has no active CRM integration')
+      return { id: `handoff-${++seq}`, conversation_id: conversationId, integration_id: integration.id, status: 'open', opened_at: new Date().toISOString() }
     },
 
     async listUsers() {

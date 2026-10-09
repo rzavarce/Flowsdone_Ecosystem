@@ -2,6 +2,10 @@ import { ApiError, apiFetch } from '@/core/http/apiFetch'
 import type { AdminApi } from './AdminApi'
 import type {
   Agent,
+  CrmHandoff,
+  CrmIntegration,
+  CrmIntegrationWithSecrets,
+  CrmTestResult,
   ChannelApp,
   ChannelConnection,
   ContactCard,
@@ -80,6 +84,16 @@ export function createHttpAdminApi(fetchFn?: typeof fetch, baseUrl?: string): Ad
 
     revealChannelAppCredentials: async (provider) =>
       (await call<{ credentials: Record<string, unknown> }>(`/channel-apps/${provider}/credentials`)).credentials,
+
+    listCrmIntegrations: (projectId) =>
+      call<CrmIntegration[]>(projectId ? `/crm-integrations?project_id=${encodeURIComponent(projectId)}` : '/crm-integrations'),
+    createCrmIntegration: (input) => call<CrmIntegrationWithSecrets>('/crm-integrations', 'POST', input),
+    updateCrmIntegration: (id, patch) => call<CrmIntegration>(`/crm-integrations/${id}`, 'PATCH', patch),
+    rotateCrmIntegrationSecrets: (id) => call<CrmIntegrationWithSecrets>(`/crm-integrations/${id}/rotate-secrets`, 'POST'),
+    testCrmIntegration: (id) => call<CrmTestResult>(`/crm-integrations/${id}/test`, 'POST'),
+    deleteCrmIntegration: (id) => call<void>(`/crm-integrations/${id}`, 'DELETE'),
+    startCrmHandoff: (conversationId, reason) =>
+      call<CrmHandoff>('/crm-handoffs', 'POST', { conversation_id: conversationId, reason: reason || null }),
 
     listUsers: () => call<UserRecord[]>('/users'),
     createUser: (input) => call<UserRecord>('/users', 'POST', input),
