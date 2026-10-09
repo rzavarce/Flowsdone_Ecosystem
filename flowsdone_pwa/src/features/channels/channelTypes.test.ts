@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import type { ChannelType } from '@/core/admin/types'
 import { CHANNEL_TYPES, CHANNEL_TYPE_LIST, maskExternalId } from './channelTypes'
 
-const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'telegram', 'tiktok', 'voice', 'webchat']
+const ALL: ChannelType[] = ['facebook', 'instagram', 'twitter', 'whatsapp_evolution', 'whatsapp_360dialog', 'telegram', 'tiktok', 'voice', 'webchat']
 
 describe('catálogo de canales', () => {
-  it('cubre exactamente los ocho canales que soporta el gateway', () => {
+  it('cubre exactamente los nueve canales que soporta el gateway', () => {
     expect(Object.keys(CHANNEL_TYPES).sort()).toEqual([...ALL].sort())
     expect(CHANNEL_TYPE_LIST).toHaveLength(ALL.length)
   })
@@ -18,10 +18,12 @@ describe('catálogo de canales', () => {
     }
   })
 
-  it('solo Facebook e Instagram piden el token de la página (obligatorio); el resto no pide credenciales', () => {
+  it('Facebook e Instagram piden el token de la página, 360dialog su API key (obligatorios); el resto no pide credenciales', () => {
     for (const c of CHANNEL_TYPE_LIST) {
       if (c.type === 'facebook' || c.type === 'instagram') {
         expect(c.credentials).toEqual([expect.objectContaining({ key: 'page_access_token', required: true })])
+      } else if (c.type === 'whatsapp_360dialog') {
+        expect(c.credentials).toEqual([expect.objectContaining({ key: 'api_key', required: true })])
       } else {
         expect(c.credentials).toEqual([])
       }

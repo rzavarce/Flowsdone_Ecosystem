@@ -8,6 +8,7 @@ export type ChannelType =
   | 'instagram'
   | 'twitter'
   | 'whatsapp_evolution'
+  | 'whatsapp_360dialog'
   | 'telegram'
   | 'tiktok'
   | 'voice'

@@ -73,7 +73,12 @@ function channelType(
 }
 
 export const CHANNEL_TYPES: Record<ChannelType, ChannelTypeConfig> = {
-  whatsapp_evolution: channelType('whatsapp_evolution', MessageCircle, 'clinica-vital', { label: 'WhatsApp' }),
+  whatsapp_evolution: channelType('whatsapp_evolution', MessageCircle, 'clinica-vital', { label: 'WhatsApp (Evolution)' }),
+  whatsapp_360dialog: channelType('whatsapp_360dialog', MessageCircle, '34600111222', {
+    label: 'WhatsApp (360dialog)',
+    credentials: ['api_key'],
+    note: true,
+  }),
   webchat: channelType('webchat', Globe, '', { autoKey: true, note: true }),
   telegram: channelType('telegram', Send, '123456789:AA…', { label: 'Telegram', note: true }),
   facebook: channelType('facebook', MessagesSquare, '102030405060708', {
