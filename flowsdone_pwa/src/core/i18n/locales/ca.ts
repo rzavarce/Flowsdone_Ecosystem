@@ -586,6 +586,8 @@ export const ca: Messages<typeof es> = {
       keepCredential: "Deixa-ho buit per conservar l'actual. Si n'escrius un, substitueix l'anterior.",
       allowedOrigins: 'Webs permeses',
       allowedOriginsHint: "Una per línia (p. ex. https://lamevaempresa.com). Buit = qualsevol web pot fer servir el xat.",
+      sandbox: 'Número de sandbox de 360dialog',
+      sandboxHint: "Marca-ho si l'API key és del sandbox (només per a proves: només escriu al teu mòbil).",
       errors: {
         project: 'Tria un projecte.',
         agent: 'Tria un agent.',
@@ -603,8 +605,14 @@ export const ca: Messages<typeof es> = {
       name: 'Nom del projecte',
     },
     types: {
+      whatsapp_360dialog: {
+        label: 'WhatsApp (360dialog)',
+        externalIdLabel: 'Número del negoci',
+        externalIdHint: 'El número connectat a 360dialog, només dígits i amb prefix de país (p. ex. 34600111222).',
+        note: 'En desar, Flowsdone configura el webhook del número a 360dialog automàticament.',
+      },
       whatsapp_evolution: {
-        label: 'WhatsApp',
+        label: 'WhatsApp (Evolution)',
         externalIdLabel: 'Nom de la instància',
         externalIdHint: 'La instància creada a Evolution API.',
         note: '',
@@ -652,6 +660,10 @@ export const ca: Messages<typeof es> = {
         note: '',
       },
       credentials: {
+        api_key: {
+          label: 'API key de 360dialog',
+          hint: "La D360-API-KEY del número (al Hub de 360dialog, o la del sandbox).",
+        },
         page_access_token: {
           label: "Token d'accés de la pàgina",
           hint: "De l'app de Meta, amb permís de missatgeria.",

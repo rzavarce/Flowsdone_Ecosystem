@@ -587,6 +587,8 @@ export const es = {
       keepCredential: 'Déjalo vacío para conservar el actual. Si escribes uno, reemplaza al anterior.',
       allowedOrigins: 'Dominios permitidos',
       allowedOriginsHint: 'Una web por línea (p. ej. https://miempresa.com). Vacío = cualquier web puede usar el chat.',
+      sandbox: 'Número de sandbox de 360dialog',
+      sandboxHint: 'Márcalo si la API key es del sandbox (solo para pruebas: escribe únicamente a tu móvil).',
       errors: {
         project: 'Elige un proyecto.',
         agent: 'Elige un agente.',
@@ -604,8 +606,14 @@ export const es = {
       name: 'Nombre del proyecto',
     },
     types: {
+      whatsapp_360dialog: {
+        label: 'WhatsApp (360dialog)',
+        externalIdLabel: 'Número del negocio',
+        externalIdHint: 'El número conectado en 360dialog, solo dígitos y con prefijo de país (p. ej. 34600111222).',
+        note: 'Al guardar, Flowsdone configura el webhook del número en 360dialog automáticamente.',
+      },
       whatsapp_evolution: {
-        label: 'WhatsApp',
+        label: 'WhatsApp (Evolution)',
         externalIdLabel: 'Nombre de la instancia',
         externalIdHint: 'La instancia creada en Evolution API.',
         note: '',
@@ -653,6 +661,10 @@ export const es = {
         note: '',
       },
       credentials: {
+        api_key: {
+          label: 'API key de 360dialog',
+          hint: 'La D360-API-KEY del número (en el Hub de 360dialog, o la del sandbox).',
+        },
         page_access_token: {
           label: 'Token de acceso de la página',
           hint: 'De la app de Meta, con permiso de mensajería.',

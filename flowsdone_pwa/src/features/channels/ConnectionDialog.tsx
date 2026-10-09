@@ -50,6 +50,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
   const [status, setStatus] = useState(connection?.status ?? 'active')
   const [credentials, setCredentials] = useState<Record<string, string>>({})
   const [origins, setOrigins] = useState(() => originsOf(connection).join('\n'))
+  const [sandbox, setSandbox] = useState(() => connection?.config?.sandbox === true)
   const [submitted, setSubmitted] = useState(false)
 
   // Valores efectivos derivados (sin efectos): si la elección ya no es válida
@@ -66,13 +67,15 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
 
   const type = editing ? connection.channel_type : channelType
   const config = CHANNEL_TYPES[type]
+  // 360dialog identifies the connection by the business number: digits only.
+  const cleanExternalId = type === 'whatsapp_360dialog' ? externalId.replace(/\D/g, '') : externalId.trim()
   const pending = create.isPending || update.isPending
   const error = create.error ?? update.error
 
   const errors = {
     project: !editing && !effectiveProjectId ? t('channels.form.errors.project') : '',
     agent: !effectiveAgentId ? t('channels.form.errors.agent') : '',
-    externalId: !editing && !config.autoKey && !externalId.trim() ? t('common.fieldRequired', { field: config.externalIdLabel }) : '',
+    externalId: !editing && !config.autoKey && !cleanExternalId ? t('common.fieldRequired', { field: config.externalIdLabel }) : '',
     credentials: Object.fromEntries(
       config.credentials.filter((f) => f.required && !editing && !credentials[f.key]?.trim()).map((f) => [f.key, t('common.fieldRequired', { field: f.label })]),
     ) as Record<string, string>,
@@ -84,7 +87,12 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
     setSubmitted(true)
     if (hasErrors) return
     const filled = Object.fromEntries(Object.entries(credentials).filter(([, v]) => v.trim()))
-    const webchatConfig = type === 'webchat' ? { config: { allowed_origins: parseOrigins(origins) } } : {}
+    const typeConfig =
+      type === 'webchat'
+        ? { config: { allowed_origins: parseOrigins(origins) } }
+        : type === 'whatsapp_360dialog'
+          ? { config: { sandbox } }
+          : {}
     try {
       if (editing) {
         await update.mutateAsync({
@@ -94,7 +102,7 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
             display_name: displayName.trim(),
             status,
             ...(Object.keys(filled).length ? { credentials: filled } : {}),
-            ...webchatConfig,
+            ...typeConfig,
           },
         })
       } else {
@@ -102,10 +110,10 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
           project_id: effectiveProjectId,
           agent_id: effectiveAgentId,
           channel_type: channelType,
-          ...(config.autoKey ? {} : { external_id: externalId.trim() }),
+          ...(config.autoKey ? {} : { external_id: cleanExternalId }),
           display_name: displayName.trim() || null,
           ...(Object.keys(filled).length ? { credentials: filled } : {}),
-          ...webchatConfig,
+          ...typeConfig,
         })
       }
       onClose()
@@ -213,6 +221,21 @@ export function ConnectionDialog({ connection, view, onClose }: ConnectionDialog
                 className="w-full rounded-lg border border-input bg-transparent px-4 py-3 font-mono text-sm shadow-theme-xs placeholder:text-muted/70 focus-visible:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/15 focus-visible:outline-none"
               />
             </Field>
+          )}
+
+          {type === 'whatsapp_360dialog' && (
+            <label className="flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={sandbox}
+                onChange={(e) => setSandbox(e.target.checked)}
+                className="mt-0.5 size-4 accent-primary"
+              />
+              <span>
+                {t('channels.form.sandbox')}
+                <span className="block text-xs text-muted">{t('channels.form.sandboxHint')}</span>
+              </span>
+            </label>
           )}
 
           {editing && (
